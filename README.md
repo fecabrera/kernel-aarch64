@@ -23,13 +23,7 @@ Output: `kernel.elf` and `kernel.img`.
 ## Run
 
 ```sh
-qemu-system-aarch64 \
-  -machine virt \
-  -cpu cortex-a710 \
-  -nographic \
-  -kernel kernel.img \
-  -serial mon:stdio \
-  -m 128M
+make run
 ```
 
 Press `Ctrl+A` then `X` to exit QEMU.

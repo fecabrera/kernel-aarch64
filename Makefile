@@ -33,5 +33,14 @@ kernel.elf: $(OBJS) linker.ld
 kernel.img: kernel.elf
 	$(OBJCOPY) -O binary $< $@
 
+run: all
+	qemu-system-aarch64 \
+		-machine virt \
+		-cpu cortex-a710 \
+		-nographic \
+		-kernel kernel.elf \
+		-serial mon:stdio \
+		-m 128M
+
 clean:
 	rm -rf build kernel.elf kernel.img
