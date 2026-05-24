@@ -82,6 +82,7 @@
 #define UART_INT_TX (1 << 5) // Transmit interrupt
 #define UART_INT_RT (1 << 6) // Receive timeout
 
+// DR masks
 #define UART_DR_DATA_MASK 0xFF
 
 // ASCII control characters
