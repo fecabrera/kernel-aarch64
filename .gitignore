@@ -1,0 +1,12 @@
+# binaries
+kernel.elf
+kernel.img
+
+# folders created during make
+build/
+
+# object files
+**/.o
+
+# IDE config
+.vscode/
