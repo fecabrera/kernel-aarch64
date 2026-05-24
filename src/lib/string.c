@@ -8,11 +8,11 @@ size_t strlen(const char *s)
     return n;
 }
 
-int memcmp(const void *ptr1, const void *ptr2, size_t num)
+int memcmp(const void *lhs, const void *rhs, size_t count)
 {
-    const uint8_t *a = ptr1;
-    const uint8_t *b = ptr2;
-    while (num--)
+    const uint8_t *a = lhs;
+    const uint8_t *b = rhs;
+    while (count--)
     {
         if (*a != *b)
             return *a - *b;
@@ -22,70 +22,70 @@ int memcmp(const void *ptr1, const void *ptr2, size_t num)
     return 0;
 }
 
-void *memcpy(void *destination, const void *source, size_t num)
+void *memcpy(void *dest, const void *source, size_t count)
 {
-    uint8_t *d = destination;
+    uint8_t *d = dest;
     const uint8_t *s = source;
-    while (num--)
+    while (count--)
         *d++ = *s++;
-    return destination;
+    return dest;
 }
 
-void *memmove(void *destination, const void *source, size_t num)
+void *memmove(void *dest, const void *source, size_t count)
 {
-    uint8_t *d = destination;
+    uint8_t *d = dest;
     const uint8_t *s = source;
     if (d < s)
-        while (num--)
+        while (count--)
             *d++ = *s++;
     else
     {
-        d += num;
-        s += num;
-        while (num--)
+        d += count;
+        s += count;
+        while (count--)
             *--d = *--s;
     }
-    return destination;
+    return dest;
 }
 
-char *strcpy(char *destination, const char *source)
+char *strcpy(char *dest, const char *source)
 {
-    char *d = destination;
+    char *d = dest;
     while ((*d++ = *source++))
         ;
-    return destination;
+    return dest;
 }
 
-char *strncpy(char *destination, const char *source, size_t num)
+char *strncpy(char *dest, const char *source, size_t count)
 {
-    char *d = destination;
-    while (num && (*d++ = *source++))
-        num--;
-    while (num--)
+    char *d = dest;
+    while (count && (*d++ = *source++))
+        count--;
+    while (count--)
         *d++ = '\0';
-    return destination;
+    return dest;
 }
 
-int strcmp(const char *str1, const char *str2)
+int strcmp(const char *lhs, const char *rhs)
 {
-    while (*str1 && *str1 == *str2)
+    while (*lhs && *lhs == *rhs)
     {
-        str1++;
-        str2++;
+        lhs++;
+        rhs++;
     }
-    return (unsigned char)*str1 - (unsigned char)*str2;
+    return (unsigned char)*lhs - (unsigned char)*rhs;
 }
 
-int strncmp(const char *str1, const char *str2, size_t num)
+int strncmp(const char *lhs, const char *rhs, size_t count)
 {
-    while (num-- && *str1 && *str2)
+    while (count-- && *lhs && *rhs)
     {
-        if (*str1 != *str2)
+        if (*lhs != *rhs)
         {
-            return (unsigned char)*str1 - (unsigned char)*str2;
+            return (unsigned char)*lhs - (unsigned char)*rhs;
         }
-        str1++;
-        str2++;
+        lhs++;
+        rhs++;
     }
     return 0;
 }
