@@ -66,6 +66,14 @@ char *strncpy(char *dest, const char *source, size_t count)
     return dest;
 }
 
+void *memset(void *dest, int ch, size_t count)
+{
+    uint8_t *d = dest;
+    while (count--)
+        *d++ = (uint8_t)ch;
+    return dest;
+}
+
 int strcmp(const char *lhs, const char *rhs)
 {
     while (*lhs && *lhs == *rhs)

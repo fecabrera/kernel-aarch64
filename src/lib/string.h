@@ -71,6 +71,30 @@ int strncmp(const char *lhs, const char *rhs, size_t count);
  ***************************************/
 
 /**
+ * Compares the first count bytes of the objects pointed to by lhs and rhs lexicographically.
+ * The sign of the result is the sign of the difference between the first pair of differing bytes.
+ * Behavior is undefined if either pointer is null or access goes beyond the end of either object.
+ *
+ * @param lhs: pointer to the first object
+ * @param rhs: pointer to the second object
+ * @param count: number of bytes to compare
+ *
+ * @return Negative if lhs < rhs, zero if equal or count is zero, positive if lhs > rhs.
+ */
+int memcmp(const void *lhs, const void *rhs, size_t count);
+
+/**
+ * Fills the first count bytes of the object pointed to by dest with the value ch.
+ *
+ * @param dest: pointer to the object to fill
+ * @param ch: fill byte value (converted to unsigned char)
+ * @param count: number of bytes to fill
+ *
+ * @return dest
+ */
+void *memset(void *dest, int ch, size_t count);
+
+/**
  * Copies count bytes from src to dest. The objects must not overlap.
  *
  * @param dest: pointer to the object to copy to
@@ -91,18 +115,5 @@ void *memcpy(void *dest, const void *src, size_t count);
  * @return dest
  */
 void *memmove(void *dest, const void *src, size_t count);
-
-/**
- * Compares the first count bytes of the objects pointed to by lhs and rhs lexicographically.
- * The sign of the result is the sign of the difference between the first pair of differing bytes.
- * Behavior is undefined if either pointer is null or access goes beyond the end of either object.
- *
- * @param lhs: pointer to the first object
- * @param rhs: pointer to the second object
- * @param count: number of bytes to compare
- *
- * @return Negative if lhs < rhs, zero if equal or count is zero, positive if lhs > rhs.
- */
-int memcmp(const void *lhs, const void *rhs, size_t count);
 
 #endif // INCLUDE_H
