@@ -158,12 +158,22 @@ uint32_t dtb_get_irq_number(const struct fdt_prop *prop, uint32_t index)
     return number;
 }
 
+uint32_t dtb_get_irq_count(const struct fdt_prop *prop)
+{
+    return prop->len / (3 * sizeof(uint32_t));
+}
+
 int dtb_get_uart_irq_number(uint32_t *ptr)
 {
     struct fdt_prop prop;
     int ret = dtb_find_prop("pl011@9000000", "interrupts", &prop);
     if (ret == 0)
     {
+        uint32_t n = dtb_get_irq_count(&prop);
+        uart_puts("Discovered ");
+        uart_put_uint(n);
+        uart_puts(" UART devices\r\n");
+
         *ptr = dtb_get_irq_number(&prop, 0);
     }
     return ret;
@@ -175,6 +185,11 @@ int dtb_get_timer_irq_number(uint32_t *ptr)
     int ret = dtb_find_prop("timer", "interrupts", &prop);
     if (ret == 0)
     {
+        uint32_t n = dtb_get_irq_count(&prop);
+        uart_puts("Discovered ");
+        uart_put_uint(n);
+        uart_puts(" timer devices\r\n");
+
         *ptr = dtb_get_irq_number(&prop, 1); // entry 1 = EL1 physical timer
     }
     return ret;
@@ -186,6 +201,11 @@ int dtb_get_rtc_irq_number(uint32_t *ptr)
     int ret = dtb_find_prop("pl031@9010000", "interrupts", &prop);
     if (ret == 0)
     {
+        uint32_t n = dtb_get_irq_count(&prop);
+        uart_puts("Discovered ");
+        uart_put_uint(n);
+        uart_puts(" RTC devices\r\n");
+
         *ptr = dtb_get_irq_number(&prop, 0);
     }
     return ret;

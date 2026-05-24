@@ -80,6 +80,16 @@ int dtb_find_prop(const char *node_path, const char *prop_name, struct fdt_prop 
 uint32_t dtb_get_irq_number(const struct fdt_prop *prop, uint32_t index);
 
 /**
+ * Returns the number of interrupt entries in an "interrupts" property.
+ * Each entry is 3 cells (type, number, flags) of 4 bytes each.
+ *
+ * @param prop: pointer to a property returned by dtb_find_prop for "interrupts"
+ *
+ * @return Number of interrupt entries in the property.
+ */
+uint32_t dtb_get_irq_count(const struct fdt_prop *prop);
+
+/**
  * Reads the UART0 (pl011@9000000) IRQ number from the DTB and writes it to ptr.
  *
  * @param ptr: output pointer to store the absolute GIC IRQ ID
