@@ -92,11 +92,37 @@
 
 #define RX_BUF_SIZE 1024
 
+/**
+ * Writes a single character to the UART, blocking until the TX FIFO has space.
+ *
+ * @param c: character to transmit
+ */
 void uart_putc(char c);
+
+/**
+ * Writes a null-terminated string to the UART.
+ *
+ * @param s: pointer to the null-terminated string to transmit
+ */
 void uart_puts(const char *s);
+
+/**
+ * Writes an unsigned 64-bit integer to the UART as a decimal string.
+ *
+ * @param n: value to transmit
+ */
 void uart_put_uint(uint64_t n);
 
+/**
+ * Initializes the PL011 UART: sets baud rate to 115200 8N1, enables FIFOs,
+ * unmasks RX interrupts, and registers the IRQ with the GIC.
+ */
 void uart_init();
+
+/**
+ * IRQ handler for UART RX and receive-timeout interrupts.
+ * Drains the RX FIFO into the ring buffer and clears the interrupt flags.
+ */
 void uart_handler();
 
 #endif // UART_H

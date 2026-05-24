@@ -41,7 +41,20 @@ struct fdt_prop
     uint32_t len;
 };
 
+/**
+ * Initializes the DTB parser by validating the magic number and storing
+ * pointers to the structure and strings blocks for subsequent lookups.
+ *
+ * @param dtb_addr: pointer to the DTB blob passed by the bootloader in x0
+ *
+ * @return 0 on success, -1 if the magic number is invalid.
+ */
 int dtb_init(void *dtb_addr);
+
+/**
+ * Walks the DTB structure block and prints every node name and property
+ * (name and byte length) to the UART. Useful for inspecting available hardware.
+ */
 void dtb_dump();
 
 /**

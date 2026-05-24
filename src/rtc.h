@@ -20,11 +20,37 @@
 // Interrupt bits (same bit position in IMSC, RIS, MIS, ICR)
 #define RTC_INT_MATCH (1 << 0) // Match interrupt
 
+/**
+ * Enables the RTC by setting the EN bit in CR and reads the IRQ number from the DTB.
+ */
 void rtc_init();
+
+/**
+ * IRQ handler for the RTC match interrupt.
+ * Clears the interrupt flag and re-masks the interrupt until the next alarm is set.
+ */
 void rtc_irq_handler();
 
+/**
+ * Reads the current time from the RTC data register.
+ *
+ * @return Current Unix timestamp.
+ */
 uint32_t rtc_get_time();
+
+/**
+ * Sets the current time by writing to the RTC load register.
+ *
+ * @param unix_time: Unix timestamp to set
+ */
 void rtc_set_time(uint32_t unix_time);
+
+/**
+ * Sets an alarm to fire at the given Unix timestamp.
+ * Writes to the match register, unmasks the match interrupt, and enables the GIC IRQ.
+ *
+ * @param unix_time: Unix timestamp at which the alarm should fire
+ */
 void rtc_set_alarm(uint32_t unix_time);
 
 #endif // RTC_H

@@ -18,11 +18,40 @@
 #define IRQ_SPI_PL011_UART1 33          // SPI: PL011 UART1
 #define IRQ_SPI_PL031_RTC_ALARM 34      // SPI: PL011 RTC alarm
 
+/**
+ * Installs the exception vector table by writing its address to vbar_el1,
+ * followed by an ISB to ensure the CPU sees the new table immediately.
+ */
 void interrupts_init();
 
+/**
+ * Handles synchronous exceptions (data aborts, instruction aborts, syscalls).
+ * Decodes the exception class from ESR_EL1 and dispatches accordingly.
+ *
+ * @param esr: Exception Syndrome Register value at the time of the exception
+ * @param elr: Exception Link Register — address of the faulting instruction
+ * @param far: Fault Address Register — virtual address that caused the fault
+ * @param ctx: optional context pointer (unused)
+ */
 void sync_handler(uint64_t esr, uint64_t elr, uint64_t far, void *ctx);
+
+/**
+ * Handles IRQ exceptions. Acknowledges the interrupt from the GIC,
+ * dispatches to the appropriate device handler, then signals end of interrupt.
+ *
+ * @param ctx: optional context pointer (unused)
+ */
 void irq_handler(void *ctx);
+
+/**
+ * Handles FIQ exceptions. Currently logs and returns.
+ */
 void fiq_handler();
+
+/**
+ * Handles SError (System Error) exceptions. Logs and halts — SErrors are
+ * typically unrecoverable hardware faults.
+ */
 void serr_handler();
 
 #endif // IRQ_H
