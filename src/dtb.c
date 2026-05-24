@@ -161,7 +161,7 @@ uint32_t dtb_get_uart_irq_number()
 {
     struct fdt_prop prop;
 
-    if (dtb_find_prop("pl011@9000000", "interrupts", &prop) == 0)
+    if (dtb_find_prop("pl011@9000000", "interrupts", &prop) == NULL)
     {
         return dtb_get_irq_number(&prop);
     }
@@ -177,7 +177,7 @@ uint32_t dtb_get_timer_irq_number()
 {
     struct fdt_prop prop;
 
-    if (dtb_find_prop("timer", "interrupts", &prop) == 0)
+    if (dtb_find_prop("timer", "interrupts", &prop) == NULL)
     {
         return dtb_get_irq_number(&prop);
     }
@@ -193,7 +193,7 @@ uint32_t dtb_get_rtc_irq_number()
 {
     struct fdt_prop prop;
 
-    if (dtb_find_prop("pl031@9010000", "interrupts", &prop) == 0)
+    if (dtb_find_prop("pl031@9010000", "interrupts", &prop) == NULL)
     {
         return dtb_get_irq_number(&prop);
     }
