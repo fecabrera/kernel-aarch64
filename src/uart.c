@@ -1,6 +1,9 @@
 #include "uart.h"
 #include "irq.h"
 #include "gic.h"
+#include "dtb.h"
+
+uint32_t uart_irq;
 
 void uart_putc(char c)
 {
@@ -60,8 +63,18 @@ void uart_init()
     // Enable UART, TX, RX
     UART_CR = UART_CR_UARTEN | UART_CR_TXE | UART_CR_RXE;
 
-    gic_enable_irq(IRQ_SPI_PL011_UART0);
-    gic_enable_irq(IRQ_SPI_PL011_UART1);
+    if (dtb_get_uart_irq_number(&uart_irq) == 0)
+    {
+        uart_puts("UART IRQ: ");
+        uart_put_uint(uart_irq);
+        uart_puts("\r\n");
+
+        gic_enable_irq(uart_irq);
+    }
+    else
+    {
+        uart_puts("UART IRQ not found!!");
+    }
 }
 
 void uart_handler()

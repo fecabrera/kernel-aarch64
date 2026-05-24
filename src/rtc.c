@@ -1,11 +1,26 @@
 #include "rtc.h"
 #include "irq.h"
 #include "gic.h"
+#include "dtb.h"
 #include "uart.h"
+
+uint32_t rtc_irq;
 
 void rtc_init()
 {
     RTC_CR = RTC_CR_EN;
+
+    if (dtb_get_rtc_irq_number(&rtc_irq) == 0)
+    {
+
+        uart_puts("RTC IRQ: ");
+        uart_put_uint(rtc_irq);
+        uart_puts("\r\n");
+    }
+    else
+    {
+        uart_puts("RTC IRQ not found!!");
+    }
 }
 
 uint32_t rtc_get_time()
@@ -22,7 +37,8 @@ void rtc_set_alarm(uint32_t unix_time)
 {
     RTC_MR = unix_time;
     RTC_IMSC = RTC_INT_MATCH;
-    gic_enable_irq(IRQ_SPI_PL031_RTC_ALARM);
+
+    gic_enable_irq(rtc_irq);
 }
 
 void rtc_irq_handler()
