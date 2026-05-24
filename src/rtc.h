@@ -17,6 +17,9 @@
 // CR flags
 #define RTC_CR_EN (1 << 0) // RTC enable
 
+// Interrupt bits (same bit position in IMSC, RIS, MIS, ICR)
+#define RTC_INT_MATCH (1 << 0) // Match interrupt
+
 void rtc_init();
 uint32_t rtc_get_time();
 void rtc_set_time(uint32_t unix_time);
