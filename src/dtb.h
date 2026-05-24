@@ -19,6 +19,14 @@ struct fdt_header
     uint32_t size_dt_struct;
 };
 
+// GIC interrupt type encoding in DT "interrupts" cells
+#define DT_IRQ_TYPE_SPI  0  // Shared Peripheral Interrupt
+#define DT_IRQ_TYPE_PPI  1  // Private Peripheral Interrupt
+
+// GIC ID base offsets — DT numbers are relative, add base to get absolute GIC ID
+#define GIC_SPI_BASE 32  // SPIs start at GIC ID 32
+#define GIC_PPI_BASE 16  // PPIs start at GIC ID 16
+
 #define FDT_MAGIC 0xD00DFEED
 #define FDT_BEGIN_NODE 0x00000001
 #define FDT_END_NODE 0x00000002

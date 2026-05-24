@@ -150,10 +150,11 @@ uint32_t dtb_get_irq_number(const struct fdt_prop *prop)
     uint32_t number = be32(cells[1]); // interrupt number
     // uint32_t flags = be32(cells[2]); // trigger type (edge/level)
 
-    if (type == 0)
-        return 32 + number; // SPI
-    if (type == 1)
-        return 16 + number; // PPI
+    if (type == DT_IRQ_TYPE_SPI)
+        return GIC_SPI_BASE + number;
+    if (type == DT_IRQ_TYPE_PPI)
+        return GIC_PPI_BASE + number;
+
     return number;
 }
 
