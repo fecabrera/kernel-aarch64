@@ -26,8 +26,6 @@ Output: `kernel.elf` and `kernel.img`.
 make run
 ```
 
-Press `Ctrl+A` then `X` to exit QEMU.
-
 ## Memory map (QEMU virt)
 
 | Address | Device |

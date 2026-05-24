@@ -37,9 +37,9 @@ run: all
 	qemu-system-aarch64 \
 		-machine virt \
 		-cpu cortex-a710 \
-		-nographic \
 		-kernel kernel.elf \
-		-serial mon:stdio \
+		-serial stdio \
+		-device virtio-gpu-pci \
 		-m 128M
 
 clean:
