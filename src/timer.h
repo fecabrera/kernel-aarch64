@@ -3,9 +3,9 @@
 
 #include <types.h>
 
-#define TIMER_INTERVAL_MS 10 // 10 ms
-
 void timer_init();
 void timer_handler();
+
+void timer_set_interval(uint64_t interval);
 
 #endif // TIMER_H

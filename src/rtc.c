@@ -19,7 +19,7 @@ void rtc_init()
     }
     else
     {
-        uart_puts("RTC IRQ not found!!");
+        uart_puts("RTC IRQ not found!!\r\n");
     }
 }
 
@@ -44,6 +44,7 @@ void rtc_set_alarm(uint32_t unix_time)
 void rtc_irq_handler()
 {
     uart_puts("[rtc] alarm fired!\r\n");
+
     RTC_ICR = RTC_INT_MATCH;   // clear interrupt
     RTC_IMSC = ~RTC_INT_MATCH; // mask
 }

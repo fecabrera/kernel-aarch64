@@ -8,14 +8,15 @@
 static volatile uint64_t ticks = 0;
 
 uint32_t timer_irq;
+uint64_t timer_freq, timer_interval;
 
 void timer_init()
 {
     // Get frequency
-    uint64_t freq = get_cntfrq_el0();
+    timer_freq = get_cntfrq_el0();
 
     // Set timer countdown
-    set_cntp_tval_el0((freq * TIMER_INTERVAL_MS) / 1000);
+    set_cntp_tval_el0((timer_freq * timer_interval) / 1000);
 
     // Enable timer, unmask interrupt
     set_cntp_ctl_el0(CNTP_CTL_ENABLE);
@@ -30,7 +31,7 @@ void timer_init()
     }
     else
     {
-        uart_puts("Timer IRQ not found!!");
+        uart_puts("Timer IRQ not found!!\r\n");
     }
 }
 
@@ -38,9 +39,16 @@ void timer_handler()
 {
     ticks++;
 
-    // Get frequency
-    uint64_t freq = get_cntfrq_el0();
+    if (((timer_interval * ticks) % 1000) == 0)
+    {
+        uart_puts("[timer] 1s elapsed\r\n");
+    }
 
     // Set timer countdown
-    set_cntp_tval_el0((freq * TIMER_INTERVAL_MS) / 1000);
+    set_cntp_tval_el0((timer_freq * timer_interval) / 1000);
+}
+
+void timer_set_interval(uint64_t interval)
+{
+    timer_interval = interval;
 }

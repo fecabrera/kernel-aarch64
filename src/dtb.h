@@ -64,7 +64,7 @@ int dtb_find_prop(const char *node_path, const char *prop_name, struct fdt_prop 
  *
  * @return Absolute GIC IRQ ID.
  */
-uint32_t dtb_get_irq_number(const struct fdt_prop *prop);
+uint32_t dtb_get_irq_number(const struct fdt_prop *prop, uint32_t index);
 
 /**
  * Reads the UART0 (pl011@9000000) IRQ number from the DTB and writes it to ptr.

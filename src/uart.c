@@ -73,7 +73,7 @@ void uart_init()
     }
     else
     {
-        uart_puts("UART IRQ not found!!");
+        uart_puts("UART IRQ not found!!\r\n");
     }
 }
 

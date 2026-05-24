@@ -143,9 +143,9 @@ void dtb_dump()
     }
 }
 
-uint32_t dtb_get_irq_number(const struct fdt_prop *prop)
+uint32_t dtb_get_irq_number(const struct fdt_prop *prop, uint32_t index)
 {
-    const uint32_t *cells = (const uint32_t *)prop->data;
+    const uint32_t *cells = (const uint32_t *)prop->data + index * 3;
     uint32_t type = be32(cells[0]);   // 0=SPI, 1=PPI
     uint32_t number = be32(cells[1]); // interrupt number
     // uint32_t flags = be32(cells[2]); // trigger type (edge/level)
@@ -164,7 +164,7 @@ int dtb_get_uart_irq_number(uint32_t *ptr)
     int ret = dtb_find_prop("pl011@9000000", "interrupts", &prop);
     if (ret == 0)
     {
-        *ptr = dtb_get_irq_number(&prop);
+        *ptr = dtb_get_irq_number(&prop, 0);
     }
     return ret;
 }
@@ -175,7 +175,7 @@ int dtb_get_timer_irq_number(uint32_t *ptr)
     int ret = dtb_find_prop("timer", "interrupts", &prop);
     if (ret == 0)
     {
-        *ptr = dtb_get_irq_number(&prop);
+        *ptr = dtb_get_irq_number(&prop, 1); // entry 1 = EL1 physical timer
     }
     return ret;
 }
@@ -186,7 +186,7 @@ int dtb_get_rtc_irq_number(uint32_t *ptr)
     int ret = dtb_find_prop("pl031@9010000", "interrupts", &prop);
     if (ret == 0)
     {
-        *ptr = dtb_get_irq_number(&prop);
+        *ptr = dtb_get_irq_number(&prop, 0);
     }
     return ret;
 }
