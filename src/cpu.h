@@ -9,6 +9,8 @@ static inline void wfi() { __asm__ volatile("wfi"); }
 static inline void irq_enable() { __asm__ volatile("msr daifclr, #2"); }
 static inline void irq_disable() { __asm__ volatile("msr daifset, #2"); }
 
+void halt();
+
 uint64_t get_cntfrq_el0();
 void set_cntp_tval_el0(const uint64_t value);
 

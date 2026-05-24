@@ -24,3 +24,11 @@ void set_cntp_ctl_el0(const uint64_t value)
 {
     __asm__ volatile("msr cntp_ctl_el0, %0" ::"r"(value));
 }
+
+void halt()
+{
+    while (1)
+    {
+        wfi();
+    }
+}
