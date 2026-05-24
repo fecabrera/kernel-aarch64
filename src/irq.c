@@ -67,6 +67,9 @@ void irq_handler(void *ctx)
     case IRQ_SPI_PL011_UART1:
         uart_handler();
         break;
+    case IRQ_SPI_PL031_RTC_ALARM:
+        rtc_irq_handler();
+        break;
     default:
         uart_puts("[IRQ] Unknown\r\n");
     }

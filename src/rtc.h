@@ -21,7 +21,10 @@
 #define RTC_INT_MATCH (1 << 0) // Match interrupt
 
 void rtc_init();
+void rtc_irq_handler();
+
 uint32_t rtc_get_time();
 void rtc_set_time(uint32_t unix_time);
+void rtc_set_alarm(uint32_t unix_time);
 
 #endif // RTC_H
