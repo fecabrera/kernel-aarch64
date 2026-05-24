@@ -15,20 +15,43 @@ void kernel_main()
     dtb_init((void *)dtb_ptr);
     dtb_dump();
 
-    uint32_t uart_irq = dtb_get_uart_irq_number();
-    uart_puts("UART IRQ: ");
-    uart_put_uint(uart_irq);
-    uart_puts("\r\n");
+    uint32_t uart_irq;
+    if (dtb_get_uart_irq_number(&uart_irq) == 0)
+    {
 
-    uint32_t timer_irq = dtb_get_timer_irq_number();
-    uart_puts("Timer IRQ: ");
-    uart_put_uint(timer_irq);
-    uart_puts("\r\n");
+        uart_puts("UART IRQ: ");
+        uart_put_uint(uart_irq);
+        uart_puts("\r\n");
+    }
+    else
+    {
+        uart_puts("UART IRQ not found!!");
+    }
 
-    uint32_t rtc_irq = dtb_get_rtc_irq_number();
-    uart_puts("RTC IRQ: ");
-    uart_put_uint(rtc_irq);
-    uart_puts("\r\n");
+    uint32_t timer_irq;
+    if (dtb_get_timer_irq_number(&timer_irq) == 0)
+    {
+        uart_puts("Timer IRQ: ");
+        uart_put_uint(timer_irq);
+        uart_puts("\r\n");
+    }
+    else
+    {
+        uart_puts("Timer IRQ not found!!");
+    }
+
+    uint32_t rtc_irq;
+    if (dtb_get_rtc_irq_number(&rtc_irq) == 0)
+    {
+
+        uart_puts("RTC IRQ: ");
+        uart_put_uint(rtc_irq);
+        uart_puts("\r\n");
+    }
+    else
+    {
+        uart_puts("RTC IRQ not found!!");
+    }
 
     gic_init();
     interrupts_init();

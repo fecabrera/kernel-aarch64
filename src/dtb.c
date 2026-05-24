@@ -158,50 +158,35 @@ uint32_t dtb_get_irq_number(const struct fdt_prop *prop)
     return number;
 }
 
-uint32_t dtb_get_uart_irq_number()
+int dtb_get_uart_irq_number(uint32_t *ptr)
 {
     struct fdt_prop prop;
-
-    if (dtb_find_prop("pl011@9000000", "interrupts", &prop) == NULL)
+    int ret = dtb_find_prop("pl011@9000000", "interrupts", &prop);
+    if (ret == 0)
     {
-        return dtb_get_irq_number(&prop);
+        *ptr = dtb_get_irq_number(&prop);
     }
-    else
-    {
-        // halt
-        uart_puts("UART IRQ not found!!");
-        halt();
-    }
+    return ret;
 }
 
-uint32_t dtb_get_timer_irq_number()
+int dtb_get_timer_irq_number(uint32_t *ptr)
 {
     struct fdt_prop prop;
-
-    if (dtb_find_prop("timer", "interrupts", &prop) == NULL)
+    int ret = dtb_find_prop("timer", "interrupts", &prop);
+    if (ret == 0)
     {
-        return dtb_get_irq_number(&prop);
+        *ptr = dtb_get_irq_number(&prop);
     }
-    else
-    {
-        // halt
-        uart_puts("Timer IRQ not found!!");
-        halt();
-    }
+    return ret;
 }
 
-uint32_t dtb_get_rtc_irq_number()
+int dtb_get_rtc_irq_number(uint32_t *ptr)
 {
     struct fdt_prop prop;
-
-    if (dtb_find_prop("pl031@9010000", "interrupts", &prop) == NULL)
+    int ret = dtb_find_prop("pl031@9010000", "interrupts", &prop);
+    if (ret == 0)
     {
-        return dtb_get_irq_number(&prop);
+        *ptr = dtb_get_irq_number(&prop);
     }
-    else
-    {
-        // halt
-        uart_puts("RTC IRQ not found!!");
-        halt();
-    }
+    return ret;
 }
