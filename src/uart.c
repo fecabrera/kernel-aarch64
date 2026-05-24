@@ -1,5 +1,5 @@
 #include "uart.h"
-#include "interrupts.h"
+#include "irq.h"
 #include "gic.h"
 
 void uart_putc(char c)

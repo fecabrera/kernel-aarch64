@@ -1,6 +1,6 @@
 #include "timer.h"
 #include "gic.h"
-#include "interrupts.h"
+#include "irq.h"
 #include "cpu.h"
 
 static volatile uint64_t ticks = 0;

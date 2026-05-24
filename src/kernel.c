@@ -1,7 +1,7 @@
 #include "cpu.h"
 #include "uart.h"
 #include "gic.h"
-#include "interrupts.h"
+#include "irq.h"
 #include "timer.h"
 #include "dtb.h"
 #include "rtc.h"
