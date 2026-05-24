@@ -1,5 +1,5 @@
-#ifndef INTERRUPTS_H
-#define INTERRUPTS_H
+#ifndef IRQ_H
+#define IRQ_H
 
 #include <types.h>
 
@@ -16,6 +16,7 @@
 #define IRQ_PPI_EL1_PHYSICAL_TIMER 30   // PPI: EL1 physical timer
 #define IRQ_SPI_PL011_UART0 32          // SPI: PL011 UART0
 #define IRQ_SPI_PL011_UART1 33          // SPI: PL011 UART1
+#define IRQ_SPI_PL031_RTC_ALARM 34      // SPI: PL011 RTC alarm
 
 void interrupts_init();
 
@@ -24,4 +25,4 @@ void irq_handler(void *ctx);
 void fiq_handler();
 void serr_handler();
 
-#endif // INTERRUPTS_H
+#endif // IRQ_H

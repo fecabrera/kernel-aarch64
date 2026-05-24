@@ -1,9 +1,10 @@
-#include "interrupts.h"
+#include "irq.h"
 #include "uart.h"
 #include "cpu.h"
 #include "gic.h"
 #include "timer.h"
 #include "timer.h"
+#include "rtc.h"
 
 extern void vector_table();
 
