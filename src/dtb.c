@@ -1,7 +1,8 @@
 // dtb.c
 #include <string.h>
 #include "dtb.h"
-#include "uart.h" // for debug prints
+#include "uart.h"
+#include "cpu.h"
 
 // DTB is big-endian, host is little-endian — must swap
 static uint32_t be32(uint32_t x)
@@ -154,4 +155,42 @@ uint32_t dtb_get_irq_number(const struct fdt_prop *prop)
     if (type == 1)
         return 16 + number; // PPI
     return number;
+}
+
+uint32_t dtb_get_uart_irq_number()
+{
+    struct fdt_prop prop;
+
+    if (dtb_find_prop("pl011@9000000", "interrupts", &prop) == 0)
+    {
+        return dtb_get_irq_number(&prop);
+    }
+    else
+    {
+        // halt
+        uart_puts("UART IRQ not found!!");
+        while (1)
+        {
+            wfi();
+        }
+    }
+}
+
+uint32_t dtb_get_timer_irq_number()
+{
+    struct fdt_prop prop;
+
+    if (dtb_find_prop("timer", "interrupts", &prop) == 0)
+    {
+        return dtb_get_irq_number(&prop);
+    }
+    else
+    {
+        // halt
+        uart_puts("Timer IRQ not found!!");
+        while (1)
+        {
+            wfi();
+        }
+    }
 }
