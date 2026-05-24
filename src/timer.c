@@ -37,12 +37,12 @@ void timer_init()
 
 void timer_handler()
 {
-    ticks++;
-
-    if (((timer_interval * ticks) % 1000) == 0)
+    if (ticks == 0)
     {
-        uart_puts("[timer] 1s elapsed\r\n");
+        uart_puts("[timer] first tick!\r\n");
     }
+
+    ticks++;
 
     // Set timer countdown
     set_cntp_tval_el0((timer_freq * timer_interval) / 1000);
