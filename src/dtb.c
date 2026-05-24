@@ -97,6 +97,51 @@ int dtb_find_prop(const char *node_path, const char *prop_name, struct fdt_prop 
     }
 }
 
+void dtb_dump()
+{
+    const uint32_t *p = struct_base;
+    int depth = 0;
+
+    while (1)
+    {
+        uint32_t token = be32(*p++);
+
+        if (token == FDT_BEGIN_NODE)
+        {
+            const char *name = (const char *)p;
+            for (int i = 0; i < depth; i++)
+                uart_puts("  ");
+            uart_puts("[node] ");
+            uart_puts(*name ? name : "/");
+            uart_puts("\r\n");
+            depth++;
+            uint32_t len = strlen(name) + 1;
+            p += (len + 3) / 4;
+        }
+        else if (token == FDT_END_NODE)
+        {
+            depth--;
+        }
+        else if (token == FDT_PROP)
+        {
+            uint32_t len = be32(*p++);
+            uint32_t nameoff = be32(*p++);
+            for (int i = 0; i < depth; i++)
+                uart_puts("  ");
+            uart_puts("  ");
+            uart_puts(strings + nameoff);
+            uart_puts(" (");
+            uart_put_uint(len);
+            uart_puts(" bytes)\r\n");
+            p += (len + 3) / 4;
+        }
+        else if (token == FDT_END)
+        {
+            break;
+        }
+    }
+}
+
 uint32_t dtb_get_irq_number(const struct fdt_prop *prop)
 {
     const uint32_t *cells = (const uint32_t *)prop->data;
