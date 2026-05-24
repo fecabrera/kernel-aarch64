@@ -35,5 +35,6 @@ struct fdt_prop
 
 int dtb_init(void *dtb_addr);
 int dtb_find_prop(const char *node_path, const char *prop_name, struct fdt_prop *out);
+uint32_t dtb_get_irq_number(const struct fdt_prop *prop);
 
 #endif
