@@ -169,10 +169,7 @@ uint32_t dtb_get_uart_irq_number()
     {
         // halt
         uart_puts("UART IRQ not found!!");
-        while (1)
-        {
-            wfi();
-        }
+        halt();
     }
 }
 
@@ -188,9 +185,22 @@ uint32_t dtb_get_timer_irq_number()
     {
         // halt
         uart_puts("Timer IRQ not found!!");
-        while (1)
-        {
-            wfi();
-        }
+        halt();
+    }
+}
+
+uint32_t dtb_get_rtc_irq_number()
+{
+    struct fdt_prop prop;
+
+    if (dtb_find_prop("pl031@9010000", "interrupts", &prop) == 0)
+    {
+        return dtb_get_irq_number(&prop);
+    }
+    else
+    {
+        // halt
+        uart_puts("RTC IRQ not found!!");
+        halt();
     }
 }

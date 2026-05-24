@@ -40,5 +40,6 @@ void dtb_dump();
 uint32_t dtb_get_irq_number(const struct fdt_prop *prop);
 uint32_t dtb_get_uart_irq_number();
 uint32_t dtb_get_timer_irq_number();
+uint32_t dtb_get_rtc_irq_number();
 
 #endif
