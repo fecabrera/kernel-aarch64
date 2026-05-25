@@ -8,7 +8,6 @@
 struct scheduler_entry
 {
     struct process *proc;
-    struct scheduler_entry *prev;
     struct scheduler_entry *next;
 };
 
@@ -19,11 +18,21 @@ struct scheduler_entry
 void scheduler_init();
 
 /**
- * Adds a process to the tail of the run queue.
+ * Adds a process to the tail of the run queue and sets its state to PROC_READY.
  *
- * @param proc: process to enqueue; must be fully initialized (ctx, entry set)
+ * @param proc: process to enqueue; must be fully initialized (ctx and entry set)
+ *
+ * @return pointer to the newly created scheduler entry, or NULL on allocation failure
  */
-void scheduler_enqueue(struct process *proc);
+struct scheduler_entry *scheduler_enqueue(struct process *proc);
+
+/**
+ * Removes the current process from the run queue and sets its state to PROC_DEAD.
+ * The caller must call destroy_process afterwards to free the task stack.
+ *
+ * @return pointer to the dequeued process, or NULL if the queue is empty
+ */
+struct process *scheduler_dequeue();
 
 /**
  * Round-robin scheduler. Advances to the next PROC_READY process in the run

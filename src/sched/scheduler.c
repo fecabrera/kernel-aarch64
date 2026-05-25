@@ -4,7 +4,8 @@
 #include <arch/syscall.h>
 #include "scheduler.h"
 
-struct scheduler_entry *current_entry = NULL;
+struct scheduler_entry *head = NULL;
+struct scheduler_entry *tail = NULL;
 
 void scheduler_init()
 {
@@ -12,60 +13,108 @@ void scheduler_init()
     syscall_register_handler(SYSCALL_YIELD, &yield_handler);
 }
 
-void scheduler_enqueue(struct process *proc)
+static struct scheduler_entry *_enqueue_entry(struct scheduler_entry *entry)
 {
-    proc->state = PROC_READY;
+    entry->next = NULL;
 
-    struct scheduler_entry *entry = (struct scheduler_entry *)kmalloc(sizeof(struct scheduler_entry));
-    entry->proc = proc;
-
-    if (current_entry == NULL)
+    if (head == NULL)
     {
-        entry->prev = entry;
-        entry->next = entry;
-        current_entry = entry;
+        head = tail = entry;
     }
     else
     {
-        entry->prev = current_entry->prev;
-        entry->next = current_entry;
-
-        current_entry->prev->next = entry;
-        current_entry->prev = entry;
+        tail->next = entry;
+        tail = entry;
     }
 
-    uart_puts("[scheduler] pid ");
+    return entry;
+}
+
+static struct scheduler_entry *_dequeue_entry()
+{
+    if (head == NULL)
+    {
+        return NULL;
+    }
+
+    struct scheduler_entry *entry = head;
+    head = entry->next;
+
+    if (head == NULL)
+    {
+        tail = NULL;
+    }
+
+    return entry;
+}
+
+static struct scheduler_entry *_cycle_entry()
+{
+    struct scheduler_entry *entry = _dequeue_entry();
+
+    if (entry == NULL)
+    {
+        return NULL;
+    }
+
+    _enqueue_entry(entry);
+
+    return entry;
+};
+
+struct scheduler_entry *scheduler_enqueue(struct process *proc)
+{
+    struct scheduler_entry *entry = (struct scheduler_entry *)kmalloc(sizeof(struct scheduler_entry));
+
+    if (entry == NULL)
+    {
+        uart_puts("[scheduler] failed to alloc entry!");
+        return NULL;
+    }
+
+    entry->proc = proc;
+    entry->proc->state = PROC_READY;
+
+    uart_puts("[scheduler] enqueue pid ");
+    uart_put_uint(entry->proc->pid);
+    uart_puts("\r\n");
+
+    return _enqueue_entry(entry);
+}
+
+struct process *scheduler_dequeue()
+{
+    struct scheduler_entry *entry = _dequeue_entry();
+
+    if (entry == NULL)
+    {
+        return NULL;
+    }
+
+    struct process *proc = entry->proc;
+    proc->state = PROC_DEAD;
+
+    kfree(entry);
+
+    uart_puts("[scheduler] dequeue pid ");
     uart_put_uint(proc->pid);
-    uart_puts(" queued up\r\n");
+    uart_puts("\r\n");
+
+    return proc;
 }
 
 struct cpu_context *scheduler_handler(struct cpu_context *ctx)
 {
-    if (current_entry == NULL)
+    struct scheduler_entry *entry = _cycle_entry();
+
+    if (entry == NULL)
     {
         // if there are no processes, return the current ctx
         return ctx;
     }
 
-    struct scheduler_entry *next_entry = current_entry;
-
-    do
-    {
-        // get next process
-        next_entry = next_entry->next;
-
-        if (next_entry == current_entry)
-        {
-            // if no other process is ready, return the current ctx
-            return current_entry->proc->ctx;
-        }
-    } while (next_entry->proc->state != PROC_READY);
-
-    // update entries
-    current_entry = next_entry;
-
     // return ctx
-    return current_entry->proc->ctx;
+    return entry->proc->ctx;
 }
 
 struct cpu_context *yield_handler(struct cpu_context *ctx)

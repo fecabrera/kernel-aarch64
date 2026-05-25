@@ -41,13 +41,17 @@ void kernel_init()
     // set up pid 1
     if (create_process(&proc, DEFAULT_STACK_SIZE) < 0)
     {
-        uart_puts("[kernel] out of memory\r\n");
+        uart_puts("[kernel] create_process() failed\r\n");
         hang();
     }
     process_config(&proc, &kernel_proc);
 
     // schedule process
-    scheduler_enqueue(&proc);
+    if (scheduler_enqueue(&proc) == NULL)
+    {
+        uart_puts("[kernel] scheduler_enqueue() failed\r\n");
+        hang();
+    }
 
     // force context switch via syscall
     syscall(SYSCALL_YIELD);

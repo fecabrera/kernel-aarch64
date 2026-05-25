@@ -68,7 +68,7 @@ src/
 
   sched/            — scheduler and process management
     process.c/h     — process struct, create/config/destroy
-    scheduler.c/h   — round-robin run queue, scheduler_enqueue, scheduler_handler
+    scheduler.c/h   — FIFO run queue, scheduler_enqueue/dequeue, round-robin via timer and yield
 ```
 
 ## Memory map (QEMU virt)
