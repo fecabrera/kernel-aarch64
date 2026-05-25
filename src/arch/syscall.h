@@ -5,6 +5,8 @@
 
 #define NUM_SYSCALLS 256
 
+#define SYSCALL_YIELD 0
+
 /**
  * Dispatches a syscall based on the number in ctx->x0.
  * Called from sync_handler when ESR_EC_SVC64 is detected.

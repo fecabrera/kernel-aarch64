@@ -50,7 +50,7 @@ void kernel_init()
     scheduler_enqueue(&proc);
 
     // force context switch via syscall
-    syscall(0);
+    syscall(SYSCALL_YIELD);
 }
 
 void kernel_proc()
