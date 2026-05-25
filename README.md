@@ -47,7 +47,7 @@ src/
 
   arch/             — AArch64-specific
     cpu.c/h         — system register accessors (cntfrq, cntp, DAIF), SPSR defines, halt/hang
-    irq.c/h         — exception handlers, IRQ dispatch table, cpu_context
+    irq.c/h         — exception handlers, IRQ dispatch table, cpu_context, irq_init
 
   drivers/          — MMIO peripheral drivers
     uart.c/h        — PL011 UART

@@ -12,7 +12,7 @@ interrupt_handler irq_table[NUM_IRQS] = {NULL};
 
 // ── Install vector table ────────────────────────────
 
-void interrupts_init()
+void irq_init()
 {
     // Point CPU to our vector table
     __asm__ volatile(

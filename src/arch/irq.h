@@ -47,7 +47,24 @@ typedef struct cpu_context *(*interrupt_handler)(struct cpu_context *);
  * Installs the exception vector table by writing its address to vbar_el1,
  * followed by an ISB to ensure the CPU sees the new table immediately.
  */
-void interrupts_init();
+void irq_init();
+
+/**
+ * Registers a handler for the given GIC IRQ ID.
+ * Overwrites any previously registered handler for that ID.
+ *
+ * @param irq: GIC IRQ ID (0–255)
+ * @param fnc: function to call when the interrupt fires
+ */
+void irq_register_handler(uint32_t irq, interrupt_handler fnc);
+
+/**
+ * Removes the handler for the given GIC IRQ ID.
+ * After this call, unhandled interrupts for that ID will log a warning.
+ *
+ * @param irq: GIC IRQ ID (0–255)
+ */
+void irq_unregister_handler(uint32_t irq);
 
 /**
  * Handles synchronous exceptions (data aborts, instruction aborts, syscalls).
@@ -71,23 +88,6 @@ void sync_handler(uint64_t esr, uint64_t elr, uint64_t far, void *ctx);
  *         the assembly stub writes this into sp before restore_context and eret.
  */
 struct cpu_context *irq_handler(struct cpu_context *ctx);
-
-/**
- * Registers a handler for the given GIC IRQ ID.
- * Overwrites any previously registered handler for that ID.
- *
- * @param irq: GIC IRQ ID (0–255)
- * @param fnc: function to call when the interrupt fires
- */
-void irq_register_handler(uint32_t irq, interrupt_handler fnc);
-
-/**
- * Removes the handler for the given GIC IRQ ID.
- * After this call, unhandled interrupts for that ID will log a warning.
- *
- * @param irq: GIC IRQ ID (0–255)
- */
-void irq_unregister_handler(uint32_t irq);
 
 /**
  * Handles FIQ exceptions. Currently logs and returns.

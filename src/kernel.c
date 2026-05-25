@@ -26,7 +26,7 @@ void kernel_init()
 
     // Initialize interrupts
     gic_init();
-    interrupts_init();
+    irq_init();
     timer_init();
     uart_init();
     rtc_init();
