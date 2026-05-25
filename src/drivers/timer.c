@@ -8,9 +8,12 @@
 
 static volatile uint64_t ticks = 0;
 
-uint32_t timer_irq;
-uint64_t timer_freq;
-uint64_t timer_interval = DEFAULT_TIMER_INTERVAL;
+static uint32_t timer_irq;
+static uint64_t timer_freq;
+static uint64_t timer_interval = DEFAULT_TIMER_INTERVAL;
+
+#define _time_quanta (timer_freq * timer_interval / 1000)
+#define _time_quantum(n) (n * _time_quanta)
 
 void timer_init()
 {
@@ -18,14 +21,14 @@ void timer_init()
     timer_freq = get_cntfrq_el0();
 
     // Set timer countdown
-    set_cntp_tval_el0((timer_freq * timer_interval) / 1000);
+    set_cntp_tval_el0(_time_quantum(1));
 
     // Enable timer, unmask interrupt
     set_cntp_ctl_el0(CNTP_CTL_ENABLE);
 
     if (dtb_get_timer_irq_number(&timer_irq) == 0)
     {
-        uart_puts("Timer IRQ: ");
+        uart_puts("[timer] IRQ: ");
         uart_put_uint(timer_irq);
         uart_puts("\r\n");
 
@@ -34,7 +37,7 @@ void timer_init()
     }
     else
     {
-        uart_puts("Timer IRQ not found!!\r\n");
+        uart_puts("[timer] IRQ not found!!\r\n");
     }
 }
 
@@ -47,7 +50,8 @@ struct cpu_context *timer_irq_handler(struct cpu_context *ctx)
 
     struct cpu_context *next_ctx = scheduler_handler(ctx);
 
-    set_cntp_tval_el0((timer_freq * timer_interval) / 1000);
+    // Set timer countdown
+    set_cntp_tval_el0(_time_quantum(1));
 
     return next_ctx;
 }

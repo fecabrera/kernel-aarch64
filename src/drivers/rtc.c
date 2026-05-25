@@ -12,7 +12,7 @@ void rtc_init()
 
     if (dtb_get_rtc_irq_number(&rtc_irq) == 0)
     {
-        uart_puts("RTC IRQ: ");
+        uart_puts("[rtc] IRQ: ");
         uart_put_uint(rtc_irq);
         uart_puts("\r\n");
 
@@ -20,7 +20,7 @@ void rtc_init()
     }
     else
     {
-        uart_puts("RTC IRQ not found!!\r\n");
+        uart_puts("[rtc] IRQ not found!!\r\n");
     }
 }
 

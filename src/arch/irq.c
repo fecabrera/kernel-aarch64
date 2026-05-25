@@ -55,37 +55,47 @@ void fiq_handler()
     uart_puts("[FIQ]\r\n");
 }
 
-void irq_register_handler(uint32_t irq, interrupt_handler fnc)
+int irq_register_handler(uint32_t irq, interrupt_handler fnc)
 {
     if (irq_table[irq] == NULL)
     {
         irq_table[irq] = fnc;
+
         uart_puts("[irq] Handler registered for IRQ ");
         uart_put_uint(irq);
         uart_puts("!\r\n");
+
+        return 0;
     }
     else
     {
         uart_puts("[irq] There's already a handler registered for IRQ ");
         uart_put_uint(irq);
         uart_puts("!\r\n");
+
+        return -1;
     }
 }
 
-void irq_unregister_handler(uint32_t irq)
+int irq_unregister_handler(uint32_t irq)
 {
     if (irq_table[irq] == NULL)
     {
         uart_puts("[irq] There's no handler registered for IRQ ");
         uart_put_uint(irq);
         uart_puts("!\r\n");
+
+        return -1;
     }
     else
     {
         irq_table[irq] = NULL;
+
         uart_puts("[irq] Handler unregistered for IRQ ");
         uart_put_uint(irq);
         uart_puts("!\r\n");
+
+        return 0;
     }
 }
 

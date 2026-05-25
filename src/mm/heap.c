@@ -183,5 +183,5 @@ void heap_dump()
     uart_puts("  free: ");
     uart_put_uint(free);
     uart_puts(" bytes\r\n");
-    uart_puts("=================\r\n");
+    uart_puts("=================\r\n\r\n");
 }

@@ -1,4 +1,5 @@
 #include <dtb.h>
+#include <arch/cpu.h>
 #include <drivers/uart.h>
 #include "mem.h"
 
@@ -8,11 +9,9 @@ void mem_init()
 {
     if (dtb_get_memory_register(&mem) == 0)
     {
-        uart_puts("Memory base: 0x");
+        uart_puts("[mem] base: 0x");
         uart_put_uint_hex(mem.base);
-        uart_puts("\r\n");
-
-        uart_puts("Memory size: ");
+        uart_puts(", size: ");
         uart_put_uint(mem.size / (1024 * 1024));
         uart_puts(" MiB");
         uart_puts("\r\n");
@@ -20,5 +19,7 @@ void mem_init()
     else
     {
         uart_puts("Memory register not found!");
+
+        hang();
     }
 }

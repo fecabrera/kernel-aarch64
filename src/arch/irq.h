@@ -51,20 +51,23 @@ void irq_init();
 
 /**
  * Registers a handler for the given GIC IRQ ID.
- * Overwrites any previously registered handler for that ID.
  *
  * @param irq: GIC IRQ ID (0–255)
  * @param fnc: function to call when the interrupt fires
+ *
+ * @return 0 on success, -1 if a handler is already registered for that IRQ
  */
-void irq_register_handler(uint32_t irq, interrupt_handler fnc);
+int irq_register_handler(uint32_t irq, interrupt_handler fnc);
 
 /**
  * Removes the handler for the given GIC IRQ ID.
  * After this call, unhandled interrupts for that ID will log a warning.
  *
  * @param irq: GIC IRQ ID (0–255)
+ *
+ * @return 0 on success, -1 if no handler was registered for that IRQ
  */
-void irq_unregister_handler(uint32_t irq);
+int irq_unregister_handler(uint32_t irq);
 
 /**
  * Handles synchronous exceptions (data aborts, instruction aborts, syscalls).

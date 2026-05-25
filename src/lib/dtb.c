@@ -102,6 +102,8 @@ int dtb_find_prop(const char *node_path, const char *prop_name, struct fdt_prop 
 
 void dtb_dump()
 {
+    uart_puts("\r\n=== dtb dump ===\r\n");
+
     const uint32_t *p = struct_base;
     int depth = 0;
 
@@ -143,6 +145,7 @@ void dtb_dump()
             break;
         }
     }
+    uart_puts("=================\r\n\r\n");
 }
 
 int dtb_get_memory_register(struct memreg *ptr)
@@ -185,7 +188,7 @@ int dtb_get_uart_irq_number(uint32_t *ptr)
     if (ret == 0)
     {
         uint32_t n = dtb_get_irq_count(&prop);
-        uart_puts("Discovered ");
+        uart_puts("[dtb] Discovered ");
         uart_put_uint(n);
         uart_puts(" UART devices\r\n");
 
@@ -201,7 +204,7 @@ int dtb_get_timer_irq_number(uint32_t *ptr)
     if (ret == 0)
     {
         uint32_t n = dtb_get_irq_count(&prop);
-        uart_puts("Discovered ");
+        uart_puts("[dtb] Discovered ");
         uart_put_uint(n);
         uart_puts(" timer devices\r\n");
 
@@ -217,7 +220,7 @@ int dtb_get_rtc_irq_number(uint32_t *ptr)
     if (ret == 0)
     {
         uint32_t n = dtb_get_irq_count(&prop);
-        uart_puts("Discovered ");
+        uart_puts("[dtb] Discovered ");
         uart_put_uint(n);
         uart_puts(" RTC devices\r\n");
 
