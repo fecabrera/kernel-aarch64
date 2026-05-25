@@ -87,7 +87,7 @@ void irq_unregister_handler(uint32_t irq)
     }
 }
 
-void irq_handler(void *ctx)
+struct cpu_context *irq_handler(struct cpu_context *ctx)
 {
     // Ask the GIC which interrupt fired (see below)
     uint32_t irq_id = gic_acknowledge();
@@ -105,4 +105,6 @@ void irq_handler(void *ctx)
     }
 
     gic_end_of_interrupt(irq_id);
+
+    return ctx;
 }

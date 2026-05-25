@@ -62,11 +62,16 @@ void sync_handler(uint64_t esr, uint64_t elr, uint64_t far, void *ctx);
 
 /**
  * Handles IRQ exceptions. Acknowledges the interrupt from the GIC,
- * dispatches to the appropriate device handler, then signals end of interrupt.
+ * dispatches to the registered handler in irq_table, then signals end of interrupt.
+ * Called from the IRQ vector stub in vectors.S with the saved register frame.
  *
- * @param ctx: optional context pointer (unused)
+ * @param ctx: pointer to the saved cpu_context on the current task's stack
+ *
+ * @return stack pointer to resume — either ctx (no switch) or a new task's sp
+ *         (context switch). The assembly stub writes this into sp before
+ *         restore_context and eret.
  */
-void irq_handler(void *ctx);
+struct cpu_context *irq_handler(struct cpu_context *ctx);
 
 /**
  * Registers a handler for the given GIC IRQ ID.
