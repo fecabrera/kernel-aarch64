@@ -20,11 +20,6 @@ void uart_puts(const char *s)
     }
 }
 
-void uart_put_uint(uint64_t n)
-{
-    uart_put_uint_base(n, 10);
-}
-
 void uart_put_uint_base(uint64_t n, int base)
 {
     if (n == 0)
@@ -44,6 +39,16 @@ void uart_put_uint_base(uint64_t n, int base)
 
     while (i--)
         uart_putc(buf[i]);
+}
+
+void uart_put_uint(uint64_t n)
+{
+    uart_put_uint_base(n, 10);
+}
+
+void uart_put_uint_hex(uint64_t n)
+{
+    uart_put_uint_base(n, 16);
 }
 
 void uart_init()

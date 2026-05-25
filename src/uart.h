@@ -107,13 +107,6 @@ void uart_putc(char c);
 void uart_puts(const char *s);
 
 /**
- * Writes an unsigned 64-bit integer to the UART as a decimal string.
- *
- * @param n: value to transmit
- */
-void uart_put_uint(uint64_t n);
-
-/**
  * Writes an unsigned 64-bit integer to the UART in the given base.
  * Supports bases 2–16; digits above 9 are lowercase (a–f).
  *
@@ -121,6 +114,21 @@ void uart_put_uint(uint64_t n);
  * @param base: numeric base (e.g. 2, 8, 10, 16)
  */
 void uart_put_uint_base(uint64_t n, int base);
+
+/**
+ * Writes an unsigned 64-bit integer to the UART as a decimal string.
+ *
+ * @param n: value to transmit
+ */
+void uart_put_uint(uint64_t n);
+
+/**
+ * Writes an unsigned 64-bit integer to the UART as a lowercase hex string,
+ * without a leading "0x" prefix.
+ *
+ * @param n: value to transmit
+ */
+void uart_put_uint_hex(uint64_t n);
 
 /**
  * Initializes the PL011 UART: sets baud rate to 115200 8N1, enables FIFOs,
