@@ -4,7 +4,7 @@ OBJCOPY = aarch64-elf-objcopy
 
 CFLAGS  = -ffreestanding -nostdlib -nostdinc \
           -mgeneral-regs-only \
-          -O2 -Wall -Wextra \
+          -O3 -Wall -Wextra \
           -mcpu=cortex-a710 \
           -Isrc \
           -Isrc/lib
