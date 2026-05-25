@@ -15,6 +15,9 @@ void kernel_main()
     dtb_init(dtb_ptr);
     dtb_dump();
 
+    heap_init();
+    heap_dump();
+
     mem_init();
 
     gic_init();
@@ -25,9 +28,6 @@ void kernel_main()
 
     timer_set_interval(10);
     irq_enable();
-
-    heap_init();
-    heap_dump();
 
     uint32_t timestamp = rtc_get_time();
     uart_puts("Current timestamp: ");

@@ -2,9 +2,10 @@
 #include "dtb.h"
 #include "uart.h"
 
+struct memreg mem;
+
 void mem_init()
 {
-    struct memreg mem;
     if (dtb_get_memory_register(&mem) == 0)
     {
         uart_puts("Memory base: 0x");
