@@ -67,9 +67,8 @@ void sync_handler(uint64_t esr, uint64_t elr, uint64_t far, void *ctx);
  *
  * @param ctx: pointer to the saved cpu_context on the current task's stack
  *
- * @return stack pointer to resume — either ctx (no switch) or a new task's sp
- *         (context switch). The assembly stub writes this into sp before
- *         restore_context and eret.
+ * @return pointer to the saved cpu_context of the next task to run;
+ *         the assembly stub writes this into sp before restore_context and eret.
  */
 struct cpu_context *irq_handler(struct cpu_context *ctx);
 
