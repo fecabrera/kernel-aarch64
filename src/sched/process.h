@@ -35,6 +35,8 @@ struct process
  *
  * @param proc: caller-allocated process struct to initialize
  * @param stack_size: size in bytes of the task stack to allocate
+ *
+ * @return 0 on success, -1 if stack allocation fails
  */
 int create_process(struct process *proc, size_t stack_size);
 
@@ -48,12 +50,14 @@ int create_process(struct process *proc, size_t stack_size);
 void process_config(struct process *proc, proc_entry entry);
 
 /**
- * Frees the task stack and marks the process as PROC_DEAD.
- * The caller is responsible for removing the process from any run queue
- * before calling this.
+ * Frees the task stack and nulls out stack and ctx pointers.
+ * Requires the process to have been dequeued via scheduler_dequeue first,
+ * which sets state to PROC_DEAD.
  *
- * @param proc: process to destroy
+ * @param proc: process to destroy; must be in PROC_DEAD state
+ *
+ * @return 0 on success, -1 if proc is not in PROC_DEAD state
  */
-void destroy_process(struct process *proc);
+int destroy_process(struct process *proc);
 
 #endif // PROCESS_H

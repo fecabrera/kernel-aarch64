@@ -32,7 +32,17 @@ void process_config(struct process *proc, proc_entry entry)
     ctx->spsr = SPSR_EL1h;
 }
 
-void destroy_process(struct process *proc)
+int destroy_process(struct process *proc)
 {
+    if (proc->state != PROC_DEAD)
+    {
+        return -1;
+    }
+
     kfree(proc->stack);
+
+    proc->stack = NULL;
+    proc->ctx = NULL;
+
+    return 0;
 }
