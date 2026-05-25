@@ -37,6 +37,20 @@ uint64_t get_cntfrq_el0();
  */
 void set_cntp_tval_el0(const uint64_t value);
 
+// SPSR_EL1 — exception level and stack pointer selection (bits 3:0)
+#define SPSR_EL0t (0x00) // EL0, SP_EL0
+#define SPSR_EL1t (0x04) // EL1, SP_EL0
+#define SPSR_EL1h (0x05) // EL1, SP_EL1 (standard kernel mode)
+#define SPSR_EL2t (0x08) // EL2, SP_EL0
+#define SPSR_EL2h (0x09) // EL2, SP_EL2
+
+// SPSR_EL1 — interrupt mask bits (DAIF, bits 9:6)
+#define SPSR_D (1 << 9) // Debug exceptions masked
+#define SPSR_A (1 << 8) // SError masked
+#define SPSR_I (1 << 7) // IRQ masked
+#define SPSR_F (1 << 6) // FIQ masked
+#define SPSR_MASKS_ALL (SPSR_D | SPSR_A | SPSR_I | SPSR_F)
+
 // cntp_ctl_el0 bits
 #define CNTP_CTL_ENABLE (1 << 0)  // Timer enabled
 #define CNTP_CTL_IMASK (1 << 1)   // Interrupt masked (suppress IRQ)

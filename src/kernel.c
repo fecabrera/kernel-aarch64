@@ -7,8 +7,13 @@
 #include <drivers/rtc.h>
 #include <mm/heap.h>
 #include <mm/mem.h>
+#include <sched/process.h>
+#include <sched/scheduler.h>
+#include "kernel.h"
 
-void kernel_main()
+static struct process proc;
+
+void kernel_init()
 {
     // Initialize DTB
     dtb_init();
@@ -31,6 +36,21 @@ void kernel_main()
     uint32_t timestamp = rtc_get_time();
     rtc_set_alarm(timestamp + 1);
 
-    // Halt
+    // set up pid 1
+    create_process(&proc, DEFAULT_STACK_SIZE);
+    process_config(&proc, &kernel_proc);
+
+    // schedule process
+    scheduler_enqueue(&proc);
+
+    // just one timer interrupt is needed for control to be effectively
+    // handed over to kernel_proc
+    halt();
+}
+
+void kernel_proc()
+{
+    uart_puts("switched control to kernel proc...\r\n");
+
     halt();
 }

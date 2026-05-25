@@ -34,18 +34,19 @@ make run
 - **ARM generic timer** — 10ms tick via EL1 physical timer (PPI 30)
 - **PL031 RTC** — match alarm interrupt
 - **Heap allocator** — first-fit free-list with 4MB region, block splitting, and coalescing (`kmalloc`/`kfree`/`krealloc`)
-- **Exception handling** — full save/restore of all 31 registers + ELR/SPSR; IRQ handlers return `struct cpu_context *` for future context switching
+- **Exception handling** — full save/restore of all 31 registers + ELR/SPSR; IRQ handlers return `struct cpu_context *` for context switching
+- **Preemptive scheduler** — round-robin, timer-driven; dedicated 4KB IRQ stack; `create_process`/`destroy_process` with 16-byte aligned task stacks
 
 ## Source layout
 
 ```
 src/
-  kernel.c          — entry point, init sequence
+  kernel.c          — kernel_init (subsystem bring-up), kernel_proc (pid 1)
   start.S           — AArch64 boot stub, saves DTB pointer, zeros BSS
   vectors.S         — exception vector table, save/restore_context macros
 
   arch/             — AArch64-specific
-    cpu.c/h         — system register accessors (cntfrq, cntp, DAIF)
+    cpu.c/h         — system register accessors (cntfrq, cntp, DAIF), SPSR defines, halt/hang
     irq.c/h         — exception handlers, IRQ dispatch table, cpu_context
 
   drivers/          — MMIO peripheral drivers
@@ -62,6 +63,10 @@ src/
     dtb.c/h         — FDT parser (be32, node/property walker)
     string.c/h      — freestanding string library (memcpy, memset, strcmp, ...)
     types.h         — stdint-style typedefs
+
+  sched/            — scheduler and process management
+    process.c/h     — process struct, create/config/destroy
+    scheduler.c/h   — round-robin run queue, scheduler_enqueue, scheduler_handler
 ```
 
 ## Memory map (QEMU virt)

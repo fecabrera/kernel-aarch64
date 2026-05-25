@@ -21,7 +21,7 @@ _start:
     bl      .zero_bss
 
     // Jump to C
-    bl      kernel_main
+    bl      kernel_init
 
 .hang:
     wfe

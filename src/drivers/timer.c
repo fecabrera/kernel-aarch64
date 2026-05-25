@@ -1,6 +1,7 @@
 #include <dtb.h>
 #include <arch/cpu.h>
 #include <arch/irq.h>
+#include <sched/scheduler.h>
 #include "timer.h"
 #include "gic.h"
 #include "uart.h"
@@ -44,10 +45,11 @@ struct cpu_context *timer_irq_handler(struct cpu_context *ctx)
         uart_puts("[timer] first tick!\r\n");
     }
 
-    // Set timer countdown
+    struct cpu_context *next_ctx = scheduler_handler(ctx);
+
     set_cntp_tval_el0((timer_freq * timer_interval) / 1000);
 
-    return ctx;
+    return next_ctx;
 }
 
 void timer_set_interval(uint64_t interval)
