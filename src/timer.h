@@ -3,6 +3,8 @@
 
 #include <types.h>
 
+#define DEFAULT_TIMER_INTERVAL 10
+
 /**
  * Initializes the ARM generic timer. Reads the timer frequency from cntfrq_el0,
  * sets the countdown from the current interval, enables the timer, and registers

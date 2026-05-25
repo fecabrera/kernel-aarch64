@@ -8,7 +8,8 @@
 static volatile uint64_t ticks = 0;
 
 uint32_t timer_irq;
-uint64_t timer_freq, timer_interval;
+uint64_t timer_freq;
+uint64_t timer_interval = DEFAULT_TIMER_INTERVAL;
 
 void timer_init()
 {
@@ -37,12 +38,10 @@ void timer_init()
 
 void timer_handler()
 {
-    if (ticks == 0)
+    if (ticks++ == 0)
     {
         uart_puts("[timer] first tick!\r\n");
     }
-
-    ticks++;
 
     // Set timer countdown
     set_cntp_tval_el0((timer_freq * timer_interval) / 1000);

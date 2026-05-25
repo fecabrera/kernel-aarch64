@@ -10,29 +10,27 @@
 
 void kernel_main()
 {
+    // Initialize DTB
     dtb_init();
     dtb_dump();
 
+    // Initialize memory
+    mem_init();
     heap_init();
     heap_dump();
 
-    mem_init();
-
+    // Initialize interrupts
     gic_init();
     interrupts_init();
     timer_init();
     uart_init();
     rtc_init();
-
-    timer_set_interval(10);
     irq_enable();
 
+    // Test RTC alarm
     uint32_t timestamp = rtc_get_time();
-    uart_puts("Current timestamp: ");
-    uart_put_uint(timestamp);
-    uart_puts("\r\n");
-
     rtc_set_alarm(timestamp + 1);
 
+    // Halt
     halt();
 }
