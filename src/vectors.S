@@ -95,11 +95,16 @@ b       serr_handler_stub
 
 irq_handler_stub:
     save_context
-    mov     x0, sp              // Pass context pointer to C
-    bl      irq_handler         // Call C handler
-    mov     sp, x0              // switch to new task's stack
-    restore_context             // restores new task's registers
-    eret                        // Return from exception
+    mov     x0, sp
+
+    ldr     x1, =_irq_stack_top
+    mov     sp, x1
+
+    bl      irq_handler
+    
+    mov     sp, x0
+    restore_context
+    eret
 
 sync_handler_stub:
     save_context

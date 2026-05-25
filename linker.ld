@@ -28,8 +28,13 @@ SECTIONS {
 
     . = ALIGN(16);
     _stack_bottom = .;
-    . += 0x4000;            /* 16KB stack */
+    . += 0x4000;            /* 16KB kernel stack */
     _stack_top = .;
+
+    . = ALIGN(16);
+    _irq_stack_bottom = .;
+    . += 0x1000;            /* 4KB IRQ stack */
+    _irq_stack_top = .;
 
     . = ALIGN(16);
     _heap_start = .;
