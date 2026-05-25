@@ -14,7 +14,6 @@ typedef enum
 {
     PROC_CREATED,
     PROC_READY,
-    PROC_RUNNING,
     PROC_BLOCKED,
     PROC_DEAD,
 } proc_state_t;
@@ -30,7 +29,7 @@ struct process
 
 /**
  * Allocates a stack and initializes the process struct with a zeroed context
- * frame. The process is left in PROC_CREATED state; call process_set_entry
+ * frame. The process is left in PROC_CREATED state; call process_config
  * before enqueueing.
  *
  * @param proc: caller-allocated process struct to initialize

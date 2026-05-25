@@ -26,14 +26,14 @@ void scheduler_init();
 void scheduler_enqueue(struct process *proc);
 
 /**
- * Round-robin scheduler. Advances to the next ready process in the run queue
- * and returns its saved context pointer.
+ * Round-robin scheduler. Advances to the next PROC_READY process in the run
+ * queue and returns its saved context pointer.
  * Registered as the timer IRQ callback to preempt the current task each tick.
  *
  * @param ctx: saved context of the currently running process
  *
- * @return saved context of the next process to run; may equal ctx if only one
- *         process is in the queue.
+ * @return saved context of the next process to run; equals ctx if no other
+ *         PROC_READY process exists in the queue.
  */
 struct cpu_context *scheduler_handler(struct cpu_context *ctx);
 

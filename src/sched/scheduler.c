@@ -57,14 +57,9 @@ struct cpu_context *scheduler_handler(struct cpu_context *ctx)
         if (next_entry == current_entry)
         {
             // if no other process is ready, return the current ctx
-            current_entry->proc->state = PROC_RUNNING;
             return current_entry->proc->ctx;
         }
     } while (next_entry->proc->state != PROC_READY);
-
-    // update statuses
-    current_entry->proc->state = PROC_READY;
-    next_entry->proc->state = PROC_RUNNING;
 
     // update entries
     current_entry = next_entry;
