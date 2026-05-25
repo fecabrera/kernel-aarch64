@@ -30,6 +30,7 @@ void kernel_init()
     timer_init();
     uart_init();
     rtc_init();
+    scheduler_init();
     irq_enable();
 
     // Test RTC alarm
@@ -47,10 +48,8 @@ void kernel_init()
     // schedule process
     scheduler_enqueue(&proc);
 
-    // just one timer interrupt is needed for control to be effectively
-    // handed over to kernel_proc, though other interrupts could be
-    // triggered before
-    halt();
+    // force context switch
+    gic_yield();
 }
 
 void kernel_proc()

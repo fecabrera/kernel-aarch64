@@ -10,13 +10,23 @@ void gic_init()
 void gic_enable_irq(uint32_t irq)
 {
     GICD_ISENABLER[irq / 32] = (1 << (irq % 32));
-    GICD_IPRIORITYR[irq / 4] |= (0xA0 << ((irq % 4) * 8)); // Mid priority
-    GICD_ITARGETSR[irq / 4] |= (0x01 << ((irq % 4) * 8));  // Route to CPU 0
+    GICD_IPRIORITYR[irq / 4] |= (GICD_PRIORITY_MID << ((irq % 4) * 8));
+    GICD_ITARGETSR[irq / 4] |= (GICD_TARGET_CPU0 << ((irq % 4) * 8));
+}
+
+void gic_trigger_sgi(uint32_t irq)
+{
+    GICD_SGIR = GICD_SGIR_TARGET_SELF | (irq & 0xF);
+}
+
+void gic_yield()
+{
+    gic_trigger_sgi(GICD_SGIR_IRQ_0);
 }
 
 uint32_t gic_acknowledge()
 {
-    return GICC_IAR & 0x3FF; // Lower 10 bits = IRQ ID
+    return GICC_IAR & GICC_IAR_IRQ_MASK;
 }
 
 void gic_end_of_interrupt(uint32_t irq)

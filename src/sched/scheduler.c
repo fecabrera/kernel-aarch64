@@ -1,8 +1,14 @@
 #include <mm/heap.h>
 #include <drivers/uart.h>
+#include <drivers/gic.h>
 #include "scheduler.h"
 
 struct scheduler_entry *current_entry = NULL;
+
+void scheduler_init()
+{
+    irq_register_handler(GICD_SGIR_IRQ_0, yield_handler);
+}
 
 void scheduler_enqueue(struct process *proc)
 {
@@ -63,4 +69,11 @@ struct cpu_context *scheduler_handler(struct cpu_context *ctx)
 
     // return ctx
     return current_entry->proc->ctx;
+}
+
+struct cpu_context *yield_handler(struct cpu_context *ctx)
+{
+    uart_puts("[scheduler] yield\r\n");
+
+    return scheduler_handler(ctx);
 }
