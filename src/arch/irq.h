@@ -3,6 +3,27 @@
 
 #include <types.h>
 
+struct cpu_context
+{
+    uint64_t x0, x1;   // [sp, #0]
+    uint64_t x2, x3;   // [sp, #16]
+    uint64_t x4, x5;   // [sp, #32]
+    uint64_t x6, x7;   // [sp, #48]
+    uint64_t x8, x9;   // [sp, #64]
+    uint64_t x10, x11; // [sp, #80]
+    uint64_t x12, x13; // [sp, #96]
+    uint64_t x14, x15; // [sp, #112]
+    uint64_t x16, x17; // [sp, #128]
+    uint64_t x18, x19; // [sp, #144]
+    uint64_t x20, x21; // [sp, #160]
+    uint64_t x22, x23; // [sp, #176]
+    uint64_t x24, x25; // [sp, #192]
+    uint64_t x26, x27; // [sp, #208]
+    uint64_t x28, x29; // [sp, #224]
+    uint64_t lr, elr;  // [sp, #240]
+    uint64_t spsr;     // [sp, #256]
+};
+
 // ESR_EL1 exception class fields
 #define ESR_EC_SHIFT 26
 #define ESR_EC_MASK 0x3F
@@ -17,6 +38,10 @@
 #define IRQ_SPI_PL011_UART0 32          // SPI: PL011 UART0
 #define IRQ_SPI_PL011_UART1 33          // SPI: PL011 UART1
 #define IRQ_SPI_PL031_RTC_ALARM 34      // SPI: PL011 RTC alarm
+
+#define NUM_IRQS 256
+
+typedef void (*interrupt_handler)(void *);
 
 /**
  * Installs the exception vector table by writing its address to vbar_el1,
@@ -42,6 +67,23 @@ void sync_handler(uint64_t esr, uint64_t elr, uint64_t far, void *ctx);
  * @param ctx: optional context pointer (unused)
  */
 void irq_handler(void *ctx);
+
+/**
+ * Registers a handler for the given GIC IRQ ID.
+ * Overwrites any previously registered handler for that ID.
+ *
+ * @param irq: GIC IRQ ID (0–255)
+ * @param fnc: function to call when the interrupt fires
+ */
+void irq_register_handler(uint32_t irq, interrupt_handler fnc);
+
+/**
+ * Removes the handler for the given GIC IRQ ID.
+ * After this call, unhandled interrupts for that ID will log a warning.
+ *
+ * @param irq: GIC IRQ ID (0–255)
+ */
+void irq_unregister_handler(uint32_t irq);
 
 /**
  * Handles FIQ exceptions. Currently logs and returns.

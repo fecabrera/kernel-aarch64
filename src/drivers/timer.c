@@ -28,6 +28,7 @@ void timer_init()
         uart_put_uint(timer_irq);
         uart_puts("\r\n");
 
+        irq_register_handler(timer_irq, &timer_irq_handler);
         gic_enable_irq(timer_irq);
     }
     else
@@ -36,7 +37,7 @@ void timer_init()
     }
 }
 
-void timer_handler()
+void timer_irq_handler(void *ctx)
 {
     if (ticks++ == 0)
     {

@@ -80,6 +80,7 @@ void uart_init()
         uart_put_uint(uart_irq);
         uart_puts("\r\n");
 
+        irq_register_handler(uart_irq, &uart_irq_handler);
         gic_enable_irq(uart_irq);
     }
     else
@@ -88,7 +89,7 @@ void uart_init()
     }
 }
 
-void uart_handler()
+void uart_irq_handler(void *ctx)
 {
     // Read all available bytes (RX or timeout interrupt)
     while (!(UART_FR & UART_FR_RXFE))

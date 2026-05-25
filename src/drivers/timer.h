@@ -17,7 +17,7 @@ void timer_init();
  * IRQ handler for the EL1 physical timer. Increments the tick counter,
  * prints a message every second, and reloads the countdown register.
  */
-void timer_handler();
+void timer_irq_handler(void *ctx);
 
 /**
  * Sets the timer tick interval in milliseconds.

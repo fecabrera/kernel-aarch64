@@ -1,3 +1,4 @@
+#include <string.h>
 #include <drivers/uart.h>
 #include <drivers/gic.h>
 #include <drivers/timer.h>
@@ -6,6 +7,8 @@
 #include "cpu.h"
 
 extern void vector_table();
+
+interrupt_handler irq_table[NUM_IRQS] = {NULL};
 
 // ── Install vector table ────────────────────────────
 
@@ -50,27 +53,55 @@ void fiq_handler()
     uart_puts("[FIQ]\r\n");
 }
 
-// ── IRQ handler ─────────────────────────────────────
+void irq_register_handler(uint32_t irq, interrupt_handler fnc)
+{
+    if (irq_table[irq] == NULL)
+    {
+        irq_table[irq] = fnc;
+        uart_puts("[irq] Handler registered for IRQ ");
+        uart_put_uint(irq);
+        uart_puts("!\r\n");
+    }
+    else
+    {
+        uart_puts("[irq] There's already a handler registered for IRQ ");
+        uart_put_uint(irq);
+        uart_puts("!\r\n");
+    }
+}
+
+void irq_unregister_handler(uint32_t irq)
+{
+    if (irq_table[irq] == NULL)
+    {
+        uart_puts("[irq] There's no handler registered for IRQ ");
+        uart_put_uint(irq);
+        uart_puts("!\r\n");
+    }
+    else
+    {
+        irq_table[irq] = NULL;
+        uart_puts("[irq] Handler unregistered for IRQ ");
+        uart_put_uint(irq);
+        uart_puts("!\r\n");
+    }
+}
 
 void irq_handler(void *ctx)
 {
     // Ask the GIC which interrupt fired (see below)
     uint32_t irq_id = gic_acknowledge();
+    interrupt_handler fnc = irq_table[irq_id];
 
-    switch (irq_id)
+    if (fnc == NULL)
     {
-    case IRQ_PPI_EL1_PHYSICAL_TIMER:
-        timer_handler();
-        break;
-    case IRQ_SPI_PL011_UART0:
-    case IRQ_SPI_PL011_UART1:
-        uart_handler();
-        break;
-    case IRQ_SPI_PL031_RTC_ALARM:
-        rtc_irq_handler();
-        break;
-    default:
-        uart_puts("[IRQ] Unknown\r\n");
+        uart_puts("[irq] Handler not found for IRQ ");
+        uart_put_uint(irq_id);
+        uart_puts("!\r\n");
+    }
+    else
+    {
+        (*fnc)(ctx);
     }
 
     gic_end_of_interrupt(irq_id);

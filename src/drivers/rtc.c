@@ -12,10 +12,11 @@ void rtc_init()
 
     if (dtb_get_rtc_irq_number(&rtc_irq) == 0)
     {
-
         uart_puts("RTC IRQ: ");
         uart_put_uint(rtc_irq);
         uart_puts("\r\n");
+
+        irq_register_handler(rtc_irq, &rtc_irq_handler);
     }
     else
     {
@@ -41,7 +42,7 @@ void rtc_set_alarm(uint32_t unix_time)
     gic_enable_irq(rtc_irq);
 }
 
-void rtc_irq_handler()
+void rtc_irq_handler(void *ctx)
 {
     uart_puts("[rtc] alarm fired!\r\n");
 
