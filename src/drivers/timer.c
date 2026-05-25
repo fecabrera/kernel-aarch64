@@ -1,8 +1,8 @@
+#include <dtb.h>
+#include <arch/cpu.h>
+#include <arch/irq.h>
 #include "timer.h"
 #include "gic.h"
-#include "irq.h"
-#include "cpu.h"
-#include "dtb.h"
 #include "uart.h"
 
 static volatile uint64_t ticks = 0;

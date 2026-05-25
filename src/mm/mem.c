@@ -1,6 +1,6 @@
+#include <dtb.h>
+#include <drivers/uart.h>
 #include "mem.h"
-#include "dtb.h"
-#include "uart.h"
 
 struct memreg mem;
 

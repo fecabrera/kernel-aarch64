@@ -1,7 +1,7 @@
+#include <dtb.h>
+#include <arch/irq.h>
 #include "uart.h"
-#include "irq.h"
 #include "gic.h"
-#include "dtb.h"
 
 uint32_t uart_irq;
 

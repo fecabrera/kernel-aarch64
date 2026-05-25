@@ -1,7 +1,7 @@
+#include <dtb.h>
+#include <arch/irq.h>
 #include "rtc.h"
-#include "irq.h"
 #include "gic.h"
-#include "dtb.h"
 #include "uart.h"
 
 uint32_t rtc_irq;

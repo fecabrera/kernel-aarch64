@@ -1,5 +1,5 @@
+#include <drivers/uart.h>
 #include "heap.h"
-#include "uart.h"
 
 static struct block_header *heap_head = 0;
 

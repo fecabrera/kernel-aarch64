@@ -1,8 +1,8 @@
 // dtb.c
 #include <string.h>
-#include "dtb.h"
-#include "uart.h"
-#include "cpu.h"
+#include <dtb.h>
+#include <arch/cpu.h>
+#include <drivers/uart.h>
 
 // DTB is big-endian, host is little-endian — must swap
 static uint32_t be32(uint32_t x)

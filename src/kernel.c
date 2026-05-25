@@ -1,12 +1,12 @@
-#include "cpu.h"
-#include "uart.h"
-#include "gic.h"
-#include "irq.h"
-#include "timer.h"
-#include "dtb.h"
-#include "rtc.h"
-#include "heap.h"
-#include "mem.h"
+#include <dtb.h>
+#include <arch/cpu.h>
+#include <arch/irq.h>
+#include <drivers/uart.h>
+#include <drivers/gic.h>
+#include <drivers/timer.h>
+#include <drivers/rtc.h>
+#include <mm/heap.h>
+#include <mm/mem.h>
 
 void kernel_main()
 {
