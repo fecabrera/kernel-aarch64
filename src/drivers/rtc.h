@@ -29,7 +29,7 @@ void rtc_init();
  * IRQ handler for the RTC match interrupt.
  * Clears the interrupt flag and re-masks the interrupt until the next alarm is set.
  */
-void rtc_irq_handler(void *ctx);
+void rtc_irq_handler(struct cpu_context *ctx);
 
 /**
  * Reads the current time from the RTC data register.

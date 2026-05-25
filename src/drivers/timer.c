@@ -37,7 +37,7 @@ void timer_init()
     }
 }
 
-void timer_irq_handler(void *ctx)
+void timer_irq_handler(struct cpu_context *ctx)
 {
     if (ticks++ == 0)
     {

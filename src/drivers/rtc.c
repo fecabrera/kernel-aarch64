@@ -42,7 +42,7 @@ void rtc_set_alarm(uint32_t unix_time)
     gic_enable_irq(rtc_irq);
 }
 
-void rtc_irq_handler(void *ctx)
+void rtc_irq_handler(struct cpu_context *ctx)
 {
     uart_puts("[rtc] alarm fired!\r\n");
 

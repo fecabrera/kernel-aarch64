@@ -41,7 +41,7 @@ struct cpu_context
 
 #define NUM_IRQS 256
 
-typedef void (*interrupt_handler)(void *);
+typedef void (*interrupt_handler)(struct cpu_context *);
 
 /**
  * Installs the exception vector table by writing its address to vbar_el1,
