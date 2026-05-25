@@ -3,6 +3,9 @@
 
 static struct block_header *heap_head = 0;
 
+extern uint8_t _heap_start[];
+extern uint8_t _heap_end[];
+
 void heap_init()
 {
     heap_head = (struct block_header *)_heap_start;

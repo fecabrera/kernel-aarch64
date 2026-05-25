@@ -18,9 +18,6 @@ struct block_header
 #define BLOCK_FREE 1
 #define BLOCK_USED 0
 
-extern uint8_t _heap_start[];
-extern uint8_t _heap_end[];
-
 /**
  * Initializes the heap allocator. Sets up the entire heap region as a single
  * free block. Must be called before any kmalloc/kfree calls.
