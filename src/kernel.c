@@ -8,11 +8,9 @@
 #include "heap.h"
 #include "mem.h"
 
-extern void *dtb_ptr;
-
 void kernel_main()
 {
-    dtb_init(dtb_ptr);
+    dtb_init();
     dtb_dump();
 
     heap_init();

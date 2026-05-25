@@ -14,9 +14,11 @@ static const struct fdt_header *hdr;
 static const char *strings; // string table base
 static const uint32_t *struct_base;
 
-int dtb_init(void *dtb_addr)
+extern void *dtb_ptr;
+
+int dtb_init()
 {
-    hdr = (const struct fdt_header *)dtb_addr;
+    hdr = (const struct fdt_header *)dtb_ptr;
 
     if (be32(hdr->magic) != FDT_MAGIC)
     {
@@ -24,8 +26,8 @@ int dtb_init(void *dtb_addr)
         return -1;
     }
 
-    strings = (const char *)dtb_addr + be32(hdr->off_dt_strings);
-    struct_base = (const uint32_t *)((uint8_t *)dtb_addr + be32(hdr->off_dt_struct));
+    strings = (const char *)dtb_ptr + be32(hdr->off_dt_strings);
+    struct_base = (const uint32_t *)((uint8_t *)dtb_ptr + be32(hdr->off_dt_struct));
     return 0;
 }
 

@@ -51,11 +51,9 @@ struct fdt_prop
  * Initializes the DTB parser by validating the magic number and storing
  * pointers to the structure and strings blocks for subsequent lookups.
  *
- * @param dtb_addr: pointer to the DTB blob passed by the bootloader in x0
- *
  * @return 0 on success, -1 if the magic number is invalid.
  */
-int dtb_init(void *dtb_addr);
+int dtb_init();
 
 /**
  * Walks the DTB structure block and prints every node name and property
