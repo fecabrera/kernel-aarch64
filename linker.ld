@@ -27,6 +27,7 @@ SECTIONS {
     } :data
 
     . = ALIGN(16);
+    _stack_bottom = .;
     . += 0x4000;            /* 16KB stack */
     _stack_top = .;
 
