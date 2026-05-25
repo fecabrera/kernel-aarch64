@@ -75,6 +75,14 @@ void dtb_dump();
  */
 int dtb_find_prop(const char *node_path, const char *prop_name, struct fdt_prop *out);
 
+/**
+ * Reads the base address and size of the main RAM region from the DTB
+ * memory@40000000 node's reg property and writes them to ptr.
+ *
+ * @param ptr: output struct populated with the physical base address and size in bytes
+ *
+ * @return 0 on success, -1 if the node or property was not found.
+ */
 int dtb_get_memory_register(struct memreg *ptr);
 
 /**

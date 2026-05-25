@@ -6,6 +6,7 @@
 #include "dtb.h"
 #include "rtc.h"
 #include "heap.h"
+#include "mem.h"
 
 extern void *dtb_ptr;
 
@@ -14,22 +15,7 @@ void kernel_main()
     dtb_init(dtb_ptr);
     dtb_dump();
 
-    struct memreg mem;
-    if (dtb_get_memory_register(&mem) == 0)
-    {
-        uart_puts("Memory base: 0x");
-        uart_put_uint_base(mem.base, 16);
-        uart_puts("\r\n");
-
-        uart_puts("Memory size: ");
-        uart_put_uint(mem.size / (1024 * 1024));
-        uart_puts(" MiB");
-        uart_puts("\r\n");
-    }
-    else
-    {
-        uart_puts("Memory register not found!");
-    }
+    mem_init();
 
     gic_init();
     interrupts_init();
