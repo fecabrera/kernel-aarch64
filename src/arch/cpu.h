@@ -9,7 +9,17 @@ static inline void wfi() { __asm__ volatile("wfi"); }
 static inline void irq_enable() { __asm__ volatile("msr daifclr, #2"); }
 static inline void irq_disable() { __asm__ volatile("msr daifset, #2"); }
 
+/**
+ * Halts the CPU in a low-power loop using wfi, waking only to service
+ * interrupts before returning to sleep.
+ */
 void halt();
+
+/**
+ * Spins forever with interrupts disabled. Used for unrecoverable errors
+ * where the system must stop completely.
+ */
+void hang();
 
 /**
  * Reads the timer frequency register (cntfrq_el0).

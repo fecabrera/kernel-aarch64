@@ -32,3 +32,11 @@ void halt()
         wfi();
     }
 }
+
+void hang()
+{
+    while (1)
+    {
+        wfe();
+    }
+}
