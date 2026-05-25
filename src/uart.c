@@ -22,18 +22,24 @@ void uart_puts(const char *s)
 
 void uart_put_uint(uint64_t n)
 {
+    uart_put_uint_base(n, 10);
+}
+
+void uart_put_uint_base(uint64_t n, int base)
+{
     if (n == 0)
     {
         uart_putc('0');
         return;
     }
 
-    char buf[20];
+    static const char digits[] = "0123456789abcdef";
+    char buf[64];
     int i = 0;
     while (n > 0)
     {
-        buf[i++] = '0' + (n % 10);
-        n /= 10;
+        buf[i++] = digits[n % base];
+        n /= base;
     }
 
     while (i--)

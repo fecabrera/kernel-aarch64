@@ -114,6 +114,15 @@ void uart_puts(const char *s);
 void uart_put_uint(uint64_t n);
 
 /**
+ * Writes an unsigned 64-bit integer to the UART in the given base.
+ * Supports bases 2–16; digits above 9 are lowercase (a–f).
+ *
+ * @param n: value to transmit
+ * @param base: numeric base (e.g. 2, 8, 10, 16)
+ */
+void uart_put_uint_base(uint64_t n, int base);
+
+/**
  * Initializes the PL011 UART: sets baud rate to 115200 8N1, enables FIFOs,
  * unmasks RX interrupts, and registers the IRQ with the GIC.
  */
