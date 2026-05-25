@@ -3,8 +3,9 @@
 #include <drivers/gic.h>
 #include <drivers/timer.h>
 #include <drivers/rtc.h>
-#include "irq.h"
 #include "cpu.h"
+#include "irq.h"
+#include "syscall.h"
 
 extern void vector_table();
 
@@ -23,29 +24,30 @@ void irq_init()
 
 // ── ESR_EL1 — decode what caused a sync exception ──
 
-void sync_handler(uint64_t esr, uint64_t elr, uint64_t far, void *ctx)
+struct cpu_context *sync_handler(struct cpu_context *ctx, uint64_t esr, uint64_t elr, uint64_t far)
 {
     uint32_t ec = (esr >> ESR_EC_SHIFT) & ESR_EC_MASK;
 
     switch (ec)
     {
     case ESR_EC_SVC64:
-        uart_puts("[SYNC] Syscall!\r\n");
+        ctx = syscall_handler(ctx);
         break;
     case ESR_EC_DABT_EL0:
-        uart_puts("[SYNC] Data abort!\r\n");
+        uart_puts("[sync] Data abort!\r\n");
         break;
     default:
-        uart_puts("[SYNC] Unknown exception\r\n");
+        uart_puts("[sync] Unknown exception\r\n");
         wfe();
     }
+
+    return ctx;
 }
 
 void serr_handler()
 {
     uart_puts("[SError] System error!\r\n");
-    while (1)
-        ;
+    hang();
 }
 
 void fiq_handler()

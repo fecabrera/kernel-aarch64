@@ -108,11 +108,18 @@ irq_handler_stub:
 
 sync_handler_stub:
     save_context
-    mrs     x0, esr_el1         // Exception Syndrome Register
-    mrs     x1, elr_el1         // Faulting address
-    mrs     x2, far_el1         // Fault Address Register
-    mov     x3, sp
+    mov     x0, sp
+
+    ldr     x1, =_irq_stack_top
+    mov     sp, x1
+
+    mrs     x1, esr_el1         // Exception Syndrome Register
+    mrs     x2, elr_el1         // Faulting address
+    mrs     x3, far_el1         // Fault Address Register
+
     bl      sync_handler
+    
+    mov     sp, x0
     restore_context
     eret
 

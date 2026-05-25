@@ -1,6 +1,7 @@
 #include <dtb.h>
 #include <arch/cpu.h>
 #include <arch/irq.h>
+#include <arch/syscall.h>
 #include <drivers/uart.h>
 #include <drivers/gic.h>
 #include <drivers/timer.h>
@@ -48,8 +49,8 @@ void kernel_init()
     // schedule process
     scheduler_enqueue(&proc);
 
-    // force context switch
-    gic_yield();
+    // force context switch via syscall
+    syscall(0);
 }
 
 void kernel_proc()

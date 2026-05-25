@@ -38,9 +38,9 @@ void scheduler_enqueue(struct process *proc);
 struct cpu_context *scheduler_handler(struct cpu_context *ctx);
 
 /**
- * IRQ handler for SGI 0 (yield). Delegates directly to scheduler_handler
- * to perform an immediate context switch.
- * Registered with irq_register_handler at scheduler_init time.
+ * Performs an immediate context switch by delegating to scheduler_handler.
+ * Registered as the handler for both SGI 0 (gic_yield) and the yield syscall
+ * (syscall_register_handler at scheduler_init time).
  *
  * @param ctx: saved context of the currently running process
  *

@@ -69,13 +69,17 @@ void irq_unregister_handler(uint32_t irq);
 /**
  * Handles synchronous exceptions (data aborts, instruction aborts, syscalls).
  * Decodes the exception class from ESR_EL1 and dispatches accordingly.
+ * For syscalls (ESR_EC_SVC64), may return a different context to perform
+ * a context switch. For faults, hangs or returns ctx unchanged.
  *
+ * @param ctx: pointer to the saved cpu_context on the current task's stack
  * @param esr: Exception Syndrome Register value at the time of the exception
  * @param elr: Exception Link Register — address of the faulting instruction
  * @param far: Fault Address Register — virtual address that caused the fault
- * @param ctx: optional context pointer (unused)
+ *
+ * @return pointer to the saved cpu_context of the next task to run
  */
-void sync_handler(uint64_t esr, uint64_t elr, uint64_t far, void *ctx);
+struct cpu_context *sync_handler(struct cpu_context *ctx, uint64_t esr, uint64_t elr, uint64_t far);
 
 /**
  * Handles IRQ exceptions. Acknowledges the interrupt from the GIC,

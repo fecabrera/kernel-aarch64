@@ -1,13 +1,15 @@
 #include <mm/heap.h>
 #include <drivers/uart.h>
 #include <drivers/gic.h>
+#include <arch/syscall.h>
 #include "scheduler.h"
 
 struct scheduler_entry *current_entry = NULL;
 
 void scheduler_init()
 {
-    irq_register_handler(GICD_SGIR_IRQ_0, yield_handler);
+    irq_register_handler(GICD_SGIR_IRQ_0, &yield_handler);
+    syscall_register_handler(0, &yield_handler);
 }
 
 void scheduler_enqueue(struct process *proc)
