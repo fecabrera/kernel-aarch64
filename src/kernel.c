@@ -27,6 +27,7 @@ void kernel_main()
     irq_enable();
 
     heap_init();
+    heap_dump();
 
     uint32_t timestamp = rtc_get_time();
     uart_puts("Current timestamp: ");
