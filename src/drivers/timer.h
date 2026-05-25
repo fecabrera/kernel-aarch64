@@ -16,8 +16,14 @@ void timer_init();
 /**
  * IRQ handler for the EL1 physical timer. Increments the tick counter,
  * prints a message every second, and reloads the countdown register.
+ * Registered with irq_register_handler at timer_init time.
+ *
+ * @param ctx: saved register frame from the interrupted context
+ *
+ * @return ctx unchanged (no context switch yet); will return the next
+ *         task's stack pointer once a scheduler is attached.
  */
-void timer_irq_handler(struct cpu_context *ctx);
+struct cpu_context *timer_irq_handler(struct cpu_context *ctx);
 
 /**
  * Sets the timer tick interval in milliseconds.

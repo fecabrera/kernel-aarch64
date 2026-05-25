@@ -37,7 +37,7 @@ void timer_init()
     }
 }
 
-void timer_irq_handler(struct cpu_context *ctx)
+struct cpu_context *timer_irq_handler(struct cpu_context *ctx)
 {
     if (ticks++ == 0)
     {
@@ -46,6 +46,8 @@ void timer_irq_handler(struct cpu_context *ctx)
 
     // Set timer countdown
     set_cntp_tval_el0((timer_freq * timer_interval) / 1000);
+
+    return ctx;
 }
 
 void timer_set_interval(uint64_t interval)

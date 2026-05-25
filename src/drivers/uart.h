@@ -139,7 +139,12 @@ void uart_init();
 /**
  * IRQ handler for UART RX and receive-timeout interrupts.
  * Drains the RX FIFO into the ring buffer and clears the interrupt flags.
+ * Registered with irq_register_handler at uart_init time.
+ *
+ * @param ctx: saved register frame from the interrupted context
+ *
+ * @return ctx unchanged (no context switch).
  */
-void uart_irq_handler(struct cpu_context *ctx);
+struct cpu_context *uart_irq_handler(struct cpu_context *ctx);
 
 #endif // UART_H

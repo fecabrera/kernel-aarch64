@@ -101,7 +101,7 @@ struct cpu_context *irq_handler(struct cpu_context *ctx)
     }
     else
     {
-        (*fnc)(ctx);
+        ctx = fnc(ctx);
     }
 
     gic_end_of_interrupt(irq_id);
