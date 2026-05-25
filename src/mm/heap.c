@@ -38,7 +38,7 @@ void *kmalloc(size_t size)
 {
     if (size == 0)
     {
-        return 0;
+        return NULL;
     }
 
     // Align size to 8 bytes
@@ -69,7 +69,7 @@ void *kmalloc(size_t size)
     }
 
     uart_puts("[heap] kmalloc: out of memory!\r\n");
-    return 0;
+    return NULL;
 }
 
 void kfree(void *ptr)

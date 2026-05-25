@@ -4,9 +4,14 @@
 
 uint64_t next_pid = 1;
 
-void create_process(struct process *proc, size_t stack_size)
+int create_process(struct process *proc, size_t stack_size)
 {
     uint8_t *stack = (uint8_t *)kmalloc_aligned(stack_size, 16);
+
+    if (stack == NULL)
+    {
+        return -1;
+    }
 
     struct cpu_context *ctx = (struct cpu_context *)(stack + stack_size - sizeof(struct cpu_context));
     memset(ctx, 0, sizeof(struct cpu_context));
@@ -16,6 +21,8 @@ void create_process(struct process *proc, size_t stack_size)
     proc->ctx = ctx;
     proc->stack = stack;
     proc->stack_size = stack_size;
+
+    return 0;
 }
 
 void process_config(struct process *proc, proc_entry entry)

@@ -36,7 +36,7 @@ struct process
  * @param proc: caller-allocated process struct to initialize
  * @param stack_size: size in bytes of the task stack to allocate
  */
-void create_process(struct process *proc, size_t stack_size);
+int create_process(struct process *proc, size_t stack_size);
 
 /**
  * Configures the process entry point and initial SPSR.

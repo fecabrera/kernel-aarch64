@@ -37,14 +37,19 @@ void kernel_init()
     rtc_set_alarm(timestamp + 1);
 
     // set up pid 1
-    create_process(&proc, DEFAULT_STACK_SIZE);
+    if (create_process(&proc, DEFAULT_STACK_SIZE) < 0)
+    {
+        uart_puts("[kernel] out of memory\r\n");
+        hang();
+    }
     process_config(&proc, &kernel_proc);
 
     // schedule process
     scheduler_enqueue(&proc);
 
     // just one timer interrupt is needed for control to be effectively
-    // handed over to kernel_proc
+    // handed over to kernel_proc, though other interrupts could be
+    // triggered before
     halt();
 }
 
