@@ -34,6 +34,12 @@ struct fdt_header
 #define FDT_NOP 0x00000004
 #define FDT_END 0x00000009
 
+struct memreg
+{
+    uint64_t base;
+    uint64_t size;
+};
+
 // Result of a property lookup
 struct fdt_prop
 {
@@ -68,6 +74,8 @@ void dtb_dump();
  * @return 0 if the property was found, -1 otherwise.
  */
 int dtb_find_prop(const char *node_path, const char *prop_name, struct fdt_prop *out);
+
+int dtb_get_memory_register(struct memreg *ptr);
 
 /**
  * Decodes an absolute GIC IRQ ID from a parsed "interrupts" property.

@@ -143,6 +143,19 @@ void dtb_dump()
     }
 }
 
+int dtb_get_memory_register(struct memreg *ptr)
+{
+    struct fdt_prop prop;
+    int ret = dtb_find_prop("memory@40000000", "reg", &prop);
+    if (ret == 0)
+    {
+        const uint32_t *cells = (const uint32_t *)prop.data;
+        ptr->base = (uint64_t)(be32(cells[0]) << 32) | be32(cells[1]);
+        ptr->size = (uint64_t)(be32(cells[2]) << 32) | be32(cells[3]);
+    }
+    return ret;
+}
+
 uint32_t dtb_get_irq_number(const struct fdt_prop *prop, uint32_t index)
 {
     const uint32_t *cells = (const uint32_t *)prop->data + index * 3;
