@@ -57,4 +57,6 @@ struct cpu_context *scheduler_handler(struct cpu_context *ctx);
  */
 struct cpu_context *yield_handler(struct cpu_context *ctx);
 
+struct cpu_context *exit_handler(struct cpu_context *ctx);
+
 #endif // SCHEDULER_H

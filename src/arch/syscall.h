@@ -5,7 +5,8 @@
 
 #define NUM_SYSCALLS 256
 
-#define SYSCALL_YIELD 24
+#define SYSCALL_EXIT 0
+#define SYSCALL_YIELD 1
 
 /**
  * Dispatches a syscall based on the number in ctx->x0.

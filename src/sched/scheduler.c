@@ -10,6 +10,7 @@ struct scheduler_entry *tail = NULL;
 void scheduler_init()
 {
     irq_register_handler(GICD_SGIR_IRQ_0, &yield_handler);
+    syscall_register_handler(SYSCALL_EXIT, &exit_handler);
     syscall_register_handler(SYSCALL_YIELD, &yield_handler);
 }
 
@@ -126,6 +127,20 @@ struct cpu_context *yield_handler(struct cpu_context *ctx)
     uart_puts(", ctx->x0 = ");
     uart_put_uint(ctx->x0);
     uart_puts("\r\n");
+
+    return scheduler_handler(ctx);
+}
+
+struct cpu_context *exit_handler(struct cpu_context *ctx)
+{
+    uart_puts("[scheduler] exit(), ctx->x0 = ");
+    uart_put_uint(ctx->x0);
+    uart_puts("\r\n");
+
+    struct process *proc = scheduler_dequeue();
+    proc->state = PROC_DEAD;
+
+    destroy_process(proc);
 
     return scheduler_handler(ctx);
 }
