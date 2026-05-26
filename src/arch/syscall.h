@@ -5,7 +5,7 @@
 
 #define NUM_SYSCALLS 256
 
-#define SYSCALL_YIELD 0
+#define SYSCALL_YIELD 24
 
 /**
  * Dispatches a syscall based on the number in ctx->x0.
@@ -41,6 +41,6 @@ void syscall_unregister_handler(uint64_t syscall_id);
  *
  * @param syscall_id: syscall number to invoke (0–NUM_SYSCALLS-1)
  */
-void syscall(uint64_t syscall_id);
+uint64_t syscall(uint64_t syscall_id);
 
 #endif // SYSCALL_H

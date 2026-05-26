@@ -119,7 +119,9 @@ struct cpu_context *scheduler_handler(struct cpu_context *ctx)
 
 struct cpu_context *yield_handler(struct cpu_context *ctx)
 {
-    uart_puts("[scheduler] yield\r\n");
+    uart_puts("[scheduler] yield()\r\n");
+
+    ctx->x0 = 0;
 
     return scheduler_handler(ctx);
 }

@@ -61,9 +61,11 @@ int irq_register_handler(uint32_t irq, interrupt_handler fnc)
     {
         irq_table[irq] = fnc;
 
-        uart_puts("[irq] Handler registered for IRQ ");
+        uart_puts("[irq] handler registered for IRQ ");
         uart_put_uint(irq);
-        uart_puts("!\r\n");
+        uart_puts(", address 0x");
+        uart_put_uint_hex((uintptr_t)fnc);
+        uart_puts("\r\n");
 
         return 0;
     }

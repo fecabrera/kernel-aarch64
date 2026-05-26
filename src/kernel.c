@@ -34,9 +34,16 @@ void kernel_init()
     scheduler_init();
     irq_enable();
 
-    // Test RTC alarm
+    // test RTC alarm
     uint32_t timestamp = rtc_get_time();
     rtc_set_alarm(timestamp + 1);
+
+    // test yield
+    uart_puts("[kernel] testing yield()\r\n");
+    uint64_t result = syscall(SYSCALL_YIELD);
+    uart_puts("[kernel] back from yield(), result = ");
+    uart_put_uint(result);
+    uart_puts("\r\n");
 
     // set up pid 1
     if (create_process(&proc, DEFAULT_STACK_SIZE) < 0)
@@ -54,12 +61,15 @@ void kernel_init()
     }
 
     // force context switch via syscall
-    syscall(SYSCALL_YIELD);
+    result = syscall(SYSCALL_YIELD);
+    uart_puts("[kernel] unexpectedly back from yield(), result = ");
+    uart_put_uint(result);
+    uart_puts("\r\n");
 }
 
 void kernel_proc()
 {
-    uart_puts("switched control to kernel proc...\r\n");
+    uart_puts("[init] taking control...\r\n");
 
     halt();
 }
