@@ -28,17 +28,17 @@ static struct scheduler_entry *_enqueue_entry(struct scheduler_entry *entry)
         tail = entry;
     }
 
-    uart_puts("[scheduler] enqueue(");
-    uart_put_uint(entry->proc->pid);
-    uart_puts("), queue = {");
-    struct scheduler_entry *curr = head;
-    while (curr != NULL)
-    {
-        uart_puts(" ");
-        uart_put_uint(curr->proc->pid);
-        curr = curr->next;
-    }
-    uart_puts(" }\r\n");
+    // uart_puts("[scheduler] enqueue(");
+    // uart_put_uint(entry->proc->pid);
+    // uart_puts("), queue = {");
+    // struct scheduler_entry *curr = head;
+    // while (curr != NULL)
+    // {
+    //     uart_puts(" ");
+    //     uart_put_uint(curr->proc->pid);
+    //     curr = curr->next;
+    // }
+    // uart_puts(" }\r\n");
 
     return entry;
 }
@@ -58,17 +58,17 @@ static struct scheduler_entry *_dequeue_entry()
         tail = NULL;
     }
 
-    uart_puts("[scheduler] dequeue(");
-    uart_put_uint(entry->proc->pid);
-    uart_puts("), queue = {");
-    struct scheduler_entry *curr = head;
-    while (curr != NULL)
-    {
-        uart_puts(" ");
-        uart_put_uint(curr->proc->pid);
-        curr = curr->next;
-    }
-    uart_puts(" }\r\n");
+    // uart_puts("[scheduler] dequeue(");
+    // uart_put_uint(entry->proc->pid);
+    // uart_puts("), queue = {");
+    // struct scheduler_entry *curr = head;
+    // while (curr != NULL)
+    // {
+    //     uart_puts(" ");
+    //     uart_put_uint(curr->proc->pid);
+    //     curr = curr->next;
+    // }
+    // uart_puts(" }\r\n");
 
     return entry;
 }
@@ -157,14 +157,22 @@ struct cpu_context *yield_handler(struct cpu_context *ctx)
 
 struct cpu_context *exit_handler(struct cpu_context *ctx)
 {
-    uart_puts("[scheduler] exit(), ctx->x0 = ");
+    struct process *proc = scheduler_dequeue();
+
+    uart_puts("[scheduler] exit(");
+    uart_put_uint(proc->pid);
+    uart_puts("), ctx->x0 = ");
     uart_put_uint(ctx->x0);
     uart_puts("\r\n");
 
-    struct process *proc = scheduler_dequeue();
     proc->state = PROC_DEAD;
 
-    destroy_process(proc);
+    if (destroy_process(proc) < 0)
+    {
+        uart_puts("[scheduler] failed to destroy process, addr = 0x");
+        uart_put_uint_hex((uintptr_t)proc);
+        uart_puts("\r\n");
+    }
 
     return scheduler_handler(ctx);
 }

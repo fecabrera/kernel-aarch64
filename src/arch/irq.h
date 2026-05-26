@@ -25,11 +25,23 @@ struct cpu_context
 };
 
 // ESR_EL1 exception class fields
+// EC occupies bits [31:26] of ESR_EL1; ISS occupies bits [24:0].
 #define ESR_EC_SHIFT 26
-#define ESR_EC_MASK 0x3F
-#define ESR_EC_SVC64 0x15
-#define ESR_EC_DABT_EL0 0x24
-#define ESR_EC_IABT_EL0 0x20
+#define ESR_EC_MASK  0x3F
+
+// EC values (ARMv8-A Architecture Reference Manual, Table D17-2)
+#define ESR_EC_UNKNOWN      0x00 // Unknown reason
+#define ESR_EC_WFx          0x01 // Trapped WFI or WFE instruction
+#define ESR_EC_FP_ACCESS    0x07 // Trapped access to SVE/SIMD/FP
+#define ESR_EC_ILL_STATE    0x0E // SP alignment fault (SP not 16-byte aligned)
+#define ESR_EC_FP_EXC       0x2C // Trapped floating-point exception
+#define ESR_EC_SVC64        0x15 // SVC executed in AArch64 (syscall entry)
+#define ESR_EC_IABT_EL0     0x20 // Instruction abort from EL0 (page fault)
+#define ESR_EC_IABT_EL1     0x21 // Instruction abort from EL1
+#define ESR_EC_PC_ALIGN     0x22 // PC alignment fault (PC not 4-byte aligned)
+#define ESR_EC_DABT_EL0     0x24 // Data abort from EL0 (page fault / bus error)
+#define ESR_EC_DABT_EL1     0x25 // Data abort from EL1
+#define ESR_EC_SERROR       0x2F // SError interrupt (async system error)
 
 #define IRQ_PPI_EL2_HYPERVISOR_TIMER 27 // PPI: EL2 hypervisor physical timer
 #define IRQ_PPI_EL1_VIRTUAL_TIMER 28    // PPI: EL1 virtual timer

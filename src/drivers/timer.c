@@ -6,8 +6,6 @@
 #include "gic.h"
 #include "uart.h"
 
-static volatile uint64_t ticks = 0;
-
 static uint32_t timer_irq;
 static uint64_t timer_freq;
 static uint64_t timer_interval = DEFAULT_TIMER_INTERVAL;
@@ -43,11 +41,7 @@ void timer_init()
 
 struct cpu_context *timer_irq_handler(struct cpu_context *ctx)
 {
-    if (ticks++ == 0)
-    {
-        uart_puts("[timer] first tick!\r\n");
-    }
-
+    // uart_puts("[timer] tick()\r\n");
     struct cpu_context *next_ctx = scheduler_handler(ctx);
 
     // Set timer countdown

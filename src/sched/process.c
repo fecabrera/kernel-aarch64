@@ -13,7 +13,11 @@ int create_process(struct process *proc, size_t stack_size)
         return -1;
     }
 
-    struct cpu_context *ctx = (struct cpu_context *)(stack + stack_size - sizeof(struct cpu_context));
+    // vectors.S save_context uses a 272-byte frame (sizeof(cpu_context)=264 + 8
+    // bytes padding for 16-byte SP alignment). Place ctx 272 bytes from the top
+    // so that after restore_context's "add sp, sp, #272", sp == stack + stack_size
+    // (16-byte aligned).
+    struct cpu_context *ctx = (struct cpu_context *)(stack + stack_size - 272);
     memset(ctx, 0, sizeof(struct cpu_context));
 
     proc->pid = next_pid++;
