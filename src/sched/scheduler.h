@@ -5,15 +5,8 @@
 #include <arch/irq.h>
 #include "process.h"
 
-struct scheduler_entry
-{
-    struct process *proc;
-    struct scheduler_entry *next;
-};
-
 /**
- * Registers all scheduler syscall handlers. Must be called after
- * before irq_enable().
+ * Registers all scheduler syscall handlers. Must be called before irq_enable().
  *
  * Registered handlers:
  *   SYSCALL_EXIT             → exit_handler
@@ -23,13 +16,15 @@ struct scheduler_entry
 void scheduler_init();
 
 /**
- * Adds a process to the tail of the run queue and sets its state to PROC_READY.
+ * Allocates a queue entry for proc, sets its state to PROC_READY, and adds
+ * it to the tail of the ready queue.
  *
- * @param proc: process to enqueue; must be fully initialized (ctx and entry set)
+ * @param proc: process to enqueue; must be fully initialized (create_process
+ *              and process_config called)
  *
- * @return pointer to the newly created scheduler entry, or NULL on allocation failure
+ * @return 0 on success, -1 on allocation failure
  */
-struct scheduler_entry *scheduler_enqueue(struct process *proc);
+int scheduler_enqueue(struct process *proc);
 
 /**
  * Removes the head of the run queue, marks the process PROC_DEAD, frees the

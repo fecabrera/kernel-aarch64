@@ -41,6 +41,9 @@ void kernel_init()
     // test yield
     uart_puts("[kernel] testing yield()\r\n");
     int64_t result = syscall_yield();
+
+    // since there are no other processes, there's no context switch and we should
+    // be back immediately with the same context
     uart_puts("[kernel] back from yield(), result = ");
     uart_put_uint(result);
     uart_puts("\r\n");
@@ -54,7 +57,7 @@ void kernel_init()
     process_config(&proc1, &init);
 
     // schedule process
-    if (scheduler_enqueue(&proc1) == NULL)
+    if (scheduler_enqueue(&proc1) < 0)
     {
         uart_puts("[kernel] scheduler_enqueue() failed\r\n");
         hang();
@@ -62,6 +65,9 @@ void kernel_init()
 
     // force context switch via syscall
     result = syscall_yield();
+
+    // note that since there are items in the ready queue, this becomes unreachable
+    // @todo: add idle task to run when ready queue is empty, then this becomes reachable
     uart_puts("[kernel] unexpectedly back from yield(), result = ");
     uart_put_uint(result);
     uart_puts("\r\n");
@@ -81,7 +87,7 @@ void init()
     }
     process_config(&proc2, &child);
 
-    if (scheduler_enqueue(&proc2) == NULL)
+    if (scheduler_enqueue(&proc2) < 0)
     {
         uart_puts("[init] scheduler_enqueue() failed\r\n");
         hang();
