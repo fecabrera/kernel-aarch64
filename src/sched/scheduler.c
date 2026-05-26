@@ -10,7 +10,6 @@ struct scheduler_entry *tail = NULL;
 
 void scheduler_init()
 {
-    irq_register_handler(GICD_SGIR_IRQ_0, &yield_handler);
     syscall_register_handler(SYSCALL_EXIT, &exit_handler);
     syscall_register_handler(SYSCALL_YIELD, &yield_handler);
     syscall_register_handler(SYSCALL_GETPID, &getpid_handler);

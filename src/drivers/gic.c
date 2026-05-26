@@ -19,11 +19,6 @@ void gic_trigger_sgi(uint32_t irq)
     GICD_SGIR = GICD_SGIR_TARGET_SELF | (irq & 0xF);
 }
 
-void gic_yield()
-{
-    gic_trigger_sgi(GICD_SGIR_IRQ_0);
-}
-
 uint32_t gic_acknowledge()
 {
     return GICC_IAR & GICC_IAR_IRQ_MASK;

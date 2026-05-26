@@ -12,8 +12,13 @@ struct scheduler_entry
 };
 
 /**
- * Registers the SGI yield handler with the GIC.
- * Must be called after gic_init() and before irq_enable().
+ * Registers all scheduler syscall handlers. Must be called after
+ * before irq_enable().
+ *
+ * Registered handlers:
+ *   SYSCALL_EXIT             → exit_handler
+ *   SYSCALL_YIELD            → yield_handler
+ *   SYSCALL_GETPID           → getpid_handler
  */
 void scheduler_init();
 
@@ -27,36 +32,54 @@ void scheduler_init();
 struct scheduler_entry *scheduler_enqueue(struct process *proc);
 
 /**
- * Removes the current process from the run queue and sets its state to PROC_DEAD.
- * The caller must call destroy_process afterwards to free the task stack.
+ * Removes the head of the run queue, marks the process PROC_DEAD, frees the
+ * scheduler entry, and returns the process pointer. Does not affect `current`.
  *
  * @return pointer to the dequeued process, or NULL if the queue is empty
  */
 struct process *scheduler_dequeue();
 
 /**
- * Round-robin scheduler. Advances to the next PROC_READY process in the run
- * queue and returns its saved context pointer.
- * Registered as the timer IRQ callback to preempt the current task each tick.
+ * FIFO scheduler. Re-enqueues `current` (if non-NULL) at the tail, then
+ * dequeues the head and sets it as the new `current`.
+ * Called by timer_irq_handler on each tick and by yield/exit handlers.
  *
- * @param ctx: saved context of the currently running process
+ * @param ctx: saved context of the calling task (used as fallback if queue is empty)
  *
- * @return saved context of the next process to run; equals ctx if no other
- *         PROC_READY process exists in the queue.
+ * @return saved context of the next task to run; equals ctx if the queue is empty.
  */
 struct cpu_context *scheduler_handler(struct cpu_context *ctx);
 
 /**
- * Performs an immediate context switch by delegating to scheduler_handler.
- * Registered as the handler for both SGI 0 (gic_yield) and the yield syscall
- * (syscall_register_handler at scheduler_init time).
+ * Syscall handler for SYSCALL_EXIT. Terminates `current`: marks it PROC_DEAD,
+ * destroys its stack, nulls `current`, then calls scheduler_handler.
+ * Returns ctx unchanged if no process is currently running.
  *
- * @param ctx: saved context of the currently running process
+ * @param ctx: saved context of the exiting process (ctx->x1 holds the status)
  *
- * @return saved context of the next process to run
+ * @return saved context of the next task to run.
+ */
+struct cpu_context *exit_handler(struct cpu_context *ctx);
+
+/**
+ * Syscall handler for SYSCALL_YIELD. Sets ctx->x0 = 0 (return value seen by
+ * the caller) and delegates to scheduler_handler to pick the next task.
+ *
+ * @param ctx: saved context of the yielding process
+ *
+ * @return saved context of the next task to run.
  */
 struct cpu_context *yield_handler(struct cpu_context *ctx);
 
-struct cpu_context *exit_handler(struct cpu_context *ctx);
+/**
+ * Syscall handler for SYSCALL_GETPID. Writes current->proc->pid into ctx->x0.
+ * Returns -1 in ctx->x0 if no process is currently scheduled.
+ * Does not perform a context switch.
+ *
+ * @param ctx: saved context of the calling process
+ *
+ * @return ctx unchanged.
+ */
+struct cpu_context *getpid_handler(struct cpu_context *ctx);
 
 #endif // SCHEDULER_H

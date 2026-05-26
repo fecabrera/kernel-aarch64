@@ -90,13 +90,6 @@ void gic_enable_irq(uint32_t irq);
 void gic_trigger_sgi(uint32_t irq);
 
 /**
- * Voluntarily yields the CPU by triggering SGI 0 on the current CPU.
- * The SGI fires immediately, causing the scheduler to select the next
- * ready process. Only callable from EL1.
- */
-void gic_yield();
-
-/**
  * Acknowledges the highest-priority pending interrupt and moves it to active state.
  * Must be called at the start of an IRQ handler before processing.
  * Returns 1023 if no real interrupt is pending (spurious).
