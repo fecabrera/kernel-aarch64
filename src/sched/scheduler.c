@@ -28,6 +28,18 @@ static struct scheduler_entry *_enqueue_entry(struct scheduler_entry *entry)
         tail = entry;
     }
 
+    uart_puts("[scheduler] enqueue(");
+    uart_put_uint(entry->proc->pid);
+    uart_puts("), queue = {");
+    struct scheduler_entry *curr = head;
+    while (curr != NULL)
+    {
+        uart_puts(" ");
+        uart_put_uint(curr->proc->pid);
+        curr = curr->next;
+    }
+    uart_puts(" }\r\n");
+
     return entry;
 }
 
@@ -45,6 +57,18 @@ static struct scheduler_entry *_dequeue_entry()
     {
         tail = NULL;
     }
+
+    uart_puts("[scheduler] dequeue(");
+    uart_put_uint(entry->proc->pid);
+    uart_puts("), queue = {");
+    struct scheduler_entry *curr = head;
+    while (curr != NULL)
+    {
+        uart_puts(" ");
+        uart_put_uint(curr->proc->pid);
+        curr = curr->next;
+    }
+    uart_puts(" }\r\n");
 
     return entry;
 }

@@ -59,15 +59,27 @@ void syscall_unregister_handler(uint64_t syscall_id)
     }
 }
 
-uint64_t syscall(uint64_t syscall_id)
+int64_t syscall_yield()
 {
-    uint64_t ret;
+    int64_t ret;
     __asm__ volatile(
         "mov x0, %1\n"
         "svc #0\n"
         "mov %0, x0"
         : "=r"(ret)
-        : "r"(syscall_id)
+        : "r"(SYSCALL_YIELD)
         : "x0");
     return ret;
+}
+
+void syscall_exit(uint64_t status)
+{
+    __asm__ volatile(
+        "mov x0, %0\n"
+        "mov x1, %1\n"
+        "svc #0"
+        :
+        : "r"((uint64_t)SYSCALL_EXIT), "r"(status)
+        : "x0", "x1");
+    __builtin_unreachable();
 }

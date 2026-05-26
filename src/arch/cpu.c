@@ -31,6 +31,7 @@ void halt()
     {
         wfi();
     }
+    __builtin_unreachable();
 }
 
 void hang()
@@ -39,4 +40,5 @@ void hang()
     {
         wfe();
     }
+    __builtin_unreachable();
 }

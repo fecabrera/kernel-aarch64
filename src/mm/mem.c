@@ -18,7 +18,7 @@ void mem_init()
     }
     else
     {
-        uart_puts("Memory register not found!");
+        uart_puts("[mem] Memory register not found!");
 
         hang();
     }

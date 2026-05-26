@@ -36,12 +36,22 @@ void syscall_register_handler(uint64_t syscall_id, interrupt_handler fnc);
 void syscall_unregister_handler(uint64_t syscall_id);
 
 /**
- * Issues a syscall by loading syscall_id into x0 and executing svc #0.
- * Traps into EL1 via the sync exception vector and dispatches through
- * syscall_handler.
+ * Voluntarily yields the CPU to the scheduler via SYSCALL_YIELD (svc #0).
+ * Traps into EL1, where yield_handler sets the return value to 0 in ctx->x0
+ * and calls scheduler_handler to pick the next runnable task. Execution
+ * resumes in the calling task when it is next scheduled.
  *
- * @param syscall_id: syscall number to invoke (0–NUM_SYSCALLS-1)
+ * @return 0 on return from the scheduler.
  */
-uint64_t syscall(uint64_t syscall_id);
+int64_t syscall_yield();
+
+/**
+ * Terminates the calling process via SYSCALL_EXIT (svc #0).
+ * Traps into EL1, where exit_handler marks the process PROC_DEAD, destroys
+ * it, and calls scheduler_handler to run the next task. Does not return.
+ *
+ * @param status: exit status passed in x1 (logged by exit_handler).
+ */
+void syscall_exit(uint64_t status);
 
 #endif // SYSCALL_H
