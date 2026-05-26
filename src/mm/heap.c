@@ -72,11 +72,11 @@ void *kmalloc(size_t size)
     return NULL;
 }
 
-void kfree(void *ptr)
+int kfree(void *ptr)
 {
     if (!ptr)
     {
-        return;
+        return -1;
     }
 
     struct block_header *hdr = (struct block_header *)((uint8_t *)ptr - HEADER_SIZE);
@@ -85,17 +85,18 @@ void kfree(void *ptr)
     if ((uint8_t *)hdr < _heap_start || (uint8_t *)hdr >= _heap_end)
     {
         uart_puts("[heap] kfree: pointer out of range!\r\n");
-        return;
+        return -2;
     }
 
     if (hdr->free)
     {
         uart_puts("[heap] kfree: double free detected!\r\n");
-        return;
+        return -3;
     }
 
     hdr->free = 1;
     merge_free_blocks();
+    return 0;
 }
 
 void *krealloc(void *ptr, size_t new_size)

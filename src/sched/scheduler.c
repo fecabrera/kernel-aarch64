@@ -4,6 +4,7 @@
 #include <arch/syscall.h>
 #include "scheduler.h"
 
+struct scheduler_entry *current = NULL;
 struct scheduler_entry *head = NULL;
 struct scheduler_entry *tail = NULL;
 
@@ -73,20 +74,6 @@ static struct scheduler_entry *_dequeue_entry()
     return entry;
 }
 
-static struct scheduler_entry *_cycle_entry()
-{
-    struct scheduler_entry *entry = _dequeue_entry();
-
-    if (entry == NULL)
-    {
-        return NULL;
-    }
-
-    _enqueue_entry(entry);
-
-    return entry;
-};
-
 struct scheduler_entry *scheduler_enqueue(struct process *proc)
 {
     struct scheduler_entry *entry = (struct scheduler_entry *)kmalloc(sizeof(struct scheduler_entry));
@@ -130,16 +117,24 @@ struct process *scheduler_dequeue()
 
 struct cpu_context *scheduler_handler(struct cpu_context *ctx)
 {
-    struct scheduler_entry *entry = _cycle_entry();
-
-    if (entry == NULL)
+    if (current != NULL)
     {
-        // if there are no processes, return the current ctx
+        _enqueue_entry(current);
+    }
+
+    current = _dequeue_entry();
+    if (current == NULL)
+    {
+        // uart_puts("[scheduler] no process to schedule, returning to kernel\r\n");
         return ctx;
     }
 
+    // uart_puts("[scheduler] context switch to pid ");
+    // uart_put_uint(current->proc->pid);
+    // uart_puts("\r\n");
+
     // return ctx
-    return entry->proc->ctx;
+    return current->proc->ctx;
 }
 
 struct cpu_context *yield_handler(struct cpu_context *ctx)
@@ -157,14 +152,21 @@ struct cpu_context *yield_handler(struct cpu_context *ctx)
 
 struct cpu_context *exit_handler(struct cpu_context *ctx)
 {
-    struct process *proc = scheduler_dequeue();
+    if (current == NULL)
+    {
+        uart_puts("[scheduler] no current process to exit!\r\n");
+        return ctx;
+    }
 
     uart_puts("[scheduler] exit(");
-    uart_put_uint(proc->pid);
+    uart_put_uint(current->proc->pid);
     uart_puts("), ctx->x0 = ");
     uart_put_uint(ctx->x0);
+    uart_puts(", ctx->x1 = ");
+    uart_put_uint(ctx->x1);
     uart_puts("\r\n");
 
+    struct process *proc = current->proc;
     proc->state = PROC_DEAD;
 
     if (destroy_process(proc) < 0)
@@ -173,6 +175,9 @@ struct cpu_context *exit_handler(struct cpu_context *ctx)
         uart_put_uint_hex((uintptr_t)proc);
         uart_puts("\r\n");
     }
+
+    // free current entry
+    current = NULL;
 
     return scheduler_handler(ctx);
 }

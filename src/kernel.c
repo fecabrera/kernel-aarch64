@@ -91,5 +91,5 @@ void child()
 {
     uart_puts("[child] Hello from the child process!\r\n");
 
-    halt();
+    syscall_exit(1);
 }

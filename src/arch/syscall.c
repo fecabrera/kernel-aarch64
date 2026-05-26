@@ -1,4 +1,5 @@
 #include <string.h>
+#include <arch/cpu.h>
 #include <drivers/uart.h>
 #include "syscall.h"
 
@@ -81,5 +82,5 @@ void syscall_exit(uint64_t status)
         :
         : "r"((uint64_t)SYSCALL_EXIT), "r"(status)
         : "x0", "x1");
-    __builtin_unreachable();
+    halt();
 }

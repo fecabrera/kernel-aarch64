@@ -42,11 +42,15 @@ void *kmalloc(size_t size);
 
 /**
  * Frees a previously allocated block and merges adjacent free blocks.
- * Passing NULL is a no-op.
  *
- * @param ptr: pointer returned by kmalloc or krealloc
+ * @param ptr: pointer returned by kmalloc or kmalloc_aligned
+ *
+ * @return  0 on success
+ *         -1 if ptr is NULL
+ *         -2 if ptr is outside the heap region
+ *         -3 if the block was already free (double-free detected)
  */
-void kfree(void *ptr);
+int kfree(void *ptr);
 
 /**
  * Resizes a previously allocated block. Allocates a new block, copies the
