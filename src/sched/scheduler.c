@@ -13,6 +13,7 @@ void scheduler_init()
     irq_register_handler(GICD_SGIR_IRQ_0, &yield_handler);
     syscall_register_handler(SYSCALL_EXIT, &exit_handler);
     syscall_register_handler(SYSCALL_YIELD, &yield_handler);
+    syscall_register_handler(SYSCALL_GETPID, &getpid_handler);
 }
 
 static struct scheduler_entry *_enqueue_entry(struct scheduler_entry *entry)
@@ -180,4 +181,21 @@ struct cpu_context *exit_handler(struct cpu_context *ctx)
     current = NULL;
 
     return scheduler_handler(ctx);
+}
+
+struct cpu_context *getpid_handler(struct cpu_context *ctx)
+{
+    if (current == NULL)
+    {
+        uart_puts("[scheduler] no current process for getpid!\r\n");
+        ctx->x0 = -1;
+        return ctx;
+    }
+
+    uart_puts("[scheduler] getpid(");
+    uart_put_uint(current->proc->pid);
+    uart_puts(")\r\n");
+
+    ctx->x0 = current->proc->pid;
+    return ctx;
 }

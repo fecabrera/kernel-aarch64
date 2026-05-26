@@ -8,6 +8,7 @@ A minimal bare-metal kernel for AArch64, targeting the QEMU `virt` machine.
 - `qemu-system-aarch64`
 
 On macOS:
+
 ```sh
 brew install aarch64-elf-gcc qemu
 ```
@@ -33,23 +34,23 @@ make run
 - **PL011 UART** — interrupt-driven RX, polled TX, 115200 8N1
 - **ARM generic timer** — 10ms tick via EL1 physical timer (PPI 30)
 - **PL031 RTC** — match alarm interrupt
-- **Heap allocator** — first-fit free-list with 4MB region, block splitting, and coalescing (`kmalloc`/`kfree`/`krealloc`)
-- **Exception handling** — full save/restore of all 31 registers + ELR/SPSR; IRQ handlers return `struct cpu_context *` for context switching
-- **Preemptive scheduler** — round-robin, timer-driven; dedicated 4KB IRQ stack; `create_process`/`destroy_process` with 16-byte aligned task stacks
-- **Syscall interface** — `svc #0` dispatch table (`syscall_register_handler`); yield syscall triggers immediate context switch
+- **Heap allocator** — first-fit free-list with 4MB region, block splitting, and coalescing (`kmalloc`/`kfree`/`krealloc`); `kfree` returns error codes for NULL, out-of-range, and double-free
+- **Exception handling** — full save/restore of all 31 registers + ELR/SPSR; IRQ handlers return `struct cpu_context *` for context switching; IABT/DABT terminate the faulting process via `exit_handler`; unknown exceptions dump the full register context
+- **Preemptive scheduler** — FIFO run queue, timer-driven; tracks the running process via a `current` pointer; dedicated 4KB IRQ stack; `create_process`/`destroy_process` with 16-byte aligned task stacks
+- **Syscall interface** — `svc #0` dispatch table (`syscall_register_handler`); `syscall_yield()` triggers an immediate context switch; `syscall_exit(status)` terminates the calling process and schedules the next one; `syscall_getpid()` returns the calling process's PID
 
 ## Source layout
 
 ```
 src/
-  kernel.c          — kernel_init (subsystem bring-up), kernel_proc (pid 1)
+  kernel.c          — kernel_init (subsystem bring-up), init (pid 1), child (pid 2)
   start.S           — AArch64 boot stub, saves DTB pointer, zeros BSS
   vectors.S         — exception vector table, save/restore_context macros
 
   arch/             — AArch64-specific
     cpu.c/h         — system register accessors (cntfrq, cntp, DAIF), SPSR defines, halt/hang
     irq.c/h         — exception handlers, IRQ dispatch table, cpu_context, irq_init
-    syscall.c/h     — syscall dispatch table, syscall_handler, syscall_register_handler
+    syscall.c/h     — syscall dispatch table, syscall_handler, syscall_register_handler, syscall_yield, syscall_exit, syscall_getpid
 
   drivers/          — MMIO peripheral drivers
     uart.c/h        — PL011 UART
@@ -73,10 +74,10 @@ src/
 
 ## Memory map (QEMU virt)
 
-| Address | Device |
-|---------|--------|
+| Address      | Device                         |
+| ------------ | ------------------------------ |
 | `0x40000000` | Kernel load address / RAM base |
-| `0x09000000` | PL011 UART0 |
-| `0x09010000` | PL031 RTC |
-| `0x08000000` | GIC distributor |
-| `0x08010000` | GIC CPU interface |
+| `0x09000000` | PL011 UART0                    |
+| `0x09010000` | PL031 RTC                      |
+| `0x08000000` | GIC distributor                |
+| `0x08010000` | GIC CPU interface              |

@@ -69,7 +69,10 @@ void kernel_init()
 
 void init()
 {
-    uart_puts("[init] taking control...\r\n");
+    uint64_t pid = syscall_getpid();
+    uart_puts("[init] pid = ");
+    uart_put_uint(pid);
+    uart_puts("\r\n");
 
     if (create_process(&proc2, DEFAULT_STACK_SIZE) < 0)
     {
@@ -89,7 +92,10 @@ void init()
 
 void child()
 {
-    uart_puts("[child] Hello from the child process!\r\n");
+    uint64_t pid = syscall_getpid();
+    uart_puts("[child] pid = ");
+    uart_put_uint(pid);
+    uart_puts("\r\n");
 
     syscall_exit(1);
 }

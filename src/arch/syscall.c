@@ -84,3 +84,16 @@ void syscall_exit(uint64_t status)
         : "x0", "x1");
     halt();
 }
+
+uint64_t syscall_getpid()
+{
+    int64_t ret;
+    __asm__ volatile(
+        "mov x0, %1\n"
+        "svc #0\n"
+        "mov %0, x0"
+        : "=r"(ret)
+        : "r"((uint64_t)SYSCALL_GETPID)
+        : "x0");
+    return ret;
+}
