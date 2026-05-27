@@ -62,9 +62,14 @@ src/
     mem.c/h         — reads RAM base/size from DTB at boot
     heap.c/h        — kmalloc/kfree/krealloc/kmalloc_aligned
 
+  dsa/              — generic data structures
+    queue.c/h       — dynamic ring-buffer FIFO queue of uint64_t (queue64_init/push/pop/peek)
+    stack.c/h       — dynamic array-backed LIFO stack of uint64_t (stack64_init/push/pop/peek)
+    deque.c/h       — doubly-linked deque of uint64_t (deque64_add/remove/peek left/right, find, find_remove)
+
   lib/              — architecture-independent libraries
     dtb.c/h         — FDT parser (be32, node/property walker)
-    queue.c/h       — generic intrusive singly-linked FIFO (queue_enqueue/dequeue)
+    queue.c/h       — generic intrusive singly-linked FIFO (unused; superseded by dsa/queue.h)
     string.c/h      — freestanding string library (memcpy, memset, strcmp, ...)
     types.h         — stdint-style typedefs
 
