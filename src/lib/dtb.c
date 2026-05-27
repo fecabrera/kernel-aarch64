@@ -28,6 +28,29 @@ int dtb_init()
 
     strings = (const char *)dtb_ptr + be32(hdr->off_dt_strings);
     struct_base = (const uint32_t *)((uint8_t *)dtb_ptr + be32(hdr->off_dt_struct));
+
+    struct fdt_prop prop;
+    if (dtb_find_prop("", "model", &prop) == 0)
+    {
+        uart_puts("[dtb] model = ");
+        uart_puts((const char *)prop.data);
+        uart_puts("\r\n");
+    }
+    if (dtb_find_prop("", "compatible", &prop) == 0)
+    {
+        const char *s = (const char *)prop.data;
+        const char *end = s + prop.len;
+        uart_puts("[dtb] compatible =");
+        while (s < end)
+        {
+            uart_puts(" \"");
+            uart_puts(s);
+            uart_puts("\"");
+            s += strlen(s) + 1;
+        }
+        uart_puts("\r\n");
+    }
+
     return 0;
 }
 
@@ -190,10 +213,24 @@ int dtb_get_uart_irq_number(uint32_t *ptr)
         uint32_t n = dtb_get_irq_count(&prop);
         uart_puts("[dtb] Discovered ");
         uart_put_uint(n);
-        uart_puts(" UART devices\r\n");
+        uart_puts(" UART devices");
 
         *ptr = dtb_get_irq_number(&prop, 0);
     }
+    if (dtb_find_prop("pl011@90000000", "compatible", &prop) == 0)
+    {
+        const char *s = (const char *)prop.data;
+        const char *end = s + prop.len;
+        uart_puts(", compatible =");
+        while (s < end)
+        {
+            uart_puts(" \"");
+            uart_puts(s);
+            uart_puts("\"");
+            s += strlen(s) + 1;
+        }
+    }
+    uart_puts("\r\n");
     return ret;
 }
 
@@ -206,10 +243,24 @@ int dtb_get_timer_irq_number(uint32_t *ptr)
         uint32_t n = dtb_get_irq_count(&prop);
         uart_puts("[dtb] Discovered ");
         uart_put_uint(n);
-        uart_puts(" timer devices\r\n");
+        uart_puts(" timer devices");
 
         *ptr = dtb_get_irq_number(&prop, 1); // entry 1 = EL1 physical timer
     }
+    if (dtb_find_prop("timer", "compatible", &prop) == 0)
+    {
+        const char *s = (const char *)prop.data;
+        const char *end = s + prop.len;
+        uart_puts(", compatible =");
+        while (s < end)
+        {
+            uart_puts(" \"");
+            uart_puts(s);
+            uart_puts("\"");
+            s += strlen(s) + 1;
+        }
+    }
+    uart_puts("\r\n");
     return ret;
 }
 
@@ -222,9 +273,23 @@ int dtb_get_rtc_irq_number(uint32_t *ptr)
         uint32_t n = dtb_get_irq_count(&prop);
         uart_puts("[dtb] Discovered ");
         uart_put_uint(n);
-        uart_puts(" RTC devices\r\n");
+        uart_puts(" RTC devices");
 
         *ptr = dtb_get_irq_number(&prop, 0);
     }
+    if (dtb_find_prop("pl031@9010000", "compatible", &prop) == 0)
+    {
+        const char *s = (const char *)prop.data;
+        const char *end = s + prop.len;
+        uart_puts(", compatible =");
+        while (s < end)
+        {
+            uart_puts(" \"");
+            uart_puts(s);
+            uart_puts("\"");
+            s += strlen(s) + 1;
+        }
+    }
+    uart_puts("\r\n");
     return ret;
 }

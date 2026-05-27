@@ -76,7 +76,7 @@ void uart_init()
 
     if (dtb_get_uart_irq_number(&uart_irq) == 0)
     {
-        uart_puts("[uart] IRQ: ");
+        uart_puts("[uart] Initializing IRQ: ");
         uart_put_uint(uart_irq);
         uart_puts("\r\n");
 

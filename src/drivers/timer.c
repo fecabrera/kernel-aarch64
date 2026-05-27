@@ -26,7 +26,7 @@ void timer_init()
 
     if (dtb_get_timer_irq_number(&timer_irq) == 0)
     {
-        uart_puts("[timer] IRQ: ");
+        uart_puts("[timer] Initializing IRQ: ");
         uart_put_uint(timer_irq);
         uart_puts("\r\n");
 
