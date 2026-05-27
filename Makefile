@@ -9,7 +9,7 @@ CFLAGS  = -ffreestanding -nostdlib -nostdinc \
           -Isrc \
           -Isrc/lib
 
-SRCS := $(wildcard src/*.c src/*.S src/lib/*.c src/drivers/*.c src/arch/*.c src/mm/*.c src/sched/*.c )
+SRCS := $(wildcard src/*.c src/*.S src/lib/*.c src/dsa/*.c src/drivers/*.c src/arch/*.c src/mm/*.c src/sched/*.c )
 OBJS := $(patsubst src/%, build/%, $(SRCS:.c=.o))
 OBJS := $(OBJS:.S=.o)
 
@@ -24,6 +24,10 @@ build/%.o: src/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 build/lib/%.o: src/lib/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+build/dsa/%.o: src/dsa/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@
 
