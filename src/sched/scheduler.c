@@ -1,15 +1,13 @@
 #include <queue.h>
 #include <mm/heap.h>
+#include <dsa/queue.h>
 #include <drivers/uart.h>
 #include <drivers/gic.h>
 #include <arch/syscall.h>
 #include "scheduler.h"
 
-struct queue_entry *current = NULL;
-struct queue ready_queue = {
-    .head = NULL,
-    .tail = NULL,
-};
+struct process *current = NULL;
+struct queue64 ready_queue;
 struct queue wait_queue = {
     .head = NULL,
     .tail = NULL,
@@ -17,6 +15,8 @@ struct queue wait_queue = {
 
 void scheduler_init()
 {
+    queue64_init(&ready_queue, 10);
+
     syscall_register_handler(SYSCALL_EXIT, &exit_handler);
     syscall_register_handler(SYSCALL_YIELD, &yield_handler);
     syscall_register_handler(SYSCALL_GETPID, &getpid_handler);
@@ -25,39 +25,25 @@ void scheduler_init()
 
 int scheduler_enqueue(struct process *proc)
 {
-    struct queue_entry *entry = (struct queue_entry *)kmalloc(sizeof(struct queue_entry));
-
-    if (entry == NULL)
-    {
-        uart_puts("[scheduler] failed to alloc entry!");
-        return -1;
-    }
-
     proc->state = PROC_READY;
 
     uart_puts("[scheduler] enqueue pid ");
     uart_put_uint(proc->pid);
     uart_puts("\r\n");
 
-    entry->data = proc;
-
-    queue_enqueue(&ready_queue, entry);
+    queue64_push(&ready_queue, (uintptr_t)proc);
     return 0;
 }
 
 struct process *scheduler_dequeue()
 {
-    struct queue_entry *entry = queue_dequeue(&ready_queue);
-
-    if (entry == NULL)
+    if (ready_queue.length == 0)
     {
         return NULL;
     }
 
-    struct process *proc = entry->data;
+    struct process *proc = (struct process *)queue64_pop(&ready_queue);
     proc->state = PROC_DEAD;
-
-    kfree(entry);
 
     uart_puts("[scheduler] dequeue pid ");
     uart_put_uint(proc->pid);
@@ -70,26 +56,22 @@ struct cpu_context *scheduler_handler(struct cpu_context *ctx)
 {
     if (current != NULL)
     {
-        struct process *_proc = current->data;
-        _proc->ctx = ctx;
-
-        queue_enqueue(&ready_queue, current);
+        current->ctx = ctx;
+        queue64_push(&ready_queue, (uintptr_t)current);
     }
 
-    current = queue_dequeue(&ready_queue);
-    if (current == NULL)
+    if (ready_queue.length == 0)
     {
-        // uart_puts("[scheduler] no process to schedule, returning to kernel\r\n");
         return ctx;
     }
 
-    struct process *proc = current->data;
+    current = (struct process *)queue64_pop(&ready_queue);
 
     // uart_puts("[scheduler] context switch to pid ");
-    // uart_put_uint(proc->pid);
+    // uart_put_uint(current->pid);
     // uart_puts("\r\n");
 
-    return proc->ctx;
+    return current->ctx;
 }
 
 struct cpu_context *yield_handler(struct cpu_context *ctx)
@@ -130,7 +112,8 @@ static void _notify_waiters(uint64_t pid, uint64_t exit_status)
             waiter->wait_pid = 0;
             waiter->ctx->x0 = exit_status; // return exit status to waiter
 
-            queue_enqueue(&ready_queue, curr);
+            queue64_push(&ready_queue, (uintptr_t)curr->data);
+            kfree(curr);
 
             curr = next;
         }
@@ -150,26 +133,24 @@ struct cpu_context *exit_handler(struct cpu_context *ctx)
         return ctx;
     }
 
-    struct process *proc = current->data;
-
     uart_puts("[scheduler] exit(");
-    uart_put_uint(proc->pid);
+    uart_put_uint(current->pid);
     uart_puts("), ctx->x0 = ");
     uart_put_uint(ctx->x0);
     uart_puts(", ctx->x1 = ");
     uart_put_uint(ctx->x1);
     uart_puts("\r\n");
 
-    proc->state = PROC_DEAD;
+    current->state = PROC_DEAD;
 
     // notify waiters
-    _notify_waiters(proc->pid, ctx->x1);
+    _notify_waiters(current->pid, ctx->x1);
 
     // destroy process resources
-    if (destroy_process(proc) < 0)
+    if (destroy_process(current) < 0)
     {
         uart_puts("[scheduler] failed to destroy process, addr = 0x");
-        uart_put_uint_hex((uintptr_t)proc);
+        uart_put_uint_hex((uintptr_t)current);
         uart_puts("\r\n");
     }
 
@@ -188,13 +169,11 @@ struct cpu_context *getpid_handler(struct cpu_context *ctx)
         return ctx;
     }
 
-    struct process *proc = current->data;
-
     uart_puts("[scheduler] getpid(");
-    uart_put_uint(proc->pid);
+    uart_put_uint(current->pid);
     uart_puts(")\r\n");
 
-    ctx->x0 = proc->pid;
+    ctx->x0 = current->pid;
     return ctx;
 }
 
@@ -213,13 +192,13 @@ struct cpu_context *waitpid_handler(struct cpu_context *ctx)
         return ctx;
     }
 
-    struct process *proc = current->data;
+    current->state = PROC_BLOCKED;
+    current->wait_pid = pid;
+    current->ctx = ctx;
 
-    proc->state = PROC_BLOCKED;
-    proc->wait_pid = pid;
-    proc->ctx = ctx;
-
-    queue_enqueue(&wait_queue, current);
+    struct queue_entry *entry = (struct queue_entry *)kmalloc(sizeof(struct queue_entry));
+    entry->data = (void *)current;
+    queue_enqueue(&wait_queue, entry);
     current = NULL;
 
     return scheduler_handler(ctx);
