@@ -79,35 +79,35 @@ struct cpu_context *sync_handler(struct cpu_context *ctx, uint64_t esr, uint64_t
     switch (ec)
     {
     case ESR_EC_SVC64:
-        uart_puts("[sync] syscall, ctx=0x");
-        uart_put_uint_hex(ctx->x0);
+        uart_puts("[sync] syscall, ctx->x0 = ");
+        uart_put_uint(ctx->x0);
         uart_puts("\r\n");
         ctx = syscall_handler(ctx);
         break;
     case ESR_EC_IABT_EL0:
-        uart_puts("[sync] instruction abort, elr=0x");
+        uart_puts("[sync] instruction abort, elr = 0x");
         uart_put_uint_hex(elr);
-        uart_puts(", far=0x");
+        uart_puts(", far = 0x");
         uart_put_uint_hex(far);
         uart_puts("\r\n");
         ctx = exit_handler(ctx);
         break;
     case ESR_EC_DABT_EL0:
-        uart_puts("[sync] data abort, elr=0x");
+        uart_puts("[sync] data abort, elr = 0x");
         uart_put_uint_hex(elr);
-        uart_puts(", far=0x");
+        uart_puts(", far = 0x");
         uart_put_uint_hex(far);
         uart_puts("\r\n");
         ctx = exit_handler(ctx);
         break;
     default:
-        uart_puts("[sync] esr=0x");
+        uart_puts("[sync] esr = 0x");
         uart_put_uint_hex(esr);
-        uart_puts(", elr=0x");
+        uart_puts(", elr = 0x");
         uart_put_uint_hex(elr);
-        uart_puts(", far=0x");
+        uart_puts(", far = 0x");
         uart_put_uint_hex(far);
-        uart_puts(", ec=0x");
+        uart_puts(", ec = 0x");
         uart_put_uint_hex(ec);
         uart_puts("\r\n");
 

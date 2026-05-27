@@ -25,6 +25,7 @@ struct process
     uint8_t *stack;
     struct cpu_context *ctx;
     size_t stack_size;
+    uint64_t wait_pid;
 };
 
 /**

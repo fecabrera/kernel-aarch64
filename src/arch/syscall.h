@@ -8,6 +8,7 @@
 #define SYSCALL_EXIT 0
 #define SYSCALL_YIELD 1
 #define SYSCALL_GETPID 2
+#define SYSCALL_WAITPID 3
 
 /**
  * Dispatches a syscall based on the number in ctx->x0.
@@ -37,17 +38,6 @@ void syscall_register_handler(uint64_t syscall_id, interrupt_handler fnc);
 void syscall_unregister_handler(uint64_t syscall_id);
 
 /**
- * Syscall handler for SYSCALL_GETPID. Returns the PID of the currently
- * running process by writing current->proc->pid into ctx->x0.
- * Returns -1 in ctx->x0 if no process is currently scheduled.
- *
- * @param ctx: saved context of the calling process
- *
- * @return ctx unchanged (no context switch).
- */
-struct cpu_context *getpid_handler(struct cpu_context *ctx);
-
-/**
  * Voluntarily yields the CPU to the scheduler via SYSCALL_YIELD (svc #0).
  * Traps into EL1, where yield_handler sets the return value to 0 in ctx->x0
  * and calls scheduler_handler to pick the next runnable task. Execution
@@ -75,5 +65,16 @@ void syscall_exit(uint64_t status);
  *         currently scheduled.
  */
 uint64_t syscall_getpid();
+
+/**
+ * Waits for the process with the given PID to terminate via SYSCALL_WAITPID (svc #0).
+ * Traps into EL1, where waitpid_handler waits for the specified process to terminate
+ * and returns its exit status. Execution resumes in the calling task without a context switch.
+ *
+ * @param pid: PID of the process to wait for
+ *
+ * @return exit status of the terminated process, or (uint64_t)-1 if no such process exists.
+ */
+uint64_t syscall_waitpid(uint64_t pid);
 
 #endif // SYSCALL_H

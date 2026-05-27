@@ -97,3 +97,17 @@ uint64_t syscall_getpid()
         : "x0");
     return ret;
 }
+
+uint64_t syscall_waitpid(uint64_t pid)
+{
+    int64_t ret;
+    __asm__ volatile(
+        "mov x0, %1\n"
+        "mov x1, %2\n"
+        "svc #0\n"
+        "mov %0, x0"
+        : "=r"(ret)
+        : "r"((uint64_t)SYSCALL_WAITPID), "r"(pid)
+        : "x0", "x1");
+    return ret;
+}

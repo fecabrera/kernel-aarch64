@@ -93,6 +93,11 @@ void init()
         hang();
     }
 
+    uint64_t exit_status = syscall_waitpid(proc2.pid);
+    uart_puts("[init] child process terminated with status ");
+    uart_put_uint(exit_status);
+    uart_puts("\r\n");
+
     halt();
 }
 

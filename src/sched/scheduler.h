@@ -12,6 +12,7 @@
  *   SYSCALL_EXIT             → exit_handler
  *   SYSCALL_YIELD            → yield_handler
  *   SYSCALL_GETPID           → getpid_handler
+ *   SYSCALL_WAITPID          → waitpid_handler
  */
 void scheduler_init();
 
@@ -76,5 +77,15 @@ struct cpu_context *yield_handler(struct cpu_context *ctx);
  * @return ctx unchanged.
  */
 struct cpu_context *getpid_handler(struct cpu_context *ctx);
+
+/**
+ * Syscall handler for SYSCALL_WAITPID. Waits for the specified process to terminate.
+ * Returns the exit status of the terminated process.
+ *
+ * @param ctx: saved context of the calling process
+ *
+ * @return ctx unchanged (no context switch).
+ */
+struct cpu_context *waitpid_handler(struct cpu_context *ctx);
 
 #endif // SCHEDULER_H
