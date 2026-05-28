@@ -26,22 +26,18 @@ void timer_init()
 
     if (dtb_get_timer_irq_number(&timer_irq) == 0)
     {
-        uart_puts("[timer] Initializing IRQ: ");
-        uart_put_uint(timer_irq);
-        uart_puts("\r\n");
-
+        uart_printf("[timer] Initializing IRQ: %i\r\n", timer_irq);
         irq_register_handler(timer_irq, &timer_irq_handler);
         gic_enable_irq(timer_irq);
     }
     else
     {
-        uart_puts("[timer] IRQ not found!!\r\n");
+        uart_printf("[timer] IRQ not found!!\r\n");
     }
 }
 
 struct cpu_context *timer_irq_handler(struct cpu_context *ctx)
 {
-    // uart_puts("[timer] tick()\r\n");
     struct cpu_context *next_ctx = scheduler_handler(ctx);
 
     // Set timer countdown

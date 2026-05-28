@@ -14,49 +14,31 @@ interrupt_handler irq_table[NUM_IRQS] = {NULL};
 
 static void ctx_dump(struct cpu_context *ctx)
 {
-    uart_puts("\r\n=== ctx dump ===\r\n");
-    uart_puts("x0  = 0x");
-    uart_put_uint_hex(ctx->x0);
-    uart_puts("\r\nx1  = 0x");
-    uart_put_uint_hex(ctx->x1);
-    uart_puts("\r\nx2  = 0x");
-    uart_put_uint_hex(ctx->x2);
-    uart_puts("\r\nx3  = 0x");
-    uart_put_uint_hex(ctx->x3);
-    uart_puts("\r\nx4  = 0x");
-    uart_put_uint_hex(ctx->x4);
-    uart_puts("\r\nx5  = 0x");
-    uart_put_uint_hex(ctx->x5);
-    uart_puts("\r\nx6  = 0x");
-    uart_put_uint_hex(ctx->x6);
-    uart_puts("\r\nx7  = 0x");
-    uart_put_uint_hex(ctx->x7);
-    uart_puts("\r\nx8  = 0x");
-    uart_put_uint_hex(ctx->x8);
-    uart_puts("\r\nx9  = 0x");
-    uart_put_uint_hex(ctx->x9);
-    uart_puts("\r\nx10 = 0x");
-    uart_put_uint_hex(ctx->x10);
-    uart_puts("\r\nx11 = 0x");
-    uart_put_uint_hex(ctx->x11);
-    uart_puts("\r\nx12 = 0x");
-    uart_put_uint_hex(ctx->x12);
-    uart_puts("\r\nx13 = 0x");
-    uart_put_uint_hex(ctx->x13);
-    uart_puts("\r\nx14 = 0x");
-    uart_put_uint_hex(ctx->x14);
-    uart_puts("\r\nx15 = 0x");
-    uart_put_uint_hex(ctx->x15);
-    uart_puts("\r\nlr  = 0x");
-    uart_put_uint_hex(ctx->lr);
-    uart_puts("\relr = 0x");
-    uart_put_uint_hex(ctx->elr);
-    uart_puts("\r\nspsr= 0b");
+    uart_printf("\r\n=== ctx dump ===\r\n");
+    uart_printf("x0  = 0x%x\r\n", ctx->x0);
+    uart_printf("x1  = 0x%x\r\n", ctx->x1);
+    uart_printf("x2  = 0x%x\r\n", ctx->x2);
+    uart_printf("x3  = 0x%x\r\n", ctx->x3);
+    uart_printf("x4  = 0x%x\r\n", ctx->x4);
+    uart_printf("x5  = 0x%x\r\n", ctx->x5);
+    uart_printf("x6  = 0x%x\r\n", ctx->x6);
+    uart_printf("x7  = 0x%x\r\n", ctx->x7);
+    uart_printf("x8  = 0x%x\r\n", ctx->x8);
+    uart_printf("x9  = 0x%x\r\n", ctx->x9);
+    uart_printf("x10 = 0x%x\r\n", ctx->x10);
+    uart_printf("x11 = 0x%x\r\n", ctx->x11);
+    uart_printf("x12 = 0x%x\r\n", ctx->x12);
+    uart_printf("x13 = 0x%x\r\n", ctx->x13);
+    uart_printf("x14 = 0x%x\r\n", ctx->x14);
+    uart_printf("x15 = 0x%x\r\n", ctx->x15);
+    uart_printf("lr  = 0x%x\r\n", ctx->lr);
+    uart_printf("elr = 0x%x\r\n", ctx->elr);
+    uart_printf("spsr= 0b");
     for (int i = sizeof(uint64_t) * 8 - 1; i >= 0; i--)
     {
-        uart_puts((ctx->spsr & (1UL << i)) ? "1" : "0");
+        uart_printf((ctx->spsr & (1UL << i)) ? "1" : "0");
     }
-    uart_puts("\r\n=================\r\n");
+    uart_printf("\r\n=================\r\n");
 }
 
 // ── Install vector table ────────────────────────────
@@ -79,37 +61,19 @@ struct cpu_context *sync_handler(struct cpu_context *ctx, uint64_t esr, uint64_t
     switch (ec)
     {
     case ESR_EC_SVC64:
-        uart_puts("[sync] syscall(");
-        uart_put_uint(ctx->x0);
-        uart_puts(")\r\n");
+        uart_printf("[sync] syscall(%d)\r\n", ctx->x0);
         ctx = syscall_handler(ctx);
         break;
     case ESR_EC_IABT_EL0:
-        uart_puts("[sync] instruction abort, elr = 0x");
-        uart_put_uint_hex(elr);
-        uart_puts(", far = 0x");
-        uart_put_uint_hex(far);
-        uart_puts("\r\n");
+        uart_printf("[sync] instruction abort, elr = 0x%x, far 0x%x\r\n", elr, far);
         ctx = exit_handler(ctx);
         break;
     case ESR_EC_DABT_EL0:
-        uart_puts("[sync] data abort, elr = 0x");
-        uart_put_uint_hex(elr);
-        uart_puts(", far = 0x");
-        uart_put_uint_hex(far);
-        uart_puts("\r\n");
+        uart_printf("[sync] data abort, elr = 0x%x, far = 0x%x\r\n", elr, far);
         ctx = exit_handler(ctx);
         break;
     default:
-        uart_puts("[sync] esr = 0x");
-        uart_put_uint_hex(esr);
-        uart_puts(", elr = 0x");
-        uart_put_uint_hex(elr);
-        uart_puts(", far = 0x");
-        uart_put_uint_hex(far);
-        uart_puts(", ec = 0x");
-        uart_put_uint_hex(ec);
-        uart_puts("\r\n");
+        uart_printf("[sync] esr = 0x%x, elr = 0x%x, far = 0x%x, ec = 0x%x\r\n", esr, elr, far, ec);
 
         ctx_dump(ctx);
 
@@ -121,13 +85,13 @@ struct cpu_context *sync_handler(struct cpu_context *ctx, uint64_t esr, uint64_t
 
 void serr_handler()
 {
-    uart_puts("[SError] System error!\r\n");
+    uart_printf("[SError] System error!\r\n");
     hang();
 }
 
 void fiq_handler()
 {
-    uart_puts("[FIQ]\r\n");
+    uart_printf("[FIQ]\r\n");
 }
 
 int irq_register_handler(uint32_t irq, interrupt_handler fnc)
@@ -135,21 +99,12 @@ int irq_register_handler(uint32_t irq, interrupt_handler fnc)
     if (irq_table[irq] == NULL)
     {
         irq_table[irq] = fnc;
-
-        uart_puts("[irq] handler registered for IRQ ");
-        uart_put_uint(irq);
-        uart_puts(", address 0x");
-        uart_put_uint_hex((uintptr_t)fnc);
-        uart_puts("\r\n");
-
+        uart_printf("[irq] handler registered for IRQ %i, address = 0x%x\r\n", irq, fnc);
         return 0;
     }
     else
     {
-        uart_puts("[irq] There's already a handler registered for IRQ ");
-        uart_put_uint(irq);
-        uart_puts("!\r\n");
-
+        uart_printf("[irq] There's already a handler registered for IRQ %i!\r\n", irq);
         return -1;
     }
 }
@@ -158,20 +113,13 @@ int irq_unregister_handler(uint32_t irq)
 {
     if (irq_table[irq] == NULL)
     {
-        uart_puts("[irq] There's no handler registered for IRQ ");
-        uart_put_uint(irq);
-        uart_puts("!\r\n");
-
+        uart_printf("[irq] There's no handler registered for IRQ %i!\r\n", irq);
         return -1;
     }
     else
     {
         irq_table[irq] = NULL;
-
-        uart_puts("[irq] Handler unregistered for IRQ ");
-        uart_put_uint(irq);
-        uart_puts("!\r\n");
-
+        uart_printf("[irq] Handler unregistered for IRQ %i!\r\n", irq);
         return 0;
     }
 }
@@ -184,9 +132,7 @@ struct cpu_context *irq_handler(struct cpu_context *ctx)
 
     if (fnc == NULL)
     {
-        uart_puts("[irq] Handler not found for IRQ ");
-        uart_put_uint(irq_id);
-        uart_puts("!\r\n");
+        uart_printf("[irq] Handler not found for IRQ %i!", irq_id);
     }
     else
     {

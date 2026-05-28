@@ -29,18 +29,13 @@ int scheduler_enqueue(struct process *proc)
     proc->state = PROC_READY;
     queue64_push(&ready_queue, (uintptr_t)proc);
 
-    uart_puts("[scheduler] enqueue(");
-    uart_put_uint(proc->pid);
-    uart_puts("), q = { ");
+    uart_printf("[scheduler] enqueue(), q = { ", proc->pid);
     for (uint64_t i = 0; i < ready_queue.length; i++)
     {
         struct process *proc = (struct process *)queue64_at(&ready_queue, i);
-        uart_put_uint(proc->pid);
-        uart_puts(" ");
+        uart_printf("%i ", proc->pid);
     }
-    uart_puts("}, current = ");
-    uart_put_uint(current->pid);
-    uart_puts("\r\n");
+    uart_printf("}, current = %i\r\n", current->pid);
 
     return 0;
 }
@@ -55,9 +50,7 @@ struct process *scheduler_dequeue()
     struct process *proc = (struct process *)queue64_pop(&ready_queue);
     proc->state = PROC_DEAD;
 
-    uart_puts("[scheduler] dequeue(");
-    uart_put_uint(proc->pid);
-    uart_puts(")\r\n");
+    uart_printf("[scheduler] dequeue(%i)\r\n", proc->pid);
 
     return proc;
 }
@@ -79,16 +72,13 @@ struct cpu_context *scheduler_handler(struct cpu_context *ctx)
 
     if (current->ctx != ctx)
     {
-        uart_puts("[scheduler] context_switch(), q = { ");
+        uart_printf("[scheduler] context_switch(), q = { ");
         struct process **procs = (struct process **)ready_queue.data;
         for (uint64_t i = 0; i < ready_queue.length; i++)
         {
-            uart_put_uint(procs[i]->pid);
-            uart_puts(" ");
+            uart_printf("%i ", procs[i]->pid);
         }
-        uart_puts("}, current = ");
-        uart_put_uint(current->pid);
-        uart_puts("\r\n");
+        uart_printf("}, current = %i\r\n", current->pid);
     }
 
     return current->ctx;
@@ -96,13 +86,9 @@ struct cpu_context *scheduler_handler(struct cpu_context *ctx)
 
 struct cpu_context *yield_handler(struct cpu_context *ctx)
 {
-    uart_puts("[scheduler] yield()");
-
     ctx->x0 = 0;
 
-    uart_puts(", ctx->x0 = ");
-    uart_put_uint(ctx->x0);
-    uart_puts("\r\n");
+    uart_printf("[scheduler] yield()\r\n");
 
     return scheduler_handler(ctx);
 }
@@ -120,11 +106,7 @@ static int _pid_eq(struct deque64_entry *entry, void *pid)
 
 static void _notify_waiter(struct process *proc, uint64_t exit_status)
 {
-    uart_puts("[scheduler] _notify_waiter(");
-    uart_put_uint(proc->pid);
-    uart_puts("), exit_status = ");
-    uart_put_uint(exit_status);
-    uart_puts("\r\n");
+    uart_printf("[scheduler] _notify_waiter(%i), exit_status = %i\r\n", proc->pid, exit_status);
 
     proc->state = PROC_READY;
     proc->wait_pid = 0;
@@ -136,9 +118,7 @@ static void _notify_waiter(struct process *proc, uint64_t exit_status)
 static void _notify_waiters(int64_t pid, uint64_t exit_status)
 {
     struct deque64_entry *entry = NULL;
-    uart_puts("[scheduler] _notify_waiters(), exit_status = ");
-    uart_put_uint(exit_status);
-    uart_puts("\r\n");
+    uart_printf("[scheduler] _notify_waiters(), exit_status = %i\r\n", exit_status);
 
     while ((entry = deque64_find_remove(&wait_queue, entry, &_pid_eq, &pid)))
     {
@@ -154,17 +134,11 @@ struct cpu_context *exit_handler(struct cpu_context *ctx)
 {
     if (current == NULL)
     {
-        uart_puts("[scheduler] no current process to exit!\r\n");
+        uart_printf("[scheduler] no current process to exit!\r\n");
         return ctx;
     }
 
-    uart_puts("[scheduler] exit(");
-    uart_put_uint(current->pid);
-    uart_puts("), ctx->x0 = ");
-    uart_put_uint(ctx->x0);
-    uart_puts(", ctx->x1 = ");
-    uart_put_uint(ctx->x1);
-    uart_puts("\r\n");
+    uart_printf("[scheduler] exit(%i), ctx->x0 = %u, ctx->x1 = %u\r\n", current->pid, ctx->x0, ctx->x1);
 
     current->state = PROC_DEAD;
 
@@ -174,9 +148,7 @@ struct cpu_context *exit_handler(struct cpu_context *ctx)
     // destroy process resources
     if (destroy_process(current) < 0)
     {
-        uart_puts("[scheduler] failed to destroy process, addr = 0x");
-        uart_put_uint_hex((uintptr_t)current);
-        uart_puts("\r\n");
+        uart_printf("[scheduler] failed to destroy process, addr = 0x%x\r\n", current);
     }
 
     // clear current entry
@@ -189,14 +161,12 @@ struct cpu_context *getpid_handler(struct cpu_context *ctx)
 {
     if (current == NULL)
     {
-        uart_puts("[scheduler] no current process for getpid!\r\n");
+        uart_printf("[scheduler] no current process for getpid!\r\n");
         ctx->x0 = -1;
         return ctx;
     }
 
-    uart_puts("[scheduler] getpid(");
-    uart_put_uint(current->pid);
-    uart_puts(")\r\n");
+    uart_printf("[scheduler] getpid(%i)\r\n", current->pid);
 
     ctx->x0 = current->pid;
     return ctx;
@@ -206,13 +176,11 @@ struct cpu_context *waitpid_handler(struct cpu_context *ctx)
 {
     int64_t pid = ctx->x1;
 
-    uart_puts("[scheduler] waitpid(");
-    uart_put_uint(pid);
-    uart_puts(")\r\n");
+    uart_printf("[scheduler] waitpid(%i)\r\n", pid);
 
     if (current == NULL)
     {
-        uart_puts("[scheduler] no current process for waitpid!\r\n");
+        uart_printf("[scheduler] no current process for waitpid!\r\n");
         ctx->x0 = -1;
         return ctx;
     }
@@ -231,16 +199,14 @@ struct cpu_context *fork_handler(struct cpu_context *ctx)
 {
     if (current == NULL)
     {
-        uart_puts("[scheduler] no current process for fork!\r\n");
+        uart_printf("[scheduler] no current process for fork!\r\n");
         ctx->x0 = -1;
         return ctx;
     }
 
     current->ctx = ctx;
 
-    uart_puts("[scheduler] fork(");
-    uart_put_uint(current->pid);
-    uart_puts(")\r\n");
+    uart_printf("[scheduler] fork(%i)\r\n", current->pid);
 
     struct process *child = (struct process *)kmalloc(sizeof(struct process));
     duplicate_process(child, current);

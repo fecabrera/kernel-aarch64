@@ -50,22 +50,6 @@ int duplicate_process(struct process *dest, struct process *src)
     dest->stack = stack;
     dest->stack_size = stack_size;
 
-    uart_puts("stack = 0x");
-    uart_put_uint_hex((uintptr_t)src->stack);
-    uart_puts(", ctx = 0x");
-    uart_put_uint_hex((uintptr_t)src->ctx);
-    uart_puts(", offset = 0x");
-    uart_put_uint_hex((uintptr_t)src->ctx - (uintptr_t)src->stack);
-    uart_puts("\r\n");
-
-    uart_puts("stack = 0x");
-    uart_put_uint_hex((uintptr_t)dest->stack);
-    uart_puts(", ctx = 0x");
-    uart_put_uint_hex((uintptr_t)dest->ctx);
-    uart_puts(", offset = 0x");
-    uart_put_uint_hex((uintptr_t)dest->ctx - (uintptr_t)dest->stack);
-    uart_puts("\r\n");
-
     return 0;
 }
 

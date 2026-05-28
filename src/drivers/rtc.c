@@ -12,15 +12,12 @@ void rtc_init()
 
     if (dtb_get_rtc_irq_number(&rtc_irq) == 0)
     {
-        uart_puts("[rtc] Initializing IRQ: ");
-        uart_put_uint(rtc_irq);
-        uart_puts("\r\n");
-
+        uart_printf("[rtc] Initializing IRQ: %i\r\n", rtc_irq);
         irq_register_handler(rtc_irq, &rtc_irq_handler);
     }
     else
     {
-        uart_puts("[rtc] IRQ not found!!\r\n");
+        uart_printf("[rtc] IRQ not found!!\r\n");
     }
 }
 
@@ -44,7 +41,7 @@ void rtc_set_alarm(uint32_t unix_time)
 
 struct cpu_context *rtc_irq_handler(struct cpu_context *ctx)
 {
-    uart_puts("[rtc] alarm fired!\r\n");
+    uart_printf("[rtc] alarm fired!\r\n");
 
     RTC_ICR = RTC_INT_MATCH;   // clear interrupt
     RTC_IMSC = ~RTC_INT_MATCH; // mask

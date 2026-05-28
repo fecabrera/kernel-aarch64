@@ -37,21 +37,19 @@ void kernel_init()
     rtc_set_alarm(timestamp + 1);
 
     // test yield
-    uart_puts("[kernel] testing yield()\r\n");
+    uart_printf("[kernel] testing yield()\r\n");
     int64_t result = syscall_yield();
 
     // since there are no other processes, there's no context switch and we should
     // be back immediately with the same context
-    uart_puts("[kernel] back from yield(), result = ");
-    uart_put_uint(result);
-    uart_puts("\r\n");
+    uart_printf("[kernel] back from yield(), result = %i\r\n", result);
 
     // set up pid 1
     struct process proc;
 
     if (create_process(&proc, DEFAULT_STACK_SIZE) < 0)
     {
-        uart_puts("[kernel] create_process() failed\r\n");
+        uart_printf("[kernel] create_process() failed\r\n");
         hang();
     }
     process_config(&proc, &init);
@@ -59,7 +57,7 @@ void kernel_init()
     // schedule process
     if (scheduler_enqueue(&proc) < 0)
     {
-        uart_puts("[kernel] scheduler_enqueue() failed\r\n");
+        uart_printf("[kernel] scheduler_enqueue() failed\r\n");
         hang();
     }
 
@@ -68,38 +66,32 @@ void kernel_init()
 
     // note that since there are items in the ready queue, this becomes unreachable
     // @todo: add idle task to run when ready queue is empty, then this becomes reachable
-    uart_puts("[kernel] unexpectedly back from yield(), result = ");
-    uart_put_uint(result);
-    uart_puts("\r\n");
+    uart_printf("[kernel] unexpectedly back from yield(), result = %i\r\n", result);
 }
 
 void init()
 {
     int64_t pid = syscall_getpid();
 
-    uart_puts("[init] pid = ");
-    uart_put_uint(pid);
-    uart_puts("\r\n");
+    uart_printf("[init] pid = %i\r\n", pid);
 
     struct process proc;
 
     if (create_process(&proc, DEFAULT_STACK_SIZE) < 0)
     {
-        uart_puts("[init] create_process() failed\r\n");
+        uart_printf("[init] create_process() failed\r\n");
         hang();
     }
     process_config(&proc, &child);
 
     if (scheduler_enqueue(&proc) < 0)
     {
-        uart_puts("[init] scheduler_enqueue() failed\r\n");
+        uart_printf("[init] scheduler_enqueue() failed\r\n");
         hang();
     }
 
     uint64_t exit_status = syscall_waitpid(proc.pid);
-    uart_puts("[init] child process terminated with status ");
-    uart_put_uint(exit_status);
-    uart_puts("\r\n");
+    uart_printf("[init] child process terminated with status %i\r\n", exit_status);
 
     halt();
 }
@@ -109,15 +101,11 @@ void child()
     int64_t fork_pid = syscall_fork();
     int64_t pid = syscall_getpid();
 
-    uart_puts("[child] pid = ");
-    uart_put_uint(pid);
-    uart_puts(", fork_pid = ");
-    uart_put_uint(fork_pid);
-    uart_puts("\r\n");
+    uart_printf("[child] pid = %i, fork_pid = %i\r\n", pid, fork_pid);
 
     if (fork_pid < 0)
     {
-        uart_puts("[child] fork() failed!\r\n");
+        uart_printf("[child] fork() failed!\r\n");
         syscall_exit(2);
     }
     else if (fork_pid == 0)

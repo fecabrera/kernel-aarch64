@@ -12,9 +12,7 @@ struct cpu_context *syscall_handler(struct cpu_context *ctx)
 
     if (fnc == NULL)
     {
-        uart_puts("[syscall] Handler not found for syscall ");
-        uart_put_uint(syscall_id);
-        uart_puts("!\r\n");
+        uart_printf("[syscall] Handler not found for syscall %i!\r\n", syscall_id);
     }
     else
     {
@@ -29,17 +27,11 @@ void syscall_register_handler(uint64_t syscall_id, interrupt_handler fnc)
     if (syscall_table[syscall_id] == NULL)
     {
         syscall_table[syscall_id] = fnc;
-        uart_puts("[syscall] handler registered for syscall ");
-        uart_put_uint(syscall_id);
-        uart_puts(", addr = 0x");
-        uart_put_uint_hex((uintptr_t)fnc);
-        uart_puts("\r\n");
+        uart_printf("[syscall] handler registered for syscall %i, addr = 0x%x\r\n", syscall_id, fnc);
     }
     else
     {
-        uart_puts("[syscall] There's already a handler registered for syscall ");
-        uart_put_uint(syscall_id);
-        uart_puts("!\r\n");
+        uart_printf("[syscall] There's already a handler registered for syscall %i!\r\n", syscall_id);
     }
 }
 
@@ -47,16 +39,12 @@ void syscall_unregister_handler(uint64_t syscall_id)
 {
     if (syscall_table[syscall_id] == NULL)
     {
-        uart_puts("[syscall] There's no handler registered for syscall ");
-        uart_put_uint(syscall_id);
-        uart_puts("!\r\n");
+        uart_printf("[syscall] There's no handler registered for syscall %i!\r\n", syscall_id);
     }
     else
     {
         syscall_table[syscall_id] = NULL;
-        uart_puts("[syscall] Handler unregistered for syscall ");
-        uart_put_uint(syscall_id);
-        uart_puts("!\r\n");
+        uart_printf("[syscall] Handler unregistered for syscall %i!\r\n", syscall_id);
     }
 }
 

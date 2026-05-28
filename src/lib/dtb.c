@@ -155,12 +155,8 @@ void dtb_dump()
             uint32_t len = be32(*p++);
             uint32_t nameoff = be32(*p++);
             for (int i = 0; i < depth; i++)
-                uart_puts("  ");
-            uart_puts("  ");
-            uart_puts(strings + nameoff);
-            uart_puts(" (");
-            uart_put_uint(len);
-            uart_puts(" bytes)\r\n");
+                uart_printf("  ");
+            uart_printf("  %s ( %i bytes)\r\n", strings + nameoff, len);
             p += (len + 3) / 4;
         }
         else if (token == FDT_END)
@@ -211,9 +207,7 @@ int dtb_get_uart_irq_number(uint32_t *ptr)
     if (ret == 0)
     {
         uint32_t n = dtb_get_irq_count(&prop);
-        uart_puts("[dtb] Discovered ");
-        uart_put_uint(n);
-        uart_puts(" UART devices");
+        uart_printf("[dtb] Discovered %i UART devices", n);
 
         *ptr = dtb_get_irq_number(&prop, 0);
     }
@@ -221,16 +215,14 @@ int dtb_get_uart_irq_number(uint32_t *ptr)
     {
         const char *s = (const char *)prop.data;
         const char *end = s + prop.len;
-        uart_puts(", compatible =");
+        uart_printf(", compatible =");
         while (s < end)
         {
-            uart_puts(" \"");
-            uart_puts(s);
-            uart_puts("\"");
+            uart_printf(" \"%s\"", s);
             s += strlen(s) + 1;
         }
     }
-    uart_puts("\r\n");
+    uart_printf("\r\n");
     return ret;
 }
 
@@ -241,9 +233,7 @@ int dtb_get_timer_irq_number(uint32_t *ptr)
     if (ret == 0)
     {
         uint32_t n = dtb_get_irq_count(&prop);
-        uart_puts("[dtb] Discovered ");
-        uart_put_uint(n);
-        uart_puts(" timer devices");
+        uart_printf("[dtb] Discovered %i timer devices", n);
 
         *ptr = dtb_get_irq_number(&prop, 1); // entry 1 = EL1 physical timer
     }
@@ -251,16 +241,14 @@ int dtb_get_timer_irq_number(uint32_t *ptr)
     {
         const char *s = (const char *)prop.data;
         const char *end = s + prop.len;
-        uart_puts(", compatible =");
+        uart_printf(", compatible =");
         while (s < end)
         {
-            uart_puts(" \"");
-            uart_puts(s);
-            uart_puts("\"");
+            uart_printf(" \"%s\"", s);
             s += strlen(s) + 1;
         }
     }
-    uart_puts("\r\n");
+    uart_printf("\r\n");
     return ret;
 }
 
@@ -271,9 +259,7 @@ int dtb_get_rtc_irq_number(uint32_t *ptr)
     if (ret == 0)
     {
         uint32_t n = dtb_get_irq_count(&prop);
-        uart_puts("[dtb] Discovered ");
-        uart_put_uint(n);
-        uart_puts(" RTC devices");
+        uart_printf("[dtb] Discovered %i RTC devices", n);
 
         *ptr = dtb_get_irq_number(&prop, 0);
     }
@@ -281,15 +267,13 @@ int dtb_get_rtc_irq_number(uint32_t *ptr)
     {
         const char *s = (const char *)prop.data;
         const char *end = s + prop.len;
-        uart_puts(", compatible =");
+        uart_printf(", compatible =");
         while (s < end)
         {
-            uart_puts(" \"");
-            uart_puts(s);
-            uart_puts("\"");
+            uart_printf(" \"%s\"", s);
             s += strlen(s) + 1;
         }
     }
-    uart_puts("\r\n");
+    uart_printf("\r\n");
     return ret;
 }

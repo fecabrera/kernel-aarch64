@@ -33,37 +33,6 @@ void uart_puts(const char *s)
     }
 }
 
-void uart_put_uint_base(uint64_t n, int base)
-{
-    if (n == 0)
-    {
-        uart_putc('0');
-        return;
-    }
-
-    static const char digits[] = "0123456789abcdef";
-    char buf[64];
-    int i = 0;
-    while (n > 0)
-    {
-        buf[i++] = digits[n % base];
-        n /= base;
-    }
-
-    while (i--)
-        uart_putc(buf[i]);
-}
-
-void uart_put_uint(uint64_t n)
-{
-    uart_put_uint_base(n, 10);
-}
-
-void uart_put_uint_hex(uint64_t n)
-{
-    uart_put_uint_base(n, 16);
-}
-
 void uart_init()
 {
     // Disable UART before configuring
@@ -89,16 +58,13 @@ void uart_init()
 
     if (dtb_get_uart_irq_number(&uart_irq) == 0)
     {
-        uart_puts("[uart] Initializing IRQ: ");
-        uart_put_uint(uart_irq);
-        uart_puts("\r\n");
-
+        uart_printf("[uart] Initializing IRQ: %i\r\n", uart_irq);
         irq_register_handler(uart_irq, &uart_irq_handler);
         gic_enable_irq(uart_irq);
     }
     else
     {
-        uart_puts("[uart] IRQ not found!!\r\n");
+        uart_printf("[uart] IRQ not found!!\r\n");
     }
 }
 
