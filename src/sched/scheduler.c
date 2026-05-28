@@ -27,12 +27,21 @@ void scheduler_init()
 int scheduler_enqueue(struct process *proc)
 {
     proc->state = PROC_READY;
+    queue64_push(&ready_queue, (uintptr_t)proc);
 
     uart_puts("[scheduler] enqueue(");
     uart_put_uint(proc->pid);
-    uart_puts(")\r\n");
+    uart_puts("), q = { ");
+    for (uint64_t i = 0; i < ready_queue.length; i++)
+    {
+        struct process *proc = (struct process *)queue64_at(&ready_queue, i);
+        uart_put_uint(proc->pid);
+        uart_puts(" ");
+    }
+    uart_puts("}, current = ");
+    uart_put_uint(current->pid);
+    uart_puts("\r\n");
 
-    queue64_push(&ready_queue, (uintptr_t)proc);
     return 0;
 }
 
@@ -70,9 +79,7 @@ struct cpu_context *scheduler_handler(struct cpu_context *ctx)
 
     if (current->ctx != ctx)
     {
-        uart_puts("[scheduler] context_switch(");
-        uart_put_uint(current->pid);
-        uart_puts("), q = { ");
+        uart_puts("[scheduler] context_switch(), q = { ");
         struct process **procs = (struct process **)ready_queue.data;
         for (uint64_t i = 0; i < ready_queue.length; i++)
         {
