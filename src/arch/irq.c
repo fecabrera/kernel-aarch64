@@ -79,9 +79,9 @@ struct cpu_context *sync_handler(struct cpu_context *ctx, uint64_t esr, uint64_t
     switch (ec)
     {
     case ESR_EC_SVC64:
-        uart_puts("[sync] syscall, ctx->x0 = ");
+        uart_puts("[sync] syscall(");
         uart_put_uint(ctx->x0);
-        uart_puts("\r\n");
+        uart_puts(")\r\n");
         ctx = syscall_handler(ctx);
         break;
     case ESR_EC_IABT_EL0:

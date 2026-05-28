@@ -6,9 +6,9 @@
 #include <arch/syscall.h>
 #include "scheduler.h"
 
-struct process *current = NULL;
-struct queue64 ready_queue;
-struct deque64 wait_queue = {
+static struct process *current = NULL;
+static struct queue64 ready_queue;
+static struct deque64 wait_queue = {
     .head = NULL,
     .tail = NULL,
 };
@@ -27,9 +27,9 @@ int scheduler_enqueue(struct process *proc)
 {
     proc->state = PROC_READY;
 
-    uart_puts("[scheduler] enqueue pid ");
+    uart_puts("[scheduler] enqueue(");
     uart_put_uint(proc->pid);
-    uart_puts("\r\n");
+    uart_puts(")\r\n");
 
     queue64_push(&ready_queue, (uintptr_t)proc);
     return 0;
@@ -45,9 +45,9 @@ struct process *scheduler_dequeue()
     struct process *proc = (struct process *)queue64_pop(&ready_queue);
     proc->state = PROC_DEAD;
 
-    uart_puts("[scheduler] dequeue pid ");
+    uart_puts("[scheduler] dequeue(");
     uart_put_uint(proc->pid);
-    uart_puts("\r\n");
+    uart_puts(")\r\n");
 
     return proc;
 }
@@ -67,9 +67,12 @@ struct cpu_context *scheduler_handler(struct cpu_context *ctx)
 
     current = (struct process *)queue64_pop(&ready_queue);
 
-    // uart_puts("[scheduler] context switch to pid ");
-    // uart_put_uint(current->pid);
-    // uart_puts("\r\n");
+    if (current->ctx != ctx)
+    {
+        uart_puts("[scheduler] context switch to pid ");
+        uart_put_uint(current->pid);
+        uart_puts("\r\n");
+    }
 
     return current->ctx;
 }
@@ -116,9 +119,9 @@ static void _notify_waiter(struct process *proc, uint64_t exit_status)
 static void _notify_waiters(uint64_t pid, uint64_t exit_status)
 {
     struct deque64_entry *entry = NULL;
-    uart_puts("[scheduler] _notify_waiters(");
-    uart_put_uint(pid);
-    uart_puts(")\r\n");
+    uart_puts("[scheduler] _notify_waiters(), exit_status = ");
+    uart_put_uint(exit_status);
+    uart_puts("\r\n");
 
     while ((entry = deque64_find_remove(&wait_queue, entry, &_pid_eq, &pid)))
     {
