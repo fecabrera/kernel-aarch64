@@ -69,13 +69,12 @@ src/
 
   lib/              — architecture-independent libraries
     dtb.c/h         — FDT parser (be32, node/property walker)
-    queue.c/h       — generic intrusive singly-linked FIFO (unused; superseded by dsa/queue.h)
     string.c/h      — freestanding string library (memcpy, memset, strcmp, ...)
     types.h         — stdint-style typedefs
 
   sched/            — scheduler and process management
     process.c/h     — process struct, create/config/destroy
-    scheduler.c/h   — FIFO ready queue and wait queue (backed by lib/queue), scheduler_enqueue/dequeue, context switch via timer and yield/exit/waitpid syscalls
+    scheduler.c/h   — FIFO ready queue (dsa/queue64) and wait queue (dsa/deque64), scheduler_enqueue/dequeue, context switch via timer and yield/exit/waitpid syscalls
 ```
 
 ## Memory map (QEMU virt)

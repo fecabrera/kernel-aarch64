@@ -1,6 +1,6 @@
-#include <queue.h>
 #include <mm/heap.h>
 #include <dsa/queue.h>
+#include <dsa/deque.h>
 #include <drivers/uart.h>
 #include <drivers/gic.h>
 #include <arch/syscall.h>
@@ -8,7 +8,7 @@
 
 struct process *current = NULL;
 struct queue64 ready_queue;
-struct queue wait_queue = {
+struct deque64 wait_queue = {
     .head = NULL,
     .tail = NULL,
 };
@@ -87,41 +87,46 @@ struct cpu_context *yield_handler(struct cpu_context *ctx)
     return scheduler_handler(ctx);
 }
 
+static int _pid_eq(struct deque64_entry *entry, void *pid)
+{
+    struct process *proc = (struct process *)entry->value;
+    uint64_t value = *(uint64_t *)pid;
+
+    if (proc->wait_pid == value)
+        return 0;
+
+    return -1;
+}
+
+static void _notify_waiter(struct process *proc, uint64_t exit_status)
+{
+    uart_puts("[scheduler] _notify_waiter(");
+    uart_put_uint(proc->pid);
+    uart_puts("), exit_status = ");
+    uart_put_uint(exit_status);
+    uart_puts("\r\n");
+
+    proc->state = PROC_READY;
+    proc->wait_pid = 0;
+    proc->ctx->x0 = exit_status;
+
+    queue64_push(&ready_queue, (uintptr_t)proc);
+}
+
 static void _notify_waiters(uint64_t pid, uint64_t exit_status)
 {
-    struct queue_entry *prev = NULL;
-    struct queue_entry *curr = wait_queue.head;
+    struct deque64_entry *entry = NULL;
+    uart_puts("[scheduler] _notify_waiters(");
+    uart_put_uint(pid);
+    uart_puts(")\r\n");
 
-    while (curr != NULL)
+    while ((entry = deque64_find_remove(&wait_queue, entry, &_pid_eq, &pid)))
     {
-        struct queue_entry *next = curr->next;
-        struct process *waiter = curr->data;
+        _notify_waiter((struct process *)entry->value, exit_status);
 
-        if (waiter->wait_pid == pid)
-        {
-            if (curr == wait_queue.head)
-                wait_queue.head = next;
-
-            if (curr == wait_queue.tail)
-                wait_queue.tail = prev;
-
-            if (prev != NULL)
-                prev->next = next;
-
-            waiter->state = PROC_READY;
-            waiter->wait_pid = 0;
-            waiter->ctx->x0 = exit_status; // return exit status to waiter
-
-            queue64_push(&ready_queue, (uintptr_t)curr->data);
-            kfree(curr);
-
-            curr = next;
-        }
-        else
-        {
-            prev = curr;
-            curr = next;
-        }
+        struct deque64_entry *next = entry->next;
+        kfree(entry);
+        entry = next;
     }
 }
 
@@ -154,7 +159,7 @@ struct cpu_context *exit_handler(struct cpu_context *ctx)
         uart_puts("\r\n");
     }
 
-    // free current entry
+    // clear current entry
     current = NULL;
 
     return scheduler_handler(ctx);
@@ -196,9 +201,7 @@ struct cpu_context *waitpid_handler(struct cpu_context *ctx)
     current->wait_pid = pid;
     current->ctx = ctx;
 
-    struct queue_entry *entry = (struct queue_entry *)kmalloc(sizeof(struct queue_entry));
-    entry->data = (void *)current;
-    queue_enqueue(&wait_queue, entry);
+    deque64_add_right(&wait_queue, (uintptr_t)current);
     current = NULL;
 
     return scheduler_handler(ctx);
