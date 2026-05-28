@@ -36,6 +36,12 @@ void queue64_destroy(struct queue64 *q)
     q->capacity = 0;
 }
 
+uint64_t queue64_at(struct queue64 *q, size_t index)
+{
+    size_t pos = (q->head + index) % (q->capacity);
+    return q->data[pos];
+}
+
 void queue64_push(struct queue64 *q, uint64_t value)
 {
     if (q->length == q->capacity)

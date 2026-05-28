@@ -37,6 +37,18 @@ void queue64_destroy(struct queue64 *q);
 void queue64_push(struct queue64 *q, uint64_t value);
 
 /**
+ * Returns the element at logical index without removing it. Index 0 is the
+ * front. Caller must ensure index < q->length — behaviour is undefined
+ * otherwise.
+ *
+ * @param q:     queue to index into
+ * @param index: logical position from the front
+ *
+ * @return the value at that position
+ */
+uint64_t queue64_at(struct queue64 *q, size_t index);
+
+/**
  * Removes and returns the front element. Caller must ensure q->length > 0
  * before calling — behaviour is undefined on an empty queue.
  *
