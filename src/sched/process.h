@@ -20,12 +20,12 @@ typedef enum
 
 struct process
 {
-    uint64_t pid;
+    int64_t pid;
     proc_state_t state;
-    uint8_t *stack;
-    struct cpu_context *ctx;
+    uint8_t *stack;          // heap-allocated task stack (base address)
+    struct cpu_context *ctx; // saved register frame, embedded near the top of stack
     size_t stack_size;
-    uint64_t wait_pid;
+    uint64_t wait_pid; // PID this process is blocked on; 0 if not waiting
 };
 
 /**
@@ -41,22 +41,34 @@ struct process
 int create_process(struct process *proc, size_t stack_size);
 
 /**
+ * Allocates a new stack for dest and copies src's stack contents and context
+ * frame into it, preserving the ctx offset within the stack. Assigns dest a
+ * new PID and sets its state to PROC_CREATED. Call process_config or adjust
+ * dest->ctx->x0 before enqueueing.
+ *
+ * @param dest: caller-allocated process struct to initialize
+ * @param src:  process to copy from
+ *
+ * @return 0 on success, -1 if stack allocation fails
+ */
+int duplicate_process(struct process *dest, struct process *src);
+
+/**
  * Configures the process entry point and initial SPSR.
  * Must be called before the process is enqueued in the scheduler.
  *
- * @param proc: process to configure
+ * @param proc:  process to configure
  * @param entry: function the process will execute after its first eret
  */
 void process_config(struct process *proc, proc_entry entry);
 
 /**
  * Frees the task stack and nulls out stack and ctx pointers.
- * Requires the process to have been dequeued via scheduler_dequeue first,
- * which sets state to PROC_DEAD.
+ * Requires proc->state == PROC_DEAD.
  *
  * @param proc: process to destroy; must be in PROC_DEAD state
  *
- * @return 0 on success, -1 if proc is not in PROC_DEAD state
+ * @return 0 on success, -1 if proc->state != PROC_DEAD
  */
 int destroy_process(struct process *proc);
 

@@ -9,6 +9,7 @@
 #define SYSCALL_YIELD 1
 #define SYSCALL_GETPID 2
 #define SYSCALL_WAITPID 3
+#define SYSCALL_FORK 4
 
 /**
  * Dispatches a syscall based on the number in ctx->x0.
@@ -58,23 +59,34 @@ void syscall_exit(uint64_t status);
 
 /**
  * Returns the PID of the calling process via SYSCALL_GETPID (svc #0).
- * Traps into EL1, where getpid_handler writes current->proc->pid into
- * ctx->x0. Execution resumes in the calling task without a context switch.
+ * Traps into EL1, where getpid_handler writes current->pid into ctx->x0.
+ * Execution resumes in the calling task without a context switch.
  *
- * @return PID of the current process, or (uint64_t)-1 if no process is
- *         currently scheduled.
+ * @return PID of the current process, or -1 if no process is currently scheduled.
  */
-uint64_t syscall_getpid();
+int64_t syscall_getpid();
 
 /**
- * Waits for the process with the given PID to terminate via SYSCALL_WAITPID (svc #0).
- * Traps into EL1, where waitpid_handler waits for the specified process to terminate
- * and returns its exit status. Execution resumes in the calling task without a context switch.
+ * Blocks the calling process until the process with the given PID exits via
+ * SYSCALL_WAITPID (svc #0). Traps into EL1, where waitpid_handler moves the
+ * caller to the wait queue and performs a context switch. Execution resumes
+ * when the target process calls syscall_exit.
  *
  * @param pid: PID of the process to wait for
  *
- * @return exit status of the terminated process, or (uint64_t)-1 if no such process exists.
+ * @return exit status of the terminated process, or -1 if no process is
+ *         currently scheduled.
  */
-uint64_t syscall_waitpid(uint64_t pid);
+uint64_t syscall_waitpid(int64_t pid);
+
+/**
+ * Forks the calling process via SYSCALL_FORK (svc #0). Traps into EL1, where
+ * fork_handler duplicates the current process (stack and context) and enqueues
+ * the child. The child resumes from the same point with a return value of 0;
+ * the parent receives the child's PID.
+ *
+ * @return child PID in the parent, 0 in the child, or -1 on failure.
+ */
+int64_t syscall_fork();
 
 #endif // SYSCALL_H

@@ -36,21 +36,21 @@ make run
 - **PL031 RTC** — match alarm interrupt
 - **Heap allocator** — first-fit free-list with 4MB region, block splitting, and coalescing (`kmalloc`/`kfree`/`krealloc`); `kfree` returns error codes for NULL, out-of-range, and double-free
 - **Exception handling** — full save/restore of all 31 registers + ELR/SPSR; IRQ handlers return `struct cpu_context *` for context switching; IABT/DABT terminate the faulting process via `exit_handler`; unknown exceptions dump the full register context
-- **Preemptive scheduler** — FIFO run queue, timer-driven; tracks the running process via a `current` pointer; dedicated 4KB IRQ stack; `create_process`/`destroy_process` with 16-byte aligned task stacks
-- **Syscall interface** — `svc #0` dispatch table (`syscall_register_handler`); `syscall_yield()` triggers an immediate context switch; `syscall_exit(status)` terminates the calling process and schedules the next one; `syscall_getpid()` returns the calling process's PID; `syscall_waitpid(pid)` blocks the caller until the target process exits
+- **Preemptive scheduler** — FIFO run queue, timer-driven; tracks the running process via a `current` pointer; dedicated 4KB IRQ stack; `create_process`/`duplicate_process`/`destroy_process` with 16-byte aligned task stacks
+- **Syscall interface** — `svc #0` dispatch table (`syscall_register_handler`); `syscall_yield()` triggers an immediate context switch; `syscall_exit(status)` terminates the calling process and schedules the next one; `syscall_getpid()` returns the calling process's PID; `syscall_waitpid(pid)` blocks the caller until the target process exits; `syscall_fork()` duplicates the calling process (child resumes at the fork site with return value 0)
 
 ## Source layout
 
 ```
 src/
-  kernel.c          — kernel_init (subsystem bring-up), init (pid 1), child (pid 2)
+  kernel.c          — kernel_init (subsystem bring-up), init (pid 1), child (pid 2, forks to create pid 3)
   start.S           — AArch64 boot stub, saves DTB pointer, zeros BSS
   vectors.S         — exception vector table, save/restore_context macros
 
   arch/             — AArch64-specific
     cpu.c/h         — system register accessors (cntfrq, cntp, DAIF), SPSR defines, halt/hang
     irq.c/h         — exception handlers, IRQ dispatch table, cpu_context, irq_init
-    syscall.c/h     — syscall dispatch table, syscall_handler, syscall_register_handler, syscall_yield, syscall_exit, syscall_getpid, syscall_waitpid
+    syscall.c/h     — syscall dispatch table, syscall_handler, syscall_register_handler, syscall_yield, syscall_exit, syscall_getpid, syscall_waitpid, syscall_fork
 
   drivers/          — MMIO peripheral drivers
     uart.c/h        — PL011 UART
@@ -73,8 +73,8 @@ src/
     types.h         — stdint-style typedefs
 
   sched/            — scheduler and process management
-    process.c/h     — process struct, create/config/destroy
-    scheduler.c/h   — FIFO ready queue (dsa/queue64) and wait queue (dsa/deque64), scheduler_enqueue/dequeue, context switch via timer and yield/exit/waitpid syscalls
+    process.c/h     — process struct, create/duplicate/config/destroy
+    scheduler.c/h   — FIFO ready queue (dsa/queue64) and wait queue (dsa/deque64), scheduler_enqueue/dequeue, context switch via timer and yield/exit/waitpid/fork syscalls
 ```
 
 ## Memory map (QEMU virt)

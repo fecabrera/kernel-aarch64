@@ -1,4 +1,5 @@
 #include <mm/heap.h>
+#include <drivers/uart.h>
 #include <arch/cpu.h>
 #include "process.h"
 
@@ -25,6 +26,45 @@ int create_process(struct process *proc, size_t stack_size)
     proc->ctx = ctx;
     proc->stack = stack;
     proc->stack_size = stack_size;
+
+    return 0;
+}
+
+int duplicate_process(struct process *dest, struct process *src)
+{
+    size_t stack_size = src->stack_size;
+    uint8_t *stack = (uint8_t *)kmalloc_aligned(src->stack_size, 16);
+
+    if (stack == NULL)
+    {
+        return -1;
+    }
+
+    uintptr_t ctx_offset = (uintptr_t)src->ctx - (uintptr_t)src->stack;
+    struct cpu_context *ctx = (struct cpu_context *)(stack + ctx_offset);
+    memcpy(ctx, src->ctx, sizeof(struct cpu_context));
+
+    dest->pid = next_pid++;
+    dest->state = PROC_CREATED;
+    dest->ctx = ctx;
+    dest->stack = stack;
+    dest->stack_size = stack_size;
+
+    uart_puts("stack = 0x");
+    uart_put_uint_hex((uintptr_t)src->stack);
+    uart_puts(", ctx = 0x");
+    uart_put_uint_hex((uintptr_t)src->ctx);
+    uart_puts(", offset = 0x");
+    uart_put_uint_hex((uintptr_t)src->ctx - (uintptr_t)src->stack);
+    uart_puts("\r\n");
+
+    uart_puts("stack = 0x");
+    uart_put_uint_hex((uintptr_t)dest->stack);
+    uart_puts(", ctx = 0x");
+    uart_put_uint_hex((uintptr_t)dest->ctx);
+    uart_puts(", offset = 0x");
+    uart_put_uint_hex((uintptr_t)dest->ctx - (uintptr_t)dest->stack);
+    uart_puts("\r\n");
 
     return 0;
 }

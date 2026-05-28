@@ -21,6 +21,7 @@ void scheduler_init()
     syscall_register_handler(SYSCALL_YIELD, &yield_handler);
     syscall_register_handler(SYSCALL_GETPID, &getpid_handler);
     syscall_register_handler(SYSCALL_WAITPID, &waitpid_handler);
+    syscall_register_handler(SYSCALL_FORK, &fork_handler);
 }
 
 int scheduler_enqueue(struct process *proc)
@@ -69,7 +70,16 @@ struct cpu_context *scheduler_handler(struct cpu_context *ctx)
 
     if (current->ctx != ctx)
     {
-        uart_puts("[scheduler] context switch to pid ");
+        uart_puts("[scheduler] context_switch(");
+        uart_put_uint(current->pid);
+        uart_puts("), q = { ");
+        struct process **procs = (struct process **)ready_queue.data;
+        for (uint64_t i = 0; i < ready_queue.length; i++)
+        {
+            uart_put_uint(procs[i]->pid);
+            uart_puts(" ");
+        }
+        uart_puts("}, current = ");
         uart_put_uint(current->pid);
         uart_puts("\r\n");
     }
@@ -116,7 +126,7 @@ static void _notify_waiter(struct process *proc, uint64_t exit_status)
     queue64_push(&ready_queue, (uintptr_t)proc);
 }
 
-static void _notify_waiters(uint64_t pid, uint64_t exit_status)
+static void _notify_waiters(int64_t pid, uint64_t exit_status)
 {
     struct deque64_entry *entry = NULL;
     uart_puts("[scheduler] _notify_waiters(), exit_status = ");
@@ -187,7 +197,7 @@ struct cpu_context *getpid_handler(struct cpu_context *ctx)
 
 struct cpu_context *waitpid_handler(struct cpu_context *ctx)
 {
-    uint64_t pid = ctx->x1;
+    int64_t pid = ctx->x1;
 
     uart_puts("[scheduler] waitpid(");
     uart_put_uint(pid);
@@ -208,4 +218,29 @@ struct cpu_context *waitpid_handler(struct cpu_context *ctx)
     current = NULL;
 
     return scheduler_handler(ctx);
+}
+
+struct cpu_context *fork_handler(struct cpu_context *ctx)
+{
+    if (current == NULL)
+    {
+        uart_puts("[scheduler] no current process for fork!\r\n");
+        ctx->x0 = -1;
+        return ctx;
+    }
+
+    current->ctx = ctx;
+
+    uart_puts("[scheduler] fork(");
+    uart_put_uint(current->pid);
+    uart_puts(")\r\n");
+
+    struct process *child = (struct process *)kmalloc(sizeof(struct process));
+    duplicate_process(child, current);
+    scheduler_enqueue(child);
+
+    child->ctx->x0 = 0;
+    ctx->x0 = child->pid;
+
+    return ctx;
 }

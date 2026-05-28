@@ -12,8 +12,6 @@
 #include <sched/scheduler.h>
 #include "kernel.h"
 
-static struct process proc1, proc2;
-
 void kernel_init()
 {
     // Initialize DTB
@@ -49,15 +47,17 @@ void kernel_init()
     uart_puts("\r\n");
 
     // set up pid 1
-    if (create_process(&proc1, DEFAULT_STACK_SIZE) < 0)
+    struct process proc;
+
+    if (create_process(&proc, DEFAULT_STACK_SIZE) < 0)
     {
         uart_puts("[kernel] create_process() failed\r\n");
         hang();
     }
-    process_config(&proc1, &init);
+    process_config(&proc, &init);
 
     // schedule process
-    if (scheduler_enqueue(&proc1) < 0)
+    if (scheduler_enqueue(&proc) < 0)
     {
         uart_puts("[kernel] scheduler_enqueue() failed\r\n");
         hang();
@@ -75,25 +75,28 @@ void kernel_init()
 
 void init()
 {
-    uint64_t pid = syscall_getpid();
+    int64_t pid = syscall_getpid();
+
     uart_puts("[init] pid = ");
     uart_put_uint(pid);
     uart_puts("\r\n");
 
-    if (create_process(&proc2, DEFAULT_STACK_SIZE) < 0)
+    struct process proc;
+
+    if (create_process(&proc, DEFAULT_STACK_SIZE) < 0)
     {
         uart_puts("[init] create_process() failed\r\n");
         hang();
     }
-    process_config(&proc2, &child);
+    process_config(&proc, &child);
 
-    if (scheduler_enqueue(&proc2) < 0)
+    if (scheduler_enqueue(&proc) < 0)
     {
         uart_puts("[init] scheduler_enqueue() failed\r\n");
         hang();
     }
 
-    uint64_t exit_status = syscall_waitpid(proc2.pid);
+    uint64_t exit_status = syscall_waitpid(proc.pid);
     uart_puts("[init] child process terminated with status ");
     uart_put_uint(exit_status);
     uart_puts("\r\n");
@@ -103,10 +106,22 @@ void init()
 
 void child()
 {
-    uint64_t pid = syscall_getpid();
+    int64_t fork_pid = syscall_fork();
+    int64_t pid = syscall_getpid();
+
     uart_puts("[child] pid = ");
     uart_put_uint(pid);
+    uart_puts(", fork_pid = ");
+    uart_put_uint(fork_pid);
     uart_puts("\r\n");
 
-    syscall_exit(1);
+    if (fork_pid < 0)
+    {
+        uart_puts("[child] fork() failed!\r\n");
+        syscall_exit(2);
+    }
+    else if (fork_pid == 0)
+        syscall_exit(0);
+    else
+        syscall_exit(1);
 }
