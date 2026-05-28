@@ -1,4 +1,5 @@
 #include <dtb.h>
+#include <stdlib.h>
 #include <arch/irq.h>
 #include "uart.h"
 #include "gic.h"
@@ -10,6 +11,18 @@ void uart_putc(char c)
     while (UART_FR & UART_FR_TXFF)
         ; // Wait if TX FIFO full
     UART_DR = c;
+}
+
+void uart_printf(const char *format, ...)
+{
+    char buff[1024];
+    __builtin_va_list args;
+    __builtin_va_start(args, format);
+    int n = vsprintf(buff, format, args);
+    __builtin_va_end(args);
+
+    for (int i = 0; i < n; i++)
+        uart_putc(buff[i]);
 }
 
 void uart_puts(const char *s)

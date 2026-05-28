@@ -100,6 +100,15 @@
 void uart_putc(char c);
 
 /**
+ * Formats a string and writes it to the UART.
+ * Supports: %d/%i (signed int), %u (unsigned int), %x (hex), %s (string), %c (char), %%.
+ *
+ * @param format: printf-style format string
+ * @param ...: variadic arguments matching the format specifiers
+ */
+void uart_printf(const char *format, ...);
+
+/**
  * Writes a null-terminated string to the UART.
  *
  * @param s: pointer to the null-terminated string to transmit
