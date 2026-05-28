@@ -70,6 +70,7 @@ src/
   lib/              — architecture-independent libraries
     dtb.c/h         — FDT parser (be32, node/property walker)
     string.c/h      — freestanding string library (memcpy, memset, strcmp, ...)
+    stdlib.c/h      — itoa, vsprintf, sprintf (freestanding; uses __builtin_va_* instead of <stdarg.h>)
     types.h         — stdint-style typedefs
 
   sched/            — scheduler and process management
