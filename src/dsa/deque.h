@@ -1,6 +1,6 @@
 #pragma once
 
-#include <types.h>
+#include <stdint.h>
 
 // Doubly-linked list deque of uint64_t values.
 // Each element is heap-allocated; head points left, tail points right.

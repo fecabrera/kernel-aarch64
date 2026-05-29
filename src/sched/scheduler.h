@@ -1,5 +1,4 @@
-#ifndef SCHEDULER_H
-#define SCHEDULER_H
+#pragma once
 
 #include <arch/cpu.h>
 #include <arch/irq.h>
@@ -104,5 +103,3 @@ struct cpu_context *waitpid_handler(struct cpu_context *ctx);
  * @return ctx of the parent, with ctx->x0 set to the child's PID, or -1 on failure
  */
 struct cpu_context *fork_handler(struct cpu_context *ctx);
-
-#endif // SCHEDULER_H

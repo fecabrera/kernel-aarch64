@@ -1,8 +1,5 @@
-#ifndef KERNEL_H
-#define KERNEL_H
+#pragma once
 
 void kernel_init();
 void init();
 void child();
-
-#endif // KERNEL_H

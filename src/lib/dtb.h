@@ -1,8 +1,6 @@
-// dtb.h
-#ifndef DTB_H
-#define DTB_H
+#pragma once
 
-#include <types.h>
+#include <stdint.h>
 
 // DTB header — all fields big-endian
 struct fdt_header
@@ -129,5 +127,3 @@ int dtb_get_timer_irq_number(uint32_t *ptr);
  * @return 0 on success, -1 if the node or property was not found.
  */
 int dtb_get_rtc_irq_number(uint32_t *ptr);
-
-#endif

@@ -1,7 +1,6 @@
-#ifndef PROCESS_H
-#define PROCESS_H
+#pragma once
 
-#include <types.h>
+#include <stdint.h>
 #include <string.h>
 #include <arch/irq.h>
 
@@ -71,5 +70,3 @@ void process_config(struct process *proc, proc_entry entry);
  * @return 0 on success, -1 if proc->state != PROC_DEAD
  */
 int destroy_process(struct process *proc);
-
-#endif // PROCESS_H

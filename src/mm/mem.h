@@ -1,6 +1,3 @@
-#ifndef MEM_H
-#define MEM_H
+#pragma once
 
 void mem_init();
-
-#endif // MEM_H

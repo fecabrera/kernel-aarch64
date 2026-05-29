@@ -1,7 +1,6 @@
-#ifndef UART_H
-#define UART_H
+#pragma once
 
-#include <types.h>
+#include <stdint.h>
 
 #define UART0_BASE 0x09000000UL
 
@@ -131,5 +130,3 @@ void uart_init();
  * @return ctx unchanged (no context switch).
  */
 struct cpu_context *uart_irq_handler(struct cpu_context *ctx);
-
-#endif // UART_H

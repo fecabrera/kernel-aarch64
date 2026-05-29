@@ -1,5 +1,4 @@
-#ifndef SYSCALL_H
-#define SYSCALL_H
+#pragma once
 
 #include "irq.h"
 
@@ -88,5 +87,3 @@ uint64_t syscall_waitpid(int64_t pid);
  * @return child PID in the parent, 0 in the child, or -1 on failure.
  */
 int64_t syscall_fork();
-
-#endif // SYSCALL_H

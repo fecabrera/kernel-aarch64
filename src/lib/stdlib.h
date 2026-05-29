@@ -1,6 +1,6 @@
 #pragma once
 
-#include <types.h>
+#include <stdint.h>
 
 /**
  * Converts a signed integer to a null-terminated string in the given base.

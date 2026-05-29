@@ -1,7 +1,6 @@
-#ifndef GIC_H
-#define GIC_H
+#pragma once
 
-#include <types.h>
+#include <stdint.h>
 
 #define GICD_BASE 0x08000000UL
 #define GICC_BASE 0x08010000UL
@@ -105,5 +104,3 @@ uint32_t gic_acknowledge();
  * @param irq: IRQ ID returned by gic_acknowledge()
  */
 void gic_end_of_interrupt(uint32_t irq);
-
-#endif // GIC_H

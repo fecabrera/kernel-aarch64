@@ -1,7 +1,6 @@
-#ifndef STACK_H
-#define STACK_H
+#pragma once
 
-#include <types.h>
+#include <stdint.h>
 #include <string.h>
 
 // Dynamic array-backed LIFO stack of uint64_t values.
@@ -55,5 +54,3 @@ uint64_t stack64_pop(struct stack64 *s);
  * @return the top value
  */
 uint64_t stack64_peek(struct stack64 *s);
-
-#endif // STACK_H

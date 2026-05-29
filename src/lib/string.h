@@ -1,7 +1,6 @@
-#ifndef INCLUDE_H
-#define INCLUDE_H
+#pragma once
 
-#include <types.h>
+#include <stdint.h>
 
 #define NULL 0
 
@@ -117,5 +116,3 @@ void *memcpy(void *dest, const void *src, size_t count);
  * @return dest
  */
 void *memmove(void *dest, const void *src, size_t count);
-
-#endif // INCLUDE_H

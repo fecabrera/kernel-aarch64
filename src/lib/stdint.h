@@ -1,5 +1,4 @@
-#ifndef TYPES_H
-#define TYPES_H
+#pragma once
 
 typedef unsigned char uint8_t;
 typedef unsigned short uint16_t;
@@ -13,5 +12,3 @@ typedef signed long long int64_t;
 
 typedef uint64_t uintptr_t;
 typedef int64_t intptr_t;
-
-#endif // TYPES_H

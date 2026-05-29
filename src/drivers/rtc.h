@@ -1,7 +1,6 @@
-#ifndef RTC_H
-#define RTC_H
+#pragma once
 
-#include <types.h>
+#include <stdint.h>
 
 #define RTC_BASE 0x09010000UL
 
@@ -57,5 +56,3 @@ void rtc_set_time(uint32_t unix_time);
  * @param unix_time: Unix timestamp at which the alarm should fire
  */
 void rtc_set_alarm(uint32_t unix_time);
-
-#endif // RTC_H

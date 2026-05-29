@@ -1,6 +1,6 @@
 #pragma once
 
-#include <types.h>
+#include <stdint.h>
 #include <string.h>
 
 // Dynamic ring-buffer FIFO queue of uint64_t values.

@@ -1,7 +1,6 @@
-#ifndef CPU_H
-#define CPU_H
+#pragma once
 
-#include <types.h>
+#include <stdint.h>
 
 static inline void wfe() { __asm__ volatile("wfe"); }
 static inline void wfi() { __asm__ volatile("wfi"); }
@@ -71,5 +70,3 @@ uint64_t get_cntp_ctl_el0();
  * @param value: value to write (combination of CNTP_CTL_* flags)
  */
 void set_cntp_ctl_el0(const uint64_t value);
-
-#endif // CPU_H

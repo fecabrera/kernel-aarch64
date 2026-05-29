@@ -1,7 +1,6 @@
-#ifndef HEAP_H
-#define HEAP_H
+#pragma once
 
-#include <types.h>
+#include <stdint.h>
 #include <string.h>
 
 struct block_header
@@ -80,5 +79,3 @@ void *kmalloc_aligned(size_t size, size_t align);
  * and total used/free byte counts to the UART.
  */
 void heap_dump();
-
-#endif // HEAP_H
