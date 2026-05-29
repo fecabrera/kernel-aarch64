@@ -95,25 +95,8 @@ int deque64_is_empty(struct deque64 *dq)
     return dq->head == NULL;
 }
 
-struct deque64_entry *deque64_find(struct deque64 *dq, struct deque64_entry *start, int (*cmp)(struct deque64_entry *, void *), void *ctx)
+struct deque64_entry *deque64_remove(struct deque64 *dq, struct deque64_entry *entry)
 {
-    struct deque64_entry *entry = start ? start->next : dq->head;
-
-    while (entry != NULL)
-    {
-        if (cmp(entry, ctx) == 0)
-            return entry;
-
-        entry = entry->next;
-    }
-
-    return NULL;
-}
-
-struct deque64_entry *deque64_find_remove(struct deque64 *dq, struct deque64_entry *start, int (*cmp)(struct deque64_entry *, void *), void *ctx)
-{
-    struct deque64_entry *entry = deque64_find(dq, start, cmp, ctx);
-
     if (entry == NULL)
         return NULL;
 
@@ -126,4 +109,27 @@ struct deque64_entry *deque64_find_remove(struct deque64 *dq, struct deque64_ent
     _deque64_remove_entry(entry);
 
     return entry;
+}
+
+struct deque64_entry *deque64_find(struct deque64 *dq, struct deque64_entry *start, int (*cmp)(struct deque64_entry *, void *), void *ctx)
+{
+    struct deque64_entry *entry = NULL;
+
+    while ((entry = deque64_next(dq, start)))
+    {
+        if (cmp(entry, ctx) == 0)
+            return entry;
+    }
+
+    return NULL;
+}
+
+struct deque64_entry *deque64_find_remove(struct deque64 *dq, struct deque64_entry *start, int (*cmp)(struct deque64_entry *, void *), void *ctx)
+{
+    return deque64_remove(dq, deque64_find(dq, start, cmp, ctx));
+}
+
+struct deque64_entry *deque64_next(struct deque64 *dq, struct deque64_entry *start)
+{
+    return start ? start->next : dq->head;
 }

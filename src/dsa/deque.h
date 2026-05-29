@@ -83,6 +83,17 @@ uint64_t deque64_peek_right(struct deque64 *dq);
 int deque64_is_empty(struct deque64 *dq);
 
 /**
+ * Unlinks a known entry from the deque and returns it. The caller is
+ * responsible for freeing the returned entry. If entry is NULL, returns NULL.
+ *
+ * @param dq:    deque to remove from
+ * @param entry: entry to remove, or NULL
+ *
+ * @return entry, or NULL if entry was NULL
+ */
+struct deque64_entry *deque64_remove(struct deque64 *dq, struct deque64_entry *entry);
+
+/**
  * Returns the first entry after start for which cmp returns 0, or NULL if
  * none match. start is exclusive: search begins at start->next. If start is
  * NULL, search begins at the head.
@@ -110,3 +121,15 @@ struct deque64_entry *deque64_find(struct deque64 *dq, struct deque64_entry *sta
  * @return pointer to the removed entry, or NULL
  */
 struct deque64_entry *deque64_find_remove(struct deque64 *dq, struct deque64_entry *start, int (*cmp)(struct deque64_entry *, void *), void *ctx);
+
+/**
+ * Returns the entry after start, or the head if start is NULL. Returns NULL
+ * if the deque is empty or start is the last entry. Useful for iterating
+ * without modifying the deque.
+ *
+ * @param dq:    deque to iterate
+ * @param start: current entry, or NULL to get the first entry
+ *
+ * @return the next entry, or NULL
+ */
+struct deque64_entry *deque64_next(struct deque64 *dq, struct deque64_entry *start);
