@@ -36,6 +36,17 @@ int scheduler_enqueue(struct process *proc);
 struct process *scheduler_dequeue();
 
 /**
+ * Allocates a process, configures it with the given entry point, and enqueues
+ * it on the ready queue. Convenience wrapper around create_process,
+ * process_config, and scheduler_enqueue.
+ *
+ * @param entry: function to run as the process entry point
+ *
+ * @return PID of the newly spawned process
+ */
+pid_t scheduler_spawn(proc_entry entry);
+
+/**
  * FIFO scheduler. Ticks the sleep queue by ms_elapsed, waking any processes
  * whose sleep has expired. Then saves ctx into current->ctx and re-enqueues
  * current (if non-NULL), and pops the head of the ready queue as the new

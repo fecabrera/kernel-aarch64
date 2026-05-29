@@ -51,21 +51,8 @@ void kernel_init()
     printk("[kernel] back from yield(), result = %i\r\n", result);
 
     // set up pid 1
-    struct process proc;
-
-    if (create_process(&proc, DEFAULT_STACK_SIZE) < 0)
-    {
-        printk("[kernel] create_process() failed\r\n");
-        hang();
-    }
-    process_config(&proc, &init);
-
-    // schedule process
-    if (scheduler_enqueue(&proc) < 0)
-    {
-        printk("[kernel] scheduler_enqueue() failed\r\n");
-        hang();
-    }
+    pid_t pid = scheduler_spawn(&init);
+    printk("[kernel] spawned init process with pid = %i\r\n", pid);
 
     // force context switch via syscall
     result = syscall_yield();
@@ -100,18 +87,18 @@ void init()
 
 void child()
 {
-    pid_t fork_pid = syscall_fork();
+    pid_t child_pid = syscall_fork();
 
-    if (fork_pid < 0)
+    if (child_pid < 0)
     {
         printk("[child] fork() failed!\r\n");
         syscall_exit(2);
     }
 
     pid_t pid = syscall_getpid();
-    printk("[child] pid = %i, fork_pid = %i\r\n", pid, fork_pid);
+    printk("[child] pid = %i, child_pid = %i\r\n", pid, child_pid);
 
-    if (fork_pid == 0)
+    if (child_pid == 0)
     {
         printk("[child] going to sleep\r\n");
 

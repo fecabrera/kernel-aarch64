@@ -1,7 +1,7 @@
+#include <debug.h>
 #include <mm/heap.h>
 #include <dsa/queue.h>
 #include <dsa/deque.h>
-#include <debug.h>
 #include <drivers/gic.h>
 #include <arch/syscall.h>
 #include "scheduler.h"
@@ -56,6 +56,18 @@ struct process *scheduler_dequeue()
     dprintk("[scheduler] dequeue(%i)\r\n", proc->pid);
 
     return proc;
+}
+
+pid_t scheduler_spawn(proc_entry entry)
+{
+    dprintk("[scheduler] spawn()\r\n");
+
+    struct process *proc = (struct process *)kmalloc(sizeof(struct process));
+    create_process(proc, DEFAULT_STACK_SIZE);
+    scheduler_enqueue(proc);
+    process_config(proc, entry);
+
+    return proc->pid;
 }
 
 static void _notify_sleeper(struct process *proc)

@@ -93,7 +93,7 @@ src/
 
   sched/            — scheduler and process management
     process.c/h     — process struct, create/duplicate/config/destroy
-    scheduler.c/h   — FIFO ready queue (dsa/queue64) and wait queue (dsa/deque64), scheduler_enqueue/dequeue, context switch via timer and yield/exit/waitpid/fork syscalls
+    scheduler.c/h   — FIFO ready queue (dsa/queue64) and wait queue (dsa/deque64), scheduler_enqueue/dequeue/spawn, context switch via timer and yield/exit/waitpid/fork syscalls
 ```
 
 ## Memory map (QEMU virt)
