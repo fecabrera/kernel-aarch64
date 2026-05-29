@@ -74,6 +74,7 @@ src/
     stdint.h        — stdint-style typedefs (uint8_t … uint64_t, intptr_t)
     limits.h        — integer limit macros (AArch64/LP64; unsigned char default)
     time.h          — time_t typedef (uint64_t)
+    sys/types.h     — pid_t typedef (int64_t)
 
   sched/            — scheduler and process management
     process.c/h     — process struct, create/duplicate/config/destroy

@@ -57,7 +57,7 @@ int64_t syscall_yield()
     return ret;
 }
 
-void syscall_exit(uint64_t status)
+void syscall_exit(int64_t status)
 {
     __asm__ volatile(
         "mov x0, %0\n"
@@ -69,7 +69,7 @@ void syscall_exit(uint64_t status)
     halt();
 }
 
-int64_t syscall_getpid()
+pid_t syscall_getpid()
 {
     int64_t ret;
     __asm__ volatile(
@@ -82,7 +82,7 @@ int64_t syscall_getpid()
     return ret;
 }
 
-uint64_t syscall_waitpid(int64_t pid)
+int64_t syscall_waitpid(pid_t pid)
 {
     int64_t ret;
     __asm__ volatile(
@@ -96,7 +96,7 @@ uint64_t syscall_waitpid(int64_t pid)
     return ret;
 }
 
-int64_t syscall_fork()
+pid_t syscall_fork()
 {
     int64_t ret;
     __asm__ volatile(

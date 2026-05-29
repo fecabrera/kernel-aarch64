@@ -12,7 +12,7 @@
 #include <sched/scheduler.h>
 #include "kernel.h"
 
-void kernel_init()
+static void _kernel_init()
 {
     // Initialize DTB
     dtb_init();
@@ -31,6 +31,11 @@ void kernel_init()
     rtc_init();
     scheduler_init();
     irq_enable();
+}
+
+void kernel_init()
+{
+    _kernel_init();
 
     // test RTC alarm
     uint32_t timestamp = rtc_get_time();
@@ -71,26 +76,22 @@ void kernel_init()
 
 void init()
 {
-    int64_t pid = syscall_getpid();
+    pid_t pid = syscall_getpid();
 
     uart_printf("[init] pid = %i\r\n", pid);
 
-    struct process proc;
+    pid_t fork_pid = syscall_fork();
 
-    if (create_process(&proc, DEFAULT_STACK_SIZE) < 0)
+    if (fork_pid < 0)
     {
-        uart_printf("[init] create_process() failed\r\n");
-        hang();
-    }
-    process_config(&proc, &child);
-
-    if (scheduler_enqueue(&proc) < 0)
-    {
-        uart_printf("[init] scheduler_enqueue() failed\r\n");
-        hang();
+        uart_printf("[child] fork() failed!\r\n");
+        halt();
     }
 
-    uint64_t exit_status = syscall_waitpid(proc.pid);
+    if (fork_pid == 0)
+        return child();
+
+    int64_t exit_status = syscall_waitpid(fork_pid);
     uart_printf("[init] child process terminated with status %i\r\n", exit_status);
 
     halt();
@@ -98,7 +99,7 @@ void init()
 
 void child()
 {
-    int64_t fork_pid = syscall_fork();
+    pid_t fork_pid = syscall_fork();
 
     if (fork_pid < 0)
     {
@@ -106,7 +107,7 @@ void child()
         syscall_exit(2);
     }
 
-    int64_t pid = syscall_getpid();
+    pid_t pid = syscall_getpid();
     uart_printf("[child] pid = %i, fork_pid = %i\r\n", pid, fork_pid);
 
     if (fork_pid == 0)
@@ -115,7 +116,7 @@ void child()
         syscall_sleep(2);
         time_t t1 = syscall_time();
 
-        uart_printf("[child] back from sleep, elapsed = %us\r\n", pid, t1 - t0);
+        uart_printf("[child] back from sleep, elapsed = %is\r\n", t1 - t0);
         syscall_exit(0);
     }
     else

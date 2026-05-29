@@ -49,7 +49,7 @@ struct process *scheduler_dequeue();
  *
  * @return saved context of the next task to run
  */
-struct cpu_context *scheduler_handler(struct cpu_context *ctx, uint64_t ms_elapsed);
+struct cpu_context *scheduler_handler(struct cpu_context *ctx, time_t ms_elapsed);
 
 /**
  * Syscall handler for SYSCALL_EXIT. Marks current PROC_DEAD, notifies any

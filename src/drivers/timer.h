@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <time.h>
 
 #define DEFAULT_TIMER_INTERVAL 10
 
@@ -31,4 +32,4 @@ struct cpu_context *timer_irq_handler(struct cpu_context *ctx);
  *
  * @param interval: tick interval in milliseconds (e.g. 10 for 10ms)
  */
-void timer_set_interval(uint64_t interval);
+void timer_set_interval(time_t interval);

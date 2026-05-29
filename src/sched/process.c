@@ -3,7 +3,7 @@
 #include <arch/cpu.h>
 #include "process.h"
 
-uint64_t next_pid = 1;
+static pid_t next_pid = 1;
 
 int create_process(struct process *proc, size_t stack_size)
 {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <time.h>
+#include <sys/types.h>
 #include "irq.h"
 
 #define NUM_SYSCALLS 256
@@ -57,7 +58,7 @@ int64_t syscall_yield();
  *
  * @param status: exit status passed in x1 (logged by exit_handler).
  */
-void syscall_exit(uint64_t status);
+void syscall_exit(int64_t status);
 
 /**
  * Returns the PID of the calling process via SYSCALL_GETPID (svc #0).
@@ -66,7 +67,7 @@ void syscall_exit(uint64_t status);
  *
  * @return PID of the current process, or -1 if no process is currently scheduled.
  */
-int64_t syscall_getpid();
+pid_t syscall_getpid();
 
 /**
  * Blocks the calling process until the process with the given PID exits via
@@ -79,7 +80,7 @@ int64_t syscall_getpid();
  * @return exit status of the terminated process, or -1 if no process is
  *         currently scheduled.
  */
-uint64_t syscall_waitpid(int64_t pid);
+int64_t syscall_waitpid(pid_t pid);
 
 /**
  * Forks the calling process via SYSCALL_FORK (svc #0). Traps into EL1, where
@@ -89,13 +90,13 @@ uint64_t syscall_waitpid(int64_t pid);
  *
  * @return child PID in the parent, 0 in the child, or -1 on failure.
  */
-int64_t syscall_fork();
+pid_t syscall_fork();
 
 /**
  * Blocks the calling process for the given number of seconds via
  * SYSCALL_SLEEP (svc #0). Traps into EL1, where sleep_handler sets
  * process->sleep_for and moves the caller to the sleep queue. The timer
- * tick decrements sleep_for on each tick; execution resumes when it reaches
+ * tick decrements sleep_for on each tick; process is enqueued when it reaches
  * zero.
  *
  * @param seconds: number of seconds to sleep

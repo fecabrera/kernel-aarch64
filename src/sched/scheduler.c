@@ -87,7 +87,7 @@ static void _notify_sleepers(uint64_t ms_elapsed)
     }
 }
 
-struct cpu_context *scheduler_handler(struct cpu_context *ctx, uint64_t ms_elapsed)
+struct cpu_context *scheduler_handler(struct cpu_context *ctx, time_t ms_elapsed)
 {
     if (ms_elapsed > 0 && !deque64_is_empty(&sleep_queue))
         _notify_sleepers(ms_elapsed);
@@ -129,7 +129,7 @@ struct cpu_context *yield_handler(struct cpu_context *ctx)
 static int _pid_eq(struct deque64_entry *entry, void *pid)
 {
     struct process *proc = (struct process *)entry->value;
-    uint64_t value = *(uint64_t *)pid;
+    pid_t value = *(pid_t *)pid;
 
     if (proc->wait_pid == value)
         return 0;
@@ -137,7 +137,7 @@ static int _pid_eq(struct deque64_entry *entry, void *pid)
     return -1;
 }
 
-static void _notify_waiter(struct process *proc, uint64_t exit_status)
+static void _notify_waiter(struct process *proc, int64_t exit_status)
 {
     uart_printf("[scheduler] _notify_waiter(%i), exit_status = %i\r\n", proc->pid, exit_status);
 
@@ -148,7 +148,7 @@ static void _notify_waiter(struct process *proc, uint64_t exit_status)
     queue64_push(&ready_queue, (uintptr_t)proc);
 }
 
-static void _notify_waiters(int64_t pid, uint64_t exit_status)
+static void _notify_waiters(pid_t pid, int64_t exit_status)
 {
     struct deque64_entry *entry = NULL;
     uart_printf("[scheduler] _notify_waiters(), exit_status = %i\r\n", exit_status);
@@ -204,7 +204,7 @@ struct cpu_context *getpid_handler(struct cpu_context *ctx)
 
 struct cpu_context *waitpid_handler(struct cpu_context *ctx)
 {
-    int64_t pid = ctx->x1;
+    pid_t pid = ctx->x1;
 
     uart_printf("[scheduler] waitpid(%i)\r\n", pid);
 

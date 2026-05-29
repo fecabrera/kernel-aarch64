@@ -7,8 +7,8 @@
 #include "uart.h"
 
 static uint32_t timer_irq;
-static uint64_t timer_freq;
-static uint64_t timer_interval = DEFAULT_TIMER_INTERVAL;
+static time_t timer_freq;
+static time_t timer_interval = DEFAULT_TIMER_INTERVAL;
 
 #define _time_quanta (timer_freq * timer_interval / 1000)
 #define _time_quantum(n) (n * _time_quanta)
@@ -46,7 +46,7 @@ struct cpu_context *timer_irq_handler(struct cpu_context *ctx)
     return next_ctx;
 }
 
-void timer_set_interval(uint64_t interval)
+void timer_set_interval(time_t interval)
 {
     timer_interval = interval;
 }
