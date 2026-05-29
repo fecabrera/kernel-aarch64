@@ -1,5 +1,6 @@
 #include <dtb.h>
 #include <arch/irq.h>
+#include <arch/syscall.h>
 #include "rtc.h"
 #include "gic.h"
 #include "uart.h"
@@ -14,6 +15,7 @@ void rtc_init()
     {
         uart_printf("[rtc] Initializing IRQ: %i\r\n", rtc_irq);
         irq_register_handler(rtc_irq, &rtc_irq_handler);
+        syscall_register_handler(SYSCALL_TIME, &time_handler);
     }
     else
     {
@@ -46,5 +48,13 @@ struct cpu_context *rtc_irq_handler(struct cpu_context *ctx)
     RTC_ICR = RTC_INT_MATCH;   // clear interrupt
     RTC_IMSC = ~RTC_INT_MATCH; // mask
 
+    return ctx;
+}
+
+struct cpu_context *time_handler(struct cpu_context *ctx)
+{
+    uart_printf("[scheduler] time()\r\n");
+
+    ctx->x0 = rtc_get_time();
     return ctx;
 }

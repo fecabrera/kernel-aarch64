@@ -20,7 +20,9 @@
 #define RTC_INT_MATCH (1 << 0) // Match interrupt
 
 /**
- * Enables the RTC by setting the EN bit in CR and reads the IRQ number from the DTB.
+ * Enables the RTC by setting the EN bit in CR, reads the IRQ number from the
+ * DTB, registers rtc_irq_handler with the GIC, and registers time_handler for
+ * SYSCALL_TIME.
  */
 void rtc_init();
 
@@ -56,3 +58,14 @@ void rtc_set_time(uint32_t unix_time);
  * @param unix_time: Unix timestamp at which the alarm should fire
  */
 void rtc_set_alarm(uint32_t unix_time);
+
+/**
+ * Syscall handler for SYSCALL_TIME. Reads the current Unix timestamp from
+ * the RTC data register (RTC_DR) and writes it into ctx->x0. Does not
+ * perform a context switch.
+ *
+ * @param ctx: saved context of the calling process
+ *
+ * @return ctx unchanged, with ctx->x0 set to the current Unix timestamp
+ */
+struct cpu_context *time_handler(struct cpu_context *ctx);

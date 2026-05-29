@@ -37,7 +37,7 @@ make run
 - **Heap allocator** — first-fit free-list with 4MB region, block splitting, and coalescing (`kmalloc`/`kfree`/`krealloc`); `kfree` returns error codes for NULL, out-of-range, and double-free
 - **Exception handling** — full save/restore of all 31 registers + ELR/SPSR; IRQ handlers return `struct cpu_context *` for context switching; IABT/DABT terminate the faulting process via `exit_handler`; unknown exceptions dump the full register context
 - **Preemptive scheduler** — FIFO run queue, timer-driven; tracks the running process via a `current` pointer; dedicated 4KB IRQ stack; `create_process`/`duplicate_process`/`destroy_process` with 16-byte aligned task stacks
-- **Syscall interface** — `svc #0` dispatch table (`syscall_register_handler`); `syscall_yield()` triggers an immediate context switch; `syscall_exit(status)` terminates the calling process and schedules the next one; `syscall_getpid()` returns the calling process's PID; `syscall_waitpid(pid)` blocks the caller until the target process exits; `syscall_fork()` duplicates the calling process (child resumes at the fork site with return value 0); `syscall_sleep(seconds)` blocks the caller in a sleep queue; the timer tick decrements `sleep_for` until it reaches zero
+- **Syscall interface** — `svc #0` dispatch table (`syscall_register_handler`); `syscall_yield()` triggers an immediate context switch; `syscall_exit(status)` terminates the calling process and schedules the next one; `syscall_getpid()` returns the calling process's PID; `syscall_waitpid(pid)` blocks the caller until the target process exits; `syscall_fork()` duplicates the calling process (child resumes at the fork site with return value 0); `syscall_sleep(seconds)` blocks the caller in a sleep queue; the timer tick decrements `sleep_for` until it reaches zero; `syscall_time()` returns the current Unix timestamp from the RTC
 
 ## Source layout
 
@@ -73,6 +73,7 @@ src/
     stdlib.c/h      — itoa, vsprintf, sprintf (freestanding; uses __builtin_va_* instead of <stdarg.h>)
     stdint.h        — stdint-style typedefs (uint8_t … uint64_t, intptr_t)
     limits.h        — integer limit macros (AArch64/LP64; unsigned char default)
+    time.h          — time_t typedef (uint64_t)
 
   sched/            — scheduler and process management
     process.c/h     — process struct, create/duplicate/config/destroy

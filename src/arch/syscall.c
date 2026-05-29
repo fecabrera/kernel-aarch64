@@ -109,7 +109,7 @@ int64_t syscall_fork()
     return ret;
 }
 
-int64_t syscall_sleep(uint64_t seconds)
+int64_t syscall_sleep(time_t seconds)
 {
     int64_t ret;
     __asm__ volatile(
@@ -120,5 +120,18 @@ int64_t syscall_sleep(uint64_t seconds)
         : "=r"(ret)
         : "r"((uint64_t)SYSCALL_SLEEP), "r"(seconds)
         : "x0", "x1");
+    return ret;
+}
+
+time_t syscall_time()
+{
+    time_t ret;
+    __asm__ volatile(
+        "mov x0, %1\n"
+        "svc #0\n"
+        "mov %0, x0"
+        : "=r"(ret)
+        : "r"((uint64_t)SYSCALL_TIME)
+        : "x0");
     return ret;
 }

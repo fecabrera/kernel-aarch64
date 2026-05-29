@@ -111,10 +111,15 @@ void child()
 
     if (fork_pid == 0)
     {
-        syscall_sleep(5);
-        uart_printf("[child] back from sleep, pid = %i\r\n", pid);
+        time_t t0 = syscall_time();
+        syscall_sleep(2);
+        time_t t1 = syscall_time();
+
+        uart_printf("[child] back from sleep, elapsed = %us\r\n", pid, t1 - t0);
         syscall_exit(0);
     }
     else
+    {
         syscall_exit(1);
+    }
 }

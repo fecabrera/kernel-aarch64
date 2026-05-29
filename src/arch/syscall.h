@@ -1,5 +1,6 @@
 #pragma once
 
+#include <time.h>
 #include "irq.h"
 
 #define NUM_SYSCALLS 256
@@ -10,6 +11,7 @@
 #define SYSCALL_WAITPID 3
 #define SYSCALL_FORK 4
 #define SYSCALL_SLEEP 5
+#define SYSCALL_TIME 6
 
 /**
  * Dispatches a syscall based on the number in ctx->x0.
@@ -100,4 +102,13 @@ int64_t syscall_fork();
  *
  * @return 0 on wakeup, or -1 if no process is currently scheduled.
  */
-int64_t syscall_sleep(uint64_t seconds);
+int64_t syscall_sleep(time_t seconds);
+
+/**
+ * Returns the current Unix timestamp via SYSCALL_TIME (svc #0).
+ * Traps into EL1, where time_handler reads the RTC and writes the value
+ * into ctx->x0.
+ *
+ * @return current Unix timestamp, or -1 on failure.
+ */
+time_t syscall_time();
