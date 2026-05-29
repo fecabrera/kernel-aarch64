@@ -19,6 +19,12 @@ brew install aarch64-elf-gcc qemu
 make
 ```
 
+Enable debug logging (activates `dprintk` output):
+
+```sh
+make CFLAGS_EXTRA=-DDEBUG
+```
+
 Output: `kernel.elf` and `kernel.img`.
 
 ## Run
@@ -76,6 +82,7 @@ src/
     deque.c/h       — doubly-linked deque of uint64_t (deque64_add/remove/peek left/right, find, find_remove, remove, next)
 
   lib/              — architecture-independent libraries
+    debug.c/h       — printk (always on) and dprintk (DEBUG=1 only), both backed by uart_vprintf
     dtb.c/h         — FDT parser (be32, node/property walker)
     string.c/h      — freestanding string library (memcpy, memset, strcmp, ...)
     stdlib.c/h      — itoa, vsprintf, sprintf (freestanding; uses __builtin_va_* instead of <stdarg.h>)

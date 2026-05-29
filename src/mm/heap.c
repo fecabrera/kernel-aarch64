@@ -1,4 +1,4 @@
-#include <drivers/uart.h>
+#include <debug.h>
 #include "heap.h"
 
 static struct block_header *heap_head = 0;
@@ -68,7 +68,7 @@ void *kmalloc(size_t size)
         cur = cur->next;
     }
 
-    uart_printf("[heap] kmalloc: out of memory!\r\n");
+    dprintk("[heap] kmalloc: out of memory!\r\n");
     return NULL;
 }
 
@@ -84,13 +84,13 @@ int kfree(void *ptr)
     // Sanity check — ptr should be inside heap
     if ((uint8_t *)hdr < _heap_start || (uint8_t *)hdr >= _heap_end)
     {
-        uart_printf("[heap] kfree: pointer out of range!\r\n");
+        dprintk("[heap] kfree: pointer out of range!\r\n");
         return -2;
     }
 
     if (hdr->free)
     {
-        uart_printf("[heap] kfree: double free detected!\r\n");
+        dprintk("[heap] kfree: double free detected!\r\n");
         return -3;
     }
 
@@ -153,7 +153,7 @@ void *kmalloc_aligned(size_t size, size_t align)
 
 void heap_dump()
 {
-    uart_printf("\r\n=== heap dump ===\r\n");
+    dprintk("\r\n=== heap dump ===\r\n");
 
     struct block_header *cur = heap_head;
     size_t used = 0, free = 0;
@@ -161,7 +161,7 @@ void heap_dump()
     int i = 0;
     while (cur)
     {
-        uart_printf("  [%i] addr=0x%x size=%i %s\r\n", i++, cur + HEADER_SIZE, cur->size, cur->free ? "FREE" : "USED");
+        dprintk("  [%i] addr=0x%x size=%i %s\r\n", i++, cur + HEADER_SIZE, cur->size, cur->free ? "FREE" : "USED");
 
         if (cur->free)
             free += cur->size;
@@ -171,7 +171,7 @@ void heap_dump()
         cur = cur->next;
     }
 
-    uart_printf("  used: %i bytes\r\n", used);
-    uart_printf("  free: %i bytes\r\n", free);
-    uart_printf("=================\r\n\r\n");
+    dprintk("  used: %i bytes\r\n", used);
+    dprintk("  free: %i bytes\r\n", free);
+    dprintk("=================\r\n\r\n");
 }

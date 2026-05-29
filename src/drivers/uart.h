@@ -108,6 +108,15 @@ void uart_putc(char c);
 void uart_printf(const char *format, ...);
 
 /**
+ * Formats a string and writes it to the UART using a pre-initialized va_list.
+ * Supports: %d/%i (signed int), %u (unsigned int), %x (hex), %s (string), %c (char), %%.
+ *
+ * @param format: printf-style format string
+ * @param args:   variadic argument list (must be initialized by the caller)
+ */
+void uart_vprintf(const char *format, __builtin_va_list args);
+
+/**
  * Writes a null-terminated string to the UART.
  *
  * @param s: pointer to the null-terminated string to transmit

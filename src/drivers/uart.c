@@ -1,4 +1,5 @@
 #include <dtb.h>
+#include <debug.h>
 #include <stdlib.h>
 #include <arch/irq.h>
 #include "uart.h"
@@ -15,11 +16,16 @@ void uart_putc(char c)
 
 void uart_printf(const char *format, ...)
 {
-    char buff[1024];
     __builtin_va_list args;
     __builtin_va_start(args, format);
-    int n = vsprintf(buff, format, args);
+    uart_vprintf(format, args);
     __builtin_va_end(args);
+}
+
+void uart_vprintf(const char *format, __builtin_va_list args)
+{
+    char buff[1024];
+    int n = vsprintf(buff, format, args);
 
     for (int i = 0; i < n; i++)
         uart_putc(buff[i]);
@@ -58,13 +64,13 @@ void uart_init()
 
     if (dtb_get_uart_irq_number(&uart_irq) == 0)
     {
-        uart_printf("[uart] Initializing IRQ: %i\r\n", uart_irq);
+        dprintk("[uart] Initializing IRQ: %i\r\n", uart_irq);
         irq_register_handler(uart_irq, &uart_irq_handler);
         gic_enable_irq(uart_irq);
     }
     else
     {
-        uart_printf("[uart] IRQ not found!!\r\n");
+        dprintk("[uart] IRQ not found!!\r\n");
     }
 }
 

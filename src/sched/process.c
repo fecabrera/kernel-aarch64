@@ -1,5 +1,5 @@
 #include <mm/heap.h>
-#include <drivers/uart.h>
+#include <debug.h>
 #include <arch/cpu.h>
 #include "process.h"
 

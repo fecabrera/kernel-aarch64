@@ -1,4 +1,5 @@
 #include <dtb.h>
+#include <debug.h>
 #include <arch/cpu.h>
 #include <arch/irq.h>
 #include <arch/syscall.h>
@@ -42,19 +43,19 @@ void kernel_init()
     rtc_set_alarm(timestamp + 1);
 
     // test yield
-    uart_printf("[kernel] testing yield()\r\n");
+    printk("[kernel] testing yield()\r\n");
     int64_t result = syscall_yield();
 
     // since there are no other processes, there's no context switch and we should
     // be back immediately with the same context
-    uart_printf("[kernel] back from yield(), result = %i\r\n", result);
+    printk("[kernel] back from yield(), result = %i\r\n", result);
 
     // set up pid 1
     struct process proc;
 
     if (create_process(&proc, DEFAULT_STACK_SIZE) < 0)
     {
-        uart_printf("[kernel] create_process() failed\r\n");
+        printk("[kernel] create_process() failed\r\n");
         hang();
     }
     process_config(&proc, &init);
@@ -62,7 +63,7 @@ void kernel_init()
     // schedule process
     if (scheduler_enqueue(&proc) < 0)
     {
-        uart_printf("[kernel] scheduler_enqueue() failed\r\n");
+        printk("[kernel] scheduler_enqueue() failed\r\n");
         hang();
     }
 
@@ -71,20 +72,20 @@ void kernel_init()
 
     // note that since there are items in the ready queue, this becomes unreachable
     // @todo: add idle task to run when ready queue is empty, then this becomes reachable
-    uart_printf("[kernel] unexpectedly back from yield(), result = %i\r\n", result);
+    printk("[kernel] unexpectedly back from yield(), result = %i\r\n", result);
 }
 
 void init()
 {
     pid_t pid = syscall_getpid();
 
-    uart_printf("[init] pid = %i\r\n", pid);
+    printk("[init] pid = %i\r\n", pid);
 
     pid_t fork_pid = syscall_fork();
 
     if (fork_pid < 0)
     {
-        uart_printf("[child] fork() failed!\r\n");
+        printk("[child] fork() failed!\r\n");
         halt();
     }
 
@@ -92,7 +93,7 @@ void init()
         return child();
 
     int64_t exit_status = syscall_waitpid(fork_pid);
-    uart_printf("[init] child process terminated with status %i\r\n", exit_status);
+    printk("[init] child process (pid %i) terminated with status %i\r\n", fork_pid, exit_status);
 
     halt();
 }
@@ -103,20 +104,22 @@ void child()
 
     if (fork_pid < 0)
     {
-        uart_printf("[child] fork() failed!\r\n");
+        printk("[child] fork() failed!\r\n");
         syscall_exit(2);
     }
 
     pid_t pid = syscall_getpid();
-    uart_printf("[child] pid = %i, fork_pid = %i\r\n", pid, fork_pid);
+    printk("[child] pid = %i, fork_pid = %i\r\n", pid, fork_pid);
 
     if (fork_pid == 0)
     {
+        printk("[child] going to sleep\r\n");
+
         time_t t0 = syscall_time();
         syscall_sleep(2);
         time_t t1 = syscall_time();
 
-        uart_printf("[child] back from sleep, elapsed = %is\r\n", t1 - t0);
+        printk("[child] back from sleep, elapsed = %is\r\n", t1 - t0);
         syscall_exit(0);
     }
     else

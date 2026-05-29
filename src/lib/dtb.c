@@ -1,8 +1,7 @@
-// dtb.c
 #include <string.h>
 #include <dtb.h>
+#include <debug.h>
 #include <arch/cpu.h>
-#include <drivers/uart.h>
 
 // DTB is big-endian, host is little-endian — must swap
 static uint32_t be32(uint32_t x)
@@ -22,7 +21,7 @@ int dtb_init()
 
     if (be32(hdr->magic) != FDT_MAGIC)
     {
-        uart_puts("[dtb] bad magic!\r\n");
+        dprintk("[dtb] bad magic!\r\n");
         return -1;
     }
 
@@ -32,23 +31,23 @@ int dtb_init()
     struct fdt_prop prop;
     if (dtb_find_prop("", "model", &prop) == 0)
     {
-        uart_puts("[dtb] model = ");
-        uart_puts((const char *)prop.data);
-        uart_puts("\r\n");
+        dprintk("[dtb] model = ");
+        dprintk((const char *)prop.data);
+        dprintk("\r\n");
     }
     if (dtb_find_prop("", "compatible", &prop) == 0)
     {
         const char *s = (const char *)prop.data;
         const char *end = s + prop.len;
-        uart_puts("[dtb] compatible =");
+        dprintk("[dtb] compatible =");
         while (s < end)
         {
-            uart_puts(" \"");
-            uart_puts(s);
-            uart_puts("\"");
+            dprintk(" \"");
+            dprintk(s);
+            dprintk("\"");
             s += strlen(s) + 1;
         }
-        uart_puts("\r\n");
+        dprintk("\r\n");
     }
 
     return 0;
@@ -125,7 +124,7 @@ int dtb_find_prop(const char *node_path, const char *prop_name, struct fdt_prop 
 
 void dtb_dump()
 {
-    uart_puts("\r\n=== dtb dump ===\r\n");
+    dprintk("\r\n=== dtb dump ===\r\n");
 
     const uint32_t *p = struct_base;
     int depth = 0;
@@ -138,10 +137,10 @@ void dtb_dump()
         {
             const char *name = (const char *)p;
             for (int i = 0; i < depth; i++)
-                uart_puts("  ");
-            uart_puts("[node] ");
-            uart_puts(*name ? name : "/");
-            uart_puts("\r\n");
+                dprintk("  ");
+            dprintk("[node] ");
+            dprintk(*name ? name : "/");
+            dprintk("\r\n");
             depth++;
             uint32_t len = strlen(name) + 1;
             p += (len + 3) / 4;
@@ -155,8 +154,8 @@ void dtb_dump()
             uint32_t len = be32(*p++);
             uint32_t nameoff = be32(*p++);
             for (int i = 0; i < depth; i++)
-                uart_printf("  ");
-            uart_printf("  %s ( %i bytes)\r\n", strings + nameoff, len);
+                dprintk("  ");
+            dprintk("  %s ( %i bytes)\r\n", strings + nameoff, len);
             p += (len + 3) / 4;
         }
         else if (token == FDT_END)
@@ -164,7 +163,7 @@ void dtb_dump()
             break;
         }
     }
-    uart_puts("=================\r\n\r\n");
+    dprintk("=================\r\n\r\n");
 }
 
 int dtb_get_memory_register(struct memreg *ptr)
@@ -207,7 +206,7 @@ int dtb_get_uart_irq_number(uint32_t *ptr)
     if (ret == 0)
     {
         uint32_t n = dtb_get_irq_count(&prop);
-        uart_printf("[dtb] Discovered %i UART devices", n);
+        dprintk("[dtb] Discovered %i UART devices", n);
 
         *ptr = dtb_get_irq_number(&prop, 0);
     }
@@ -215,14 +214,14 @@ int dtb_get_uart_irq_number(uint32_t *ptr)
     {
         const char *s = (const char *)prop.data;
         const char *end = s + prop.len;
-        uart_printf(", compatible =");
+        dprintk(", compatible =");
         while (s < end)
         {
-            uart_printf(" \"%s\"", s);
+            dprintk(" \"%s\"", s);
             s += strlen(s) + 1;
         }
     }
-    uart_printf("\r\n");
+    dprintk("\r\n");
     return ret;
 }
 
@@ -233,7 +232,7 @@ int dtb_get_timer_irq_number(uint32_t *ptr)
     if (ret == 0)
     {
         uint32_t n = dtb_get_irq_count(&prop);
-        uart_printf("[dtb] Discovered %i timer devices", n);
+        dprintk("[dtb] Discovered %i timer devices", n);
 
         *ptr = dtb_get_irq_number(&prop, 1); // entry 1 = EL1 physical timer
     }
@@ -241,14 +240,14 @@ int dtb_get_timer_irq_number(uint32_t *ptr)
     {
         const char *s = (const char *)prop.data;
         const char *end = s + prop.len;
-        uart_printf(", compatible =");
+        dprintk(", compatible =");
         while (s < end)
         {
-            uart_printf(" \"%s\"", s);
+            dprintk(" \"%s\"", s);
             s += strlen(s) + 1;
         }
     }
-    uart_printf("\r\n");
+    dprintk("\r\n");
     return ret;
 }
 
@@ -259,7 +258,7 @@ int dtb_get_rtc_irq_number(uint32_t *ptr)
     if (ret == 0)
     {
         uint32_t n = dtb_get_irq_count(&prop);
-        uart_printf("[dtb] Discovered %i RTC devices", n);
+        dprintk("[dtb] Discovered %i RTC devices", n);
 
         *ptr = dtb_get_irq_number(&prop, 0);
     }
@@ -267,13 +266,13 @@ int dtb_get_rtc_irq_number(uint32_t *ptr)
     {
         const char *s = (const char *)prop.data;
         const char *end = s + prop.len;
-        uart_printf(", compatible =");
+        dprintk(", compatible =");
         while (s < end)
         {
-            uart_printf(" \"%s\"", s);
+            dprintk(" \"%s\"", s);
             s += strlen(s) + 1;
         }
     }
-    uart_printf("\r\n");
+    dprintk("\r\n");
     return ret;
 }

@@ -7,7 +7,8 @@ CFLAGS  = -ffreestanding -nostdlib -nostdinc \
           -O3 -Wall -Wextra \
           -mcpu=cortex-a710 \
           -Isrc \
-          -Isrc/lib
+          -Isrc/lib \
+          $(CFLAGS_EXTRA)
 
 SRCS := $(wildcard src/*.c src/*.S src/lib/*.c src/dsa/*.c src/drivers/*.c src/arch/*.c src/mm/*.c src/sched/*.c )
 OBJS := $(patsubst src/%, build/%, $(SRCS:.c=.o))

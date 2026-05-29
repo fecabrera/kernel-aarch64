@@ -1,10 +1,10 @@
 #include <dtb.h>
+#include <debug.h>
 #include <arch/cpu.h>
 #include <arch/irq.h>
 #include <sched/scheduler.h>
 #include "timer.h"
 #include "gic.h"
-#include "uart.h"
 
 static uint32_t timer_irq;
 static time_t timer_freq;
@@ -26,13 +26,13 @@ void timer_init()
 
     if (dtb_get_timer_irq_number(&timer_irq) == 0)
     {
-        uart_printf("[timer] Initializing IRQ: %i\r\n", timer_irq);
+        dprintk("[timer] Initializing IRQ: %i\r\n", timer_irq);
         irq_register_handler(timer_irq, &timer_irq_handler);
         gic_enable_irq(timer_irq);
     }
     else
     {
-        uart_printf("[timer] IRQ not found!!\r\n");
+        dprintk("[timer] IRQ not found!!\r\n");
     }
 }
 

@@ -1,6 +1,6 @@
 #include <string.h>
 #include <arch/cpu.h>
-#include <drivers/uart.h>
+#include <debug.h>
 #include "syscall.h"
 
 interrupt_handler syscall_table[NUM_SYSCALLS] = {NULL};
@@ -11,7 +11,7 @@ struct cpu_context *syscall_handler(struct cpu_context *ctx)
     interrupt_handler fnc = syscall_table[syscall_id];
 
     if (fnc == NULL)
-        uart_printf("[syscall] Handler not found for syscall %i!\r\n", syscall_id);
+        dprintk("[syscall] Handler not found for syscall %i!\r\n", syscall_id);
     else
         ctx = fnc(ctx);
 
@@ -23,11 +23,11 @@ void syscall_register_handler(uint64_t syscall_id, interrupt_handler fnc)
     if (syscall_table[syscall_id] == NULL)
     {
         syscall_table[syscall_id] = fnc;
-        uart_printf("[syscall] handler registered for syscall %i, addr = 0x%x\r\n", syscall_id, fnc);
+        dprintk("[syscall] handler registered for syscall %i, addr = 0x%x\r\n", syscall_id, fnc);
     }
     else
     {
-        uart_printf("[syscall] There's already a handler registered for syscall %i!\r\n", syscall_id);
+        dprintk("[syscall] There's already a handler registered for syscall %i!\r\n", syscall_id);
     }
 }
 
@@ -35,12 +35,12 @@ void syscall_unregister_handler(uint64_t syscall_id)
 {
     if (syscall_table[syscall_id] == NULL)
     {
-        uart_printf("[syscall] There's no handler registered for syscall %i!\r\n", syscall_id);
+        dprintk("[syscall] There's no handler registered for syscall %i!\r\n", syscall_id);
     }
     else
     {
         syscall_table[syscall_id] = NULL;
-        uart_printf("[syscall] Handler unregistered for syscall %i!\r\n", syscall_id);
+        dprintk("[syscall] Handler unregistered for syscall %i!\r\n", syscall_id);
     }
 }
 
