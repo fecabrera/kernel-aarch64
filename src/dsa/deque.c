@@ -1,7 +1,7 @@
 #include <mm/heap.h>
 #include "deque.h"
 
-void _deque64_insert_entry(struct deque64_entry *entry, struct deque64_entry *prev, struct deque64_entry *next)
+static void _deque64_insert_entry(struct deque64_entry *entry, struct deque64_entry *prev, struct deque64_entry *next)
 {
     entry->next = next;
     entry->prev = prev;
@@ -13,7 +13,7 @@ void _deque64_insert_entry(struct deque64_entry *entry, struct deque64_entry *pr
         next->prev = entry;
 }
 
-void _deque64_remove_entry(struct deque64_entry *entry)
+static void _deque64_remove_entry(struct deque64_entry *entry)
 {
     struct deque64_entry *prev = entry->prev;
     struct deque64_entry *next = entry->next;
@@ -97,10 +97,7 @@ int deque64_is_empty(struct deque64 *dq)
 
 struct deque64_entry *deque64_find(struct deque64 *dq, struct deque64_entry *start, int (*cmp)(struct deque64_entry *, void *), void *ctx)
 {
-    struct deque64_entry *entry = start;
-
-    if (entry == NULL)
-        entry = dq->head;
+    struct deque64_entry *entry = start ? start->next : dq->head;
 
     while (entry != NULL)
     {

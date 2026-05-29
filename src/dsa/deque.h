@@ -83,11 +83,12 @@ uint64_t deque64_peek_right(struct deque64 *dq);
 int deque64_is_empty(struct deque64 *dq);
 
 /**
- * Returns the first entry for which cmp returns 0, or NULL if none match.
- * Search begins at start; if start is NULL, begins at the head.
+ * Returns the first entry after start for which cmp returns 0, or NULL if
+ * none match. start is exclusive: search begins at start->next. If start is
+ * NULL, search begins at the head.
  *
  * @param dq:    deque to search
- * @param start: entry to start from, or NULL to start from the head
+ * @param start: entry preceding the search range, or NULL to search from head
  * @param cmp:   comparator called on each entry; return 0 on match
  * @param ctx:   caller context forwarded to each cmp call
  *
@@ -96,12 +97,13 @@ int deque64_is_empty(struct deque64 *dq);
 struct deque64_entry *deque64_find(struct deque64 *dq, struct deque64_entry *start, int (*cmp)(struct deque64_entry *, void *), void *ctx);
 
 /**
- * Finds and unlinks the first entry for which cmp returns 0, or returns NULL
- * if none match. The caller is responsible for freeing the returned entry.
- * Search begins at start; if start is NULL, begins at the head.
+ * Finds and unlinks the first entry after start for which cmp returns 0, or
+ * returns NULL if none match. start is exclusive: search begins at
+ * start->next. If start is NULL, search begins at the head. The caller is
+ * responsible for freeing the returned entry.
  *
  * @param dq:    deque to search and remove from
- * @param start: entry to start from, or NULL to start from the head
+ * @param start: entry preceding the search range, or NULL to search from head
  * @param cmp:   comparator called on each entry; return 0 on match
  * @param ctx:   caller context forwarded to each cmp call
  *

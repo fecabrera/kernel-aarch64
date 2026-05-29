@@ -123,10 +123,7 @@ static void _notify_waiters(int64_t pid, uint64_t exit_status)
     while ((entry = deque64_find_remove(&wait_queue, entry, &_pid_eq, &pid)))
     {
         _notify_waiter((struct process *)entry->value, exit_status);
-
-        struct deque64_entry *next = entry->next;
         kfree(entry);
-        entry = next;
     }
 }
 
