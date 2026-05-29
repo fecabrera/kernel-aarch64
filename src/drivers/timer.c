@@ -38,7 +38,7 @@ void timer_init()
 
 struct cpu_context *timer_irq_handler(struct cpu_context *ctx)
 {
-    struct cpu_context *next_ctx = scheduler_handler(ctx);
+    struct cpu_context *next_ctx = scheduler_handler(ctx, timer_interval);
 
     // Set timer countdown
     set_cntp_tval_el0(_time_quantum(1));

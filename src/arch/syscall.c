@@ -11,13 +11,9 @@ struct cpu_context *syscall_handler(struct cpu_context *ctx)
     interrupt_handler fnc = syscall_table[syscall_id];
 
     if (fnc == NULL)
-    {
         uart_printf("[syscall] Handler not found for syscall %i!\r\n", syscall_id);
-    }
     else
-    {
         ctx = fnc(ctx);
-    }
 
     return ctx;
 }
@@ -110,5 +106,19 @@ int64_t syscall_fork()
         : "=r"(ret)
         : "r"((uint64_t)SYSCALL_FORK)
         : "x0");
+    return ret;
+}
+
+int64_t syscall_sleep(uint64_t seconds)
+{
+    int64_t ret;
+    __asm__ volatile(
+        "mov x0, %1\n"
+        "mov x1, %2\n"
+        "svc #0\n"
+        "mov %0, x0"
+        : "=r"(ret)
+        : "r"((uint64_t)SYSCALL_SLEEP), "r"(seconds)
+        : "x0", "x1");
     return ret;
 }

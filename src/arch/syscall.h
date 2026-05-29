@@ -9,6 +9,7 @@
 #define SYSCALL_GETPID 2
 #define SYSCALL_WAITPID 3
 #define SYSCALL_FORK 4
+#define SYSCALL_SLEEP 5
 
 /**
  * Dispatches a syscall based on the number in ctx->x0.
@@ -87,3 +88,16 @@ uint64_t syscall_waitpid(int64_t pid);
  * @return child PID in the parent, 0 in the child, or -1 on failure.
  */
 int64_t syscall_fork();
+
+/**
+ * Blocks the calling process for the given number of seconds via
+ * SYSCALL_SLEEP (svc #0). Traps into EL1, where sleep_handler sets
+ * process->sleep_for and moves the caller to the sleep queue. The timer
+ * tick decrements sleep_for on each tick; execution resumes when it reaches
+ * zero.
+ *
+ * @param seconds: number of seconds to sleep
+ *
+ * @return 0 on wakeup, or -1 if no process is currently scheduled.
+ */
+int64_t syscall_sleep(uint64_t seconds);

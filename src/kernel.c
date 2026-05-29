@@ -99,17 +99,22 @@ void init()
 void child()
 {
     int64_t fork_pid = syscall_fork();
-    int64_t pid = syscall_getpid();
-
-    uart_printf("[child] pid = %i, fork_pid = %i\r\n", pid, fork_pid);
 
     if (fork_pid < 0)
     {
         uart_printf("[child] fork() failed!\r\n");
         syscall_exit(2);
     }
-    else if (fork_pid == 0)
+
+    int64_t pid = syscall_getpid();
+    uart_printf("[child] pid = %i, fork_pid = %i\r\n", pid, fork_pid);
+
+    if (fork_pid == 0)
+    {
+        syscall_sleep(5);
+        uart_printf("[child] back from sleep, pid = %i\r\n", pid);
         syscall_exit(0);
+    }
     else
         syscall_exit(1);
 }

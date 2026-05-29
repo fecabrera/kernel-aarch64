@@ -131,13 +131,9 @@ struct cpu_context *irq_handler(struct cpu_context *ctx)
     interrupt_handler fnc = irq_table[irq_id];
 
     if (fnc == NULL)
-    {
         uart_printf("[irq] Handler not found for IRQ %i!", irq_id);
-    }
     else
-    {
         ctx = fnc(ctx);
-    }
 
     gic_end_of_interrupt(irq_id);
 

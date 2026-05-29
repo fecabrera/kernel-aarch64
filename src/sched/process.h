@@ -17,14 +17,31 @@ typedef enum
     PROC_DEAD,
 } proc_state_t;
 
+/**
+ * Represents a schedulable process. Created by create_process, configured by
+ * process_config, and destroyed by destroy_process.
+ *
+ * @field pid:        unique process identifier, assigned at creation
+ * @field state:      current lifecycle state (PROC_CREATED, PROC_READY,
+ *                    PROC_BLOCKED, or PROC_DEAD)
+ * @field stack:      base address of the heap-allocated task stack
+ * @field ctx:        saved register frame (cpu_context), embedded near the
+ *                    top of stack and updated on every context switch
+ * @field stack_size: size of the stack allocation in bytes
+ * @field wait_pid:   PID this process is blocked waiting for via waitpid;
+ *                    0 when not waiting
+ * @field sleep_for:  remaining sleep duration in milliseconds; 0 when not
+ *                    sleeping
+ */
 struct process
 {
     int64_t pid;
     proc_state_t state;
-    uint8_t *stack;          // heap-allocated task stack (base address)
-    struct cpu_context *ctx; // saved register frame, embedded near the top of stack
+    uint8_t *stack;
+    struct cpu_context *ctx;
     size_t stack_size;
-    uint64_t wait_pid; // PID this process is blocked on; 0 if not waiting
+    uint64_t wait_pid;
+    uint64_t sleep_for;
 };
 
 /**

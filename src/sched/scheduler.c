@@ -8,7 +8,11 @@
 
 static struct process *current = NULL;
 static struct queue64 ready_queue;
-static struct deque64 wait_queue = {
+static struct deque64 waitpid_queue = {
+    .head = NULL,
+    .tail = NULL,
+};
+static struct deque64 sleep_queue = {
     .head = NULL,
     .tail = NULL,
 };
@@ -22,6 +26,7 @@ void scheduler_init()
     syscall_register_handler(SYSCALL_GETPID, &getpid_handler);
     syscall_register_handler(SYSCALL_WAITPID, &waitpid_handler);
     syscall_register_handler(SYSCALL_FORK, &fork_handler);
+    syscall_register_handler(SYSCALL_SLEEP, &sleep_handler);
 }
 
 int scheduler_enqueue(struct process *proc)
@@ -43,9 +48,7 @@ int scheduler_enqueue(struct process *proc)
 struct process *scheduler_dequeue()
 {
     if (ready_queue.length == 0)
-    {
         return NULL;
-    }
 
     struct process *proc = (struct process *)queue64_pop(&ready_queue);
     proc->state = PROC_DEAD;
@@ -55,8 +58,40 @@ struct process *scheduler_dequeue()
     return proc;
 }
 
-struct cpu_context *scheduler_handler(struct cpu_context *ctx)
+static void _notify_sleeper(struct process *proc)
 {
+    uart_printf("[scheduler] _update_sleepers(%i)\r\n", proc->pid);
+
+    proc->state = PROC_READY;
+    proc->sleep_for = 0;
+    proc->ctx->x0 = 0;
+
+    queue64_push(&ready_queue, (uintptr_t)proc);
+}
+
+static void _notify_sleepers(uint64_t ms_elapsed)
+{
+    struct deque64_entry *entry = NULL;
+
+    while ((entry = deque64_next(&sleep_queue, entry)))
+    {
+        struct process *proc = (struct process *)entry->value;
+
+        if (proc->sleep_for < ms_elapsed)
+        {
+            deque64_remove(&sleep_queue, entry);
+            _notify_sleeper(proc);
+        }
+        else
+            proc->sleep_for -= ms_elapsed;
+    }
+}
+
+struct cpu_context *scheduler_handler(struct cpu_context *ctx, uint64_t ms_elapsed)
+{
+    if (ms_elapsed > 0 && !deque64_is_empty(&sleep_queue))
+        _notify_sleepers(ms_elapsed);
+
     if (current != NULL)
     {
         current->ctx = ctx;
@@ -64,20 +99,18 @@ struct cpu_context *scheduler_handler(struct cpu_context *ctx)
     }
 
     if (ready_queue.length == 0)
-    {
         return ctx;
-    }
 
     current = (struct process *)queue64_pop(&ready_queue);
 
     if (current->ctx != ctx)
     {
         uart_printf("[scheduler] context_switch(), q = { ");
+
         struct process **procs = (struct process **)ready_queue.data;
         for (uint64_t i = 0; i < ready_queue.length; i++)
-        {
             uart_printf("%i ", procs[i]->pid);
-        }
+
         uart_printf("}, current = %i\r\n", current->pid);
     }
 
@@ -90,7 +123,7 @@ struct cpu_context *yield_handler(struct cpu_context *ctx)
 
     uart_printf("[scheduler] yield()\r\n");
 
-    return scheduler_handler(ctx);
+    return scheduler_handler(ctx, 0);
 }
 
 static int _pid_eq(struct deque64_entry *entry, void *pid)
@@ -120,7 +153,7 @@ static void _notify_waiters(int64_t pid, uint64_t exit_status)
     struct deque64_entry *entry = NULL;
     uart_printf("[scheduler] _notify_waiters(), exit_status = %i\r\n", exit_status);
 
-    while ((entry = deque64_find_remove(&wait_queue, entry, &_pid_eq, &pid)))
+    while ((entry = deque64_find_remove(&waitpid_queue, entry, &_pid_eq, &pid)))
     {
         _notify_waiter((struct process *)entry->value, exit_status);
         kfree(entry);
@@ -151,7 +184,7 @@ struct cpu_context *exit_handler(struct cpu_context *ctx)
     // clear current entry
     current = NULL;
 
-    return scheduler_handler(ctx);
+    return scheduler_handler(ctx, 0);
 }
 
 struct cpu_context *getpid_handler(struct cpu_context *ctx)
@@ -186,10 +219,10 @@ struct cpu_context *waitpid_handler(struct cpu_context *ctx)
     current->wait_pid = pid;
     current->ctx = ctx;
 
-    deque64_add_right(&wait_queue, (uintptr_t)current);
+    deque64_add_right(&waitpid_queue, (uintptr_t)current);
     current = NULL;
 
-    return scheduler_handler(ctx);
+    return scheduler_handler(ctx, 0);
 }
 
 struct cpu_context *fork_handler(struct cpu_context *ctx)
@@ -213,4 +246,27 @@ struct cpu_context *fork_handler(struct cpu_context *ctx)
     ctx->x0 = child->pid;
 
     return ctx;
+}
+
+struct cpu_context *sleep_handler(struct cpu_context *ctx)
+{
+    int64_t seconds = ctx->x1;
+
+    if (current == NULL)
+    {
+        uart_printf("[scheduler] no current process for sleep!\r\n");
+        ctx->x0 = -1;
+        return ctx;
+    }
+
+    uart_printf("[scheduler] sleep(%i)\r\n", seconds);
+
+    current->state = PROC_BLOCKED;
+    current->sleep_for = seconds * 1000;
+    current->ctx = ctx;
+
+    deque64_add_right(&sleep_queue, (uintptr_t)current);
+    current = NULL;
+
+    return scheduler_handler(ctx, 0);
 }

@@ -13,6 +13,7 @@
  *   SYSCALL_GETPID           → getpid_handler
  *   SYSCALL_WAITPID          → waitpid_handler
  *   SYSCALL_FORK             → fork_handler
+ *   SYSCALL_SLEEP            → sleep_handler
  */
 void scheduler_init();
 
@@ -35,17 +36,20 @@ int scheduler_enqueue(struct process *proc);
 struct process *scheduler_dequeue();
 
 /**
- * FIFO scheduler. Saves ctx into current->ctx and re-enqueues current (if
- * non-NULL), then pops the head of the ready queue as the new current.
- * Called by the timer IRQ handler on each tick and by yield/exit/waitpid/fork
- * handlers.
+ * FIFO scheduler. Ticks the sleep queue by ms_elapsed, waking any processes
+ * whose sleep has expired. Then saves ctx into current->ctx and re-enqueues
+ * current (if non-NULL), and pops the head of the ready queue as the new
+ * current. Called by the timer IRQ handler on each tick and by
+ * yield/exit/waitpid/fork/sleep handlers.
  *
- * @param ctx: saved context of the interrupted task; returned unchanged if the
- *             queue is empty
+ * @param ctx:        saved context of the interrupted task; returned unchanged
+ *                    if the ready queue is empty
+ * @param ms_elapsed: milliseconds elapsed since the last tick; passed to the
+ *                    sleep queue to decrement sleep_for counters
  *
  * @return saved context of the next task to run
  */
-struct cpu_context *scheduler_handler(struct cpu_context *ctx);
+struct cpu_context *scheduler_handler(struct cpu_context *ctx, uint64_t ms_elapsed);
 
 /**
  * Syscall handler for SYSCALL_EXIT. Marks current PROC_DEAD, notifies any
@@ -103,3 +107,17 @@ struct cpu_context *waitpid_handler(struct cpu_context *ctx);
  * @return ctx of the parent, with ctx->x0 set to the child's PID, or -1 on failure
  */
 struct cpu_context *fork_handler(struct cpu_context *ctx);
+
+/**
+ * Syscall handler for SYSCALL_SLEEP. Sets current->sleep_for to
+ * ctx->x1 * 1000 ms, moves current to the sleep queue, and calls
+ * scheduler_handler to run the next task. The process is woken by
+ * _notify_sleepers inside scheduler_handler once sleep_for reaches zero.
+ *
+ * @param ctx: saved context of the calling process; ctx->x1 holds the sleep
+ *             duration in seconds
+ *
+ * @return ctx of the next task to run, or ctx unchanged if no process is
+ *         currently scheduled
+ */
+struct cpu_context *sleep_handler(struct cpu_context *ctx);
