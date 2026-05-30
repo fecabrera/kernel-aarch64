@@ -31,7 +31,7 @@ struct cpu_context *syscall_handler(struct cpu_context *ctx);
  * @param syscall_id: syscall number to handle (0–NUM_SYSCALLS-1)
  * @param fnc: function to call when the syscall is invoked
  */
-void syscall_register_handler(uint64_t syscall_id, interrupt_handler fnc);
+void syscall_register_handler(uint64_t syscall_id, interrupt_handler_t fnc);
 
 /**
  * Removes the handler for the given syscall ID.

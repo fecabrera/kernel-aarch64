@@ -134,8 +134,9 @@ void uart_init();
  * Drains the RX FIFO into the ring buffer and clears the interrupt flags.
  * Registered with irq_register_handler at uart_init time.
  *
+ * @param irq: IRQ ID passed by the dispatcher (unused)
  * @param ctx: saved register frame from the interrupted context
  *
  * @return ctx unchanged (no context switch).
  */
-struct cpu_context *uart_irq_handler(struct cpu_context *ctx);
+struct cpu_context *uart_irq_handler(int irq, struct cpu_context *ctx);

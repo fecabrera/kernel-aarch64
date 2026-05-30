@@ -52,7 +52,13 @@ struct cpu_context
 
 #define NUM_IRQS 256
 
-typedef struct cpu_context *(*interrupt_handler)(struct cpu_context *);
+// IRQ handler: receives the GIC IRQ ID and the saved register frame.
+// Used with irq_register_handler.
+typedef struct cpu_context *(*irq_handler_t)(int irq, struct cpu_context *);
+
+// Syscall handler: receives only the saved register frame.
+// Used with syscall_register_handler.
+typedef struct cpu_context *(*interrupt_handler_t)(struct cpu_context *);
 
 /**
  * Installs the exception vector table by writing its address to vbar_el1,
@@ -68,7 +74,7 @@ void irq_init();
  *
  * @return 0 on success, -1 if a handler is already registered for that IRQ
  */
-int irq_register_handler(uint32_t irq, interrupt_handler fnc);
+int irq_register_handler(uint32_t irq, irq_handler_t fnc);
 
 /**
  * Removes the handler for the given GIC IRQ ID.

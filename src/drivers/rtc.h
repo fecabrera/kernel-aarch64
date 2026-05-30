@@ -31,11 +31,12 @@ void rtc_init();
  * Clears the interrupt flag and re-masks the interrupt until the next alarm is set.
  * Registered with irq_register_handler at rtc_init time.
  *
+ * @param irq: IRQ ID passed by the dispatcher (unused)
  * @param ctx: saved register frame from the interrupted context
  *
  * @return ctx unchanged (no context switch).
  */
-struct cpu_context *rtc_irq_handler(struct cpu_context *ctx);
+struct cpu_context *rtc_irq_handler(int irq, struct cpu_context *ctx);
 
 /**
  * Reads the current time from the RTC data register.

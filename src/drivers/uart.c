@@ -74,7 +74,7 @@ void uart_init()
     }
 }
 
-struct cpu_context *uart_irq_handler(struct cpu_context *ctx)
+struct cpu_context *uart_irq_handler(int i, struct cpu_context *ctx)
 {
     // Read all available bytes (RX or timeout interrupt)
     while (!(UART_FR & UART_FR_RXFE))

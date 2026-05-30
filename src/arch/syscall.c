@@ -3,12 +3,12 @@
 #include <debug.h>
 #include "syscall.h"
 
-interrupt_handler syscall_table[NUM_SYSCALLS] = {NULL};
+interrupt_handler_t syscall_table[NUM_SYSCALLS] = {NULL};
 
 struct cpu_context *syscall_handler(struct cpu_context *ctx)
 {
     uint32_t syscall_id = ctx->x0;
-    interrupt_handler fnc = syscall_table[syscall_id];
+    interrupt_handler_t fnc = syscall_table[syscall_id];
 
     if (fnc == NULL)
         dprintk("[syscall] Handler not found for syscall %i!\r\n", syscall_id);
@@ -18,7 +18,7 @@ struct cpu_context *syscall_handler(struct cpu_context *ctx)
     return ctx;
 }
 
-void syscall_register_handler(uint64_t syscall_id, interrupt_handler fnc)
+void syscall_register_handler(uint64_t syscall_id, interrupt_handler_t fnc)
 {
     if (syscall_table[syscall_id] == NULL)
     {

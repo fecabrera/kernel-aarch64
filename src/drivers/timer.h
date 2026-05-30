@@ -20,11 +20,12 @@ void timer_init();
  * calls scheduler_handler to preempt the current task.
  * Registered with irq_register_handler at timer_init time.
  *
+ * @param irq: IRQ ID passed by the dispatcher (unused)
  * @param ctx: saved register frame from the interrupted context
  *
  * @return saved context of the next task to run as selected by the scheduler
  */
-struct cpu_context *timer_irq_handler(struct cpu_context *ctx);
+struct cpu_context *timer_irq_handler(int irq, struct cpu_context *ctx);
 
 /**
  * Sets the timer tick interval in milliseconds.

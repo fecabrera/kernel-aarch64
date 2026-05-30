@@ -41,7 +41,7 @@ void rtc_set_alarm(uint32_t unix_time)
     gic_enable_irq(rtc_irq);
 }
 
-struct cpu_context *rtc_irq_handler(struct cpu_context *ctx)
+struct cpu_context *rtc_irq_handler(int irq, struct cpu_context *ctx)
 {
     dprintk("[rtc] alarm fired!\r\n");
 

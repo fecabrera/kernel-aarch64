@@ -10,7 +10,7 @@
 
 extern void vector_table();
 
-interrupt_handler irq_table[NUM_IRQS] = {NULL};
+irq_handler_t irq_table[NUM_IRQS] = {NULL};
 
 static void ctx_dump(struct cpu_context *ctx)
 {
@@ -94,7 +94,7 @@ void fiq_handler()
     dprintk("[FIQ]\r\n");
 }
 
-int irq_register_handler(uint32_t irq, interrupt_handler fnc)
+int irq_register_handler(uint32_t irq, irq_handler_t fnc)
 {
     if (irq_table[irq] == NULL)
     {
@@ -128,12 +128,12 @@ struct cpu_context *irq_handler(struct cpu_context *ctx)
 {
     // Ask the GIC which interrupt fired (see below)
     uint32_t irq_id = gic_acknowledge();
-    interrupt_handler fnc = irq_table[irq_id];
+    irq_handler_t fnc = irq_table[irq_id];
 
     if (fnc == NULL)
         dprintk("[irq] Handler not found for IRQ %i!", irq_id);
     else
-        ctx = fnc(ctx);
+        ctx = fnc(irq_id, ctx);
 
     gic_end_of_interrupt(irq_id);
 

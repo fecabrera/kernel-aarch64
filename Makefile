@@ -55,6 +55,7 @@ run: all
 		-device virtio-gpu-pci \
 		-drive file=init.img,format=raw,if=none,id=hd0 \
     	-device virtio-blk-device,drive=hd0 \
+		-global virtio-mmio.force-legacy=false \
 		-m 128M
 
 clean:
