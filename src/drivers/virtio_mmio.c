@@ -1,9 +1,11 @@
 #include <debug.h>
 #include <dtb.h>
+#include <string.h>
 #include "gic.h"
 #include "virtio_mmio.h"
 
 static int _irq_to_slot[256] = {0};
+static virtio_mmio_handler_t _handlers[32];
 
 static struct virtq_desc desc;
 static struct virtq_avail avail;
@@ -119,6 +121,15 @@ void virtio_mmio_init()
 struct cpu_context *virtio_mmio_irq_handler(int irq, struct cpu_context *ctx)
 {
     int i = _irq_to_slot[irq];
+    virtio_mmio_handler_t fnc = _handlers[i];
+
     printk("[virtio_mmio@%x] IRQ handler\r\n", VIRTIO_MMIO_ADDR(i));
-    return ctx;
+
+    if (fnc == NULL)
+    {
+        dprintk("[virtio_mmio@%x] Handler not found for slot %i!", VIRTIO_MMIO_ADDR(i), i);
+        return ctx;
+    }
+
+    return fnc(i, ctx);
 }

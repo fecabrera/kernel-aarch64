@@ -131,6 +131,8 @@ struct virtq_used
     } ring[DEFAULT_VIRTIO_QUEUE_NUM];
 };
 
+typedef struct cpu_context *(*virtio_mmio_handler_t)(int i, struct cpu_context *);
+
 /**
  * Scans all 32 virtio MMIO slots, initializes each valid device found
  * (modern version, non-zero device ID), reads its feature words, and
