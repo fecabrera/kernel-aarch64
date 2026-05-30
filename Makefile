@@ -14,7 +14,9 @@ SRCS := $(wildcard src/*.c src/*.S src/lib/*.c src/dsa/*.c src/drivers/*.c src/a
 OBJS := $(patsubst src/%, build/%, $(SRCS:.c=.o))
 OBJS := $(OBJS:.S=.o)
 
-all: kernel.elf kernel.img init.img
+build: kernel.elf kernel.img
+
+all: build init.img
 
 build/%.o: src/%.S
 	@mkdir -p $(dir $@)
@@ -54,7 +56,7 @@ run: all
 		-serial stdio \
 		-device virtio-gpu-pci \
 		-drive file=init.img,format=raw,if=none,id=hd0 \
-    	-device virtio-blk-device,drive=hd0 \
+		-device virtio-blk-device,drive=hd0 \
 		-global virtio-mmio.force-legacy=false \
 		-m 128M
 
