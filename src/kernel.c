@@ -7,6 +7,7 @@
 #include <drivers/gic.h>
 #include <drivers/timer.h>
 #include <drivers/rtc.h>
+#include <drivers/virtio_mmio.h>
 #include <mm/heap.h>
 #include <mm/mem.h>
 #include <sched/process.h>
@@ -26,6 +27,7 @@ void kernel_init()
 
     // Initialize interrupts
     gic_init();
+    virtio_mmio_init();
     irq_init();
     uart_init();
     rtc_init();

@@ -36,7 +36,10 @@ Enable debug logging (activates `dprintk` output):
 make CFLAGS_EXTRA=-DDEBUG
 ```
 
-Output: `kernel.elf`, `kernel.img`, and `init.img` (100MB FAT32 ramdisk populated from `init/`).
+Targets:
+
+- `make build` — kernel only (`kernel.elf`, `kernel.img`)
+- `make` / `make all` — kernel + `init.img` (100MB FAT32 ramdisk populated from `init/`)
 
 ## Run
 
@@ -51,6 +54,7 @@ make run
 - **PL011 UART** — interrupt-driven RX, polled TX, 115200 8N1
 - **ARM generic timer** — 10ms tick via EL1 physical timer (PPI 30)
 - **PL031 RTC** — match alarm interrupt
+- **virtio MMIO** — scans all 32 MMIO slots; validates magic, version, and device ID; negotiates features; sets up a 64-entry virtqueue (desc/avail/used rings); registers per-slot IRQ handlers via GIC
 - **Heap allocator** — first-fit free-list with 4MB region, block splitting, and coalescing (`kmalloc`/`kfree`/`krealloc`); `kfree` returns error codes for NULL, out-of-range, and double-free
 - **Exception handling** — full save/restore of all 31 registers + ELR/SPSR; IRQ handlers return `struct cpu_context *` for context switching; IABT/DABT terminate the faulting process via `exit_handler`; unknown exceptions dump the full register context
 - **Preemptive scheduler** — FIFO run queue, timer-driven; tracks the running process via a `current` pointer; dedicated 4KB IRQ stack; `create_process`/`duplicate_process`/`destroy_process` with 16-byte aligned task stacks; idles via `halt` when the ready queue is empty
@@ -84,6 +88,7 @@ src/
     gic.c/h         — GIC-400 distributor + CPU interface
     timer.c/h       — ARM generic timer
     rtc.c/h         — PL031 RTC
+    virtio_mmio.c/h — virtio MMIO transport: slot scanning, feature negotiation, virtqueue setup (virtq_desc/virtq_avail/virtq_used), IRQ dispatch
 
   mm/               — memory subsystem
     mem.c/h         — reads RAM base/size from DTB at boot
@@ -96,7 +101,7 @@ src/
 
   lib/              — architecture-independent libraries
     debug.c/h       — printk (always on) and dprintk (DEBUG=1 only), both backed by uart_vprintf
-    dtb.c/h         — FDT parser (be32, node/property walker)
+    dtb.c/h         — FDT parser (be32, node/property walker); IRQ number lookup for timer, RTC, and virtio MMIO slots
     string.c/h      — freestanding string library (memcpy, memset, strcmp, ...)
     stdlib.c/h      — itoa, vsprintf, sprintf (freestanding; uses __builtin_va_* instead of <stdarg.h>)
     stdint.h        — stdint-style typedefs (uint8_t … uint64_t, intptr_t)

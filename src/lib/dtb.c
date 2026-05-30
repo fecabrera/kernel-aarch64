@@ -1,7 +1,9 @@
-#include <string.h>
 #include <dtb.h>
+#include <string.h>
+#include <stdlib.h>
 #include <debug.h>
 #include <arch/cpu.h>
+#include <drivers/virtio_mmio.h>
 
 // DTB is big-endian, host is little-endian — must swap
 static uint32_t be32(uint32_t x)
@@ -263,6 +265,36 @@ int dtb_get_rtc_irq_number(uint32_t *ptr)
         *ptr = dtb_get_irq_number(&prop, 0);
     }
     if (dtb_find_prop("pl031@9010000", "compatible", &prop) == 0)
+    {
+        const char *s = (const char *)prop.data;
+        const char *end = s + prop.len;
+        dprintk(", compatible =");
+        while (s < end)
+        {
+            dprintk(" \"%s\"", s);
+            s += strlen(s) + 1;
+        }
+    }
+    dprintk("\r\n");
+    return ret;
+}
+
+int dtb_get_virtio_mmio_irq_number(int n, uint32_t *ptr)
+{
+    char prop_name[50];
+    sprintf(prop_name, "virtio_mmio@%x", VIRTIO_MMIO_ADDR(n));
+
+    struct fdt_prop prop;
+    int ret = dtb_find_prop(prop_name, "interrupts", &prop);
+
+    if (ret == 0)
+    {
+        uint32_t n = dtb_get_irq_count(&prop);
+        dprintk("[dtb] Discovered %i virtio_mmio devices", n);
+
+        *ptr = dtb_get_irq_number(&prop, 0);
+    }
+    if (dtb_find_prop(prop_name, "compatible", &prop) == 0)
     {
         const char *s = (const char *)prop.data;
         const char *end = s + prop.len;

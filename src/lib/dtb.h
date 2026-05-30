@@ -127,3 +127,15 @@ int dtb_get_timer_irq_number(uint32_t *ptr);
  * @return 0 on success, -1 if the node or property was not found.
  */
 int dtb_get_rtc_irq_number(uint32_t *ptr);
+
+/**
+ * Reads the absolute GIC IRQ ID for the nth virtio MMIO device from the DTB.
+ * virtio MMIO devices are enumerated in address order (virtio_mmio@a000000
+ * is n=0, virtio_mmio@a000200 is n=1, etc.).
+ *
+ * @param n:   zero-based index of the virtio MMIO device
+ * @param ptr: output pointer to store the absolute GIC IRQ ID
+ *
+ * @return 0 on success, -1 if the node or property was not found.
+ */
+int dtb_get_virtio_mmio_irq_number(int n, uint32_t *ptr);
