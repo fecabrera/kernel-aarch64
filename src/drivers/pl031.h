@@ -21,10 +21,10 @@
 
 /**
  * Enables the RTC by setting the EN bit in CR, reads the IRQ number from the
- * DTB, registers rtc_irq_handler with the GIC, and registers time_handler for
+ * DTB, registers pl031_irq_handler with the GIC, and registers time_handler for
  * SYSCALL_TIME.
  */
-void rtc_init();
+void pl031_init();
 
 /**
  * IRQ handler for the RTC match interrupt.
@@ -36,21 +36,21 @@ void rtc_init();
  *
  * @return ctx unchanged (no context switch).
  */
-struct cpu_context *rtc_irq_handler(int irq, struct cpu_context *ctx);
+struct cpu_context *pl031_irq_handler(int irq, struct cpu_context *ctx);
 
 /**
  * Reads the current time from the RTC data register.
  *
  * @return Current Unix timestamp.
  */
-uint32_t rtc_get_time();
+uint32_t pl031_get_time();
 
 /**
  * Sets the current time by writing to the RTC load register.
  *
  * @param unix_time: Unix timestamp to set
  */
-void rtc_set_time(uint32_t unix_time);
+void pl031_set_time(uint32_t unix_time);
 
 /**
  * Sets an alarm to fire at the given Unix timestamp.
@@ -58,7 +58,7 @@ void rtc_set_time(uint32_t unix_time);
  *
  * @param unix_time: Unix timestamp at which the alarm should fire
  */
-void rtc_set_alarm(uint32_t unix_time);
+void pl031_set_alarm(uint32_t unix_time);
 
 /**
  * Syscall handler for SYSCALL_TIME. Reads the current Unix timestamp from

@@ -108,7 +108,7 @@ uint32_t dtb_get_irq_count(const struct fdt_prop *prop);
  *
  * @return 0 on success, -1 if the node or property was not found.
  */
-int dtb_get_uart_irq_number(uint32_t *ptr);
+int dtb_get_pl011_irq_number(uint32_t *ptr);
 
 /**
  * Reads the ARM generic timer IRQ number from the DTB and writes it to ptr.

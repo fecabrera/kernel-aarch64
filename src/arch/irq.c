@@ -2,7 +2,7 @@
 #include <debug.h>
 #include <drivers/gic.h>
 #include <drivers/timer.h>
-#include <drivers/rtc.h>
+#include <drivers/pl031.h>
 #include <sched/scheduler.h>
 #include "cpu.h"
 #include "irq.h"

@@ -84,10 +84,10 @@ src/
     syscall.c/h     — syscall dispatch table, syscall_handler, syscall_register_handler, syscall_yield, syscall_exit, syscall_getpid, syscall_waitpid, syscall_fork
 
   drivers/          — MMIO peripheral drivers
-    uart.c/h        — PL011 UART
+    pl011.c/h       — PL011 UART
     gic.c/h         — GIC-400 distributor + CPU interface
     timer.c/h       — ARM generic timer
-    rtc.c/h         — PL031 RTC
+    pl031.c/h       — PL031 RTC
     virtio_mmio.c/h — virtio MMIO transport: slot scanning, feature negotiation, virtqueue setup (virtq_desc/virtq_avail/virtq_used), IRQ dispatch
 
   mm/               — memory subsystem
@@ -100,7 +100,7 @@ src/
     deque.c/h       — doubly-linked deque of uint64_t (deque64_add/remove/peek left/right, find, find_remove, remove, next)
 
   lib/              — architecture-independent libraries
-    debug.c/h       — printk (always on) and dprintk (DEBUG=1 only), both backed by uart_vprintf
+    debug.c/h       — printk (always on) and dprintk (DEBUG=1 only), both backed by pl011_vprintf
     dtb.c/h         — FDT parser (be32, node/property walker); IRQ number lookup for timer, RTC, and virtio MMIO slots
     string.c/h      — freestanding string library (memcpy, memset, strcmp, ...)
     stdlib.c/h      — itoa, vsprintf, sprintf (freestanding; uses __builtin_va_* instead of <stdarg.h>)

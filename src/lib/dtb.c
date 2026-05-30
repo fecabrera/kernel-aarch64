@@ -201,7 +201,7 @@ uint32_t dtb_get_irq_count(const struct fdt_prop *prop)
     return prop->len / (3 * sizeof(uint32_t));
 }
 
-int dtb_get_uart_irq_number(uint32_t *ptr)
+int dtb_get_pl011_irq_number(uint32_t *ptr)
 {
     struct fdt_prop prop;
     int ret = dtb_find_prop("pl011@9000000", "interrupts", &prop);

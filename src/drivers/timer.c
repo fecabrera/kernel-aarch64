@@ -36,7 +36,7 @@ void timer_init()
     }
 }
 
-struct cpu_context *timer_irq_handler(int irq, struct cpu_context *ctx)
+struct cpu_context *timer_irq_handler(__attribute__((unused)) int irq, struct cpu_context *ctx)
 {
     struct cpu_context *next_ctx = scheduler_handler(ctx, timer_interval);
 

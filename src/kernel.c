@@ -3,10 +3,10 @@
 #include <arch/cpu.h>
 #include <arch/irq.h>
 #include <arch/syscall.h>
-#include <drivers/uart.h>
+#include <drivers/pl011.h>
 #include <drivers/gic.h>
 #include <drivers/timer.h>
-#include <drivers/rtc.h>
+#include <drivers/pl031.h>
 #include <drivers/virtio_mmio.h>
 #include <mm/heap.h>
 #include <mm/mem.h>
@@ -29,8 +29,8 @@ void kernel_init()
     gic_init();
     virtio_mmio_init();
     irq_init();
-    uart_init();
-    rtc_init();
+    pl011_init();
+    pl031_init();
     scheduler_init();
     irq_enable();
 
