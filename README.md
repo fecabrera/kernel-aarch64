@@ -53,7 +53,7 @@ make run
 - **PL031 RTC** — match alarm interrupt
 - **Heap allocator** — first-fit free-list with 4MB region, block splitting, and coalescing (`kmalloc`/`kfree`/`krealloc`); `kfree` returns error codes for NULL, out-of-range, and double-free
 - **Exception handling** — full save/restore of all 31 registers + ELR/SPSR; IRQ handlers return `struct cpu_context *` for context switching; IABT/DABT terminate the faulting process via `exit_handler`; unknown exceptions dump the full register context
-- **Preemptive scheduler** — FIFO run queue, timer-driven; tracks the running process via a `current` pointer; dedicated 4KB IRQ stack; `create_process`/`duplicate_process`/`destroy_process` with 16-byte aligned task stacks; idles via `wfi` when the ready queue is empty
+- **Preemptive scheduler** — FIFO run queue, timer-driven; tracks the running process via a `current` pointer; dedicated 4KB IRQ stack; `create_process`/`duplicate_process`/`destroy_process` with 16-byte aligned task stacks; idles via `halt` when the ready queue is empty
 - **Syscall interface**
   - `svc #0` dispatch table (`syscall_register_handler`)
   - `syscall_yield()` triggers an immediate context switch
