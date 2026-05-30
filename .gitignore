@@ -1,6 +1,13 @@
 # binaries
 kernel.elf
+
+# imgs
 kernel.img
+init.img
+
+# DTB
+*.dtb
+*.dts
 
 # folders created during make
 build/

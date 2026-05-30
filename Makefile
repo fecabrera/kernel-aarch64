@@ -14,7 +14,7 @@ SRCS := $(wildcard src/*.c src/*.S src/lib/*.c src/dsa/*.c src/drivers/*.c src/a
 OBJS := $(patsubst src/%, build/%, $(SRCS:.c=.o))
 OBJS := $(OBJS:.S=.o)
 
-all: kernel.elf kernel.img
+all: kernel.elf kernel.img init.img
 
 build/%.o: src/%.S
 	@mkdir -p $(dir $@)
@@ -38,6 +38,14 @@ kernel.elf: $(OBJS) linker.ld
 kernel.img: kernel.elf
 	$(OBJCOPY) -O binary $< $@
 
+init.img:
+	dd if=/dev/zero of=$@ bs=1M count=100; \
+	mkfs.fat -F 32 $@; \
+	dev=$$(hdiutil attach $@ | grep -o '/Volumes/.*'); \
+	cp -R init/* "$$dev"; \
+	dot_clean "$$dev"; \
+	hdiutil detach "$$dev"
+
 run: all
 	qemu-system-aarch64 \
 		-machine virt \
@@ -45,7 +53,9 @@ run: all
 		-kernel kernel.elf \
 		-serial stdio \
 		-device virtio-gpu-pci \
+		-drive file=init.img,format=raw,if=none,id=hd0 \
+    	-device virtio-blk-device,drive=hd0 \
 		-m 128M
 
 clean:
-	rm -rf build kernel.elf kernel.img
+	rm -rf build kernel.elf kernel.img init.img

@@ -6,11 +6,22 @@ A minimal bare-metal kernel for AArch64, targeting the QEMU `virt` machine.
 
 - `aarch64-elf-gcc` and `aarch64-elf-ld` (cross-compiler toolchain)
 - `qemu-system-aarch64`
+- `dosfstools`
 
 On macOS:
 
 ```sh
-brew install aarch64-elf-gcc qemu
+brew install aarch64-elf-gcc qemu dosfstools
+```
+
+### Development tools
+
+- `dtc`
+
+On macOS:
+
+```sh
+brew install dtc
 ```
 
 ## Build
@@ -25,7 +36,7 @@ Enable debug logging (activates `dprintk` output):
 make CFLAGS_EXTRA=-DDEBUG
 ```
 
-Output: `kernel.elf` and `kernel.img`.
+Output: `kernel.elf`, `kernel.img`, and `init.img` (100MB FAT32 ramdisk populated from `init/`).
 
 ## Run
 
@@ -56,6 +67,8 @@ make run
 ## Source layout
 
 ```
+init/               — files bundled into init.img at build time (FAT32 ramdisk)
+
 src/
   kernel.c          — kernel_init (subsystem bring-up), init (pid 1), child (pid 2, forks to create pid 3)
   start.S           — AArch64 boot stub, saves DTB pointer, zeros BSS
@@ -105,3 +118,4 @@ src/
 | `0x09010000` | PL031 RTC                      |
 | `0x08000000` | GIC distributor                |
 | `0x08010000` | GIC CPU interface              |
+| `0x0a000000` | virtio-blk MMIO (init.img)     |
