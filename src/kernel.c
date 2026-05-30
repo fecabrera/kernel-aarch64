@@ -13,7 +13,7 @@
 #include <sched/scheduler.h>
 #include "kernel.h"
 
-static void _kernel_init()
+void kernel_init()
 {
     // Initialize DTB
     dtb_init();
@@ -27,39 +27,20 @@ static void _kernel_init()
     // Initialize interrupts
     gic_init();
     irq_init();
-    timer_init();
     uart_init();
     rtc_init();
     scheduler_init();
     irq_enable();
-}
 
-void kernel_init()
-{
-    _kernel_init();
-
-    // test RTC alarm
-    uint32_t timestamp = rtc_get_time();
-    rtc_set_alarm(timestamp + 1);
-
-    // test yield
-    printk("[kernel] testing yield()\r\n");
-    int64_t result = syscall_yield();
-
-    // since there are no other processes, there's no context switch and we should
-    // be back immediately with the same context
-    printk("[kernel] back from yield(), result = %i\r\n", result);
-
-    // set up pid 1
+    // set up root process
     pid_t pid = scheduler_spawn(&init);
-    printk("[kernel] spawned init process with pid = %i\r\n", pid);
+    printk("[kernel] spawned init process with pid %i\r\n", pid);
+
+    // start scheduler
+    timer_init();
 
     // force context switch via syscall
-    result = syscall_yield();
-
-    // note that since there are items in the ready queue, this becomes unreachable
-    // @todo: add idle task to run when ready queue is empty, then this becomes reachable
-    printk("[kernel] unexpectedly back from yield(), result = %i\r\n", result);
+    syscall_yield();
 }
 
 void init()
@@ -82,7 +63,7 @@ void init()
     int64_t exit_status = syscall_waitpid(fork_pid);
     printk("[init] child process (pid %i) terminated with status %i\r\n", fork_pid, exit_status);
 
-    halt();
+    syscall_exit(0);
 }
 
 void child()

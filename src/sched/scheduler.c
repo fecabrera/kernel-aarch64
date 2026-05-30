@@ -6,6 +6,7 @@
 #include <arch/syscall.h>
 #include "scheduler.h"
 
+struct cpu_context *idle_ctx;
 static struct process *current = NULL;
 static struct queue64 ready_queue;
 static struct deque64 waitpid_queue = {
@@ -19,6 +20,8 @@ static struct deque64 sleep_queue = {
 
 void scheduler_init()
 {
+    idle_ctx = (struct cpu_context *)kmalloc(272);
+
     queue64_init(&ready_queue, 10);
 
     syscall_register_handler(SYSCALL_EXIT, &exit_handler);
@@ -40,7 +43,7 @@ int scheduler_enqueue(struct process *proc)
         struct process *proc = (struct process *)queue64_at(&ready_queue, i);
         dprintk("%i ", proc->pid);
     }
-    dprintk("}, current = %i\r\n", current->pid);
+    dprintk("}, current = %i\r\n", current ? current->pid : 0);
 
     return 0;
 }
@@ -70,29 +73,28 @@ pid_t scheduler_spawn(proc_entry entry)
     return proc->pid;
 }
 
-static void _notify_sleeper(struct process *proc)
-{
-    dprintk("[scheduler] _update_sleepers(%i)\r\n", proc->pid);
-
-    proc->state = PROC_READY;
-    proc->sleep_for = 0;
-    proc->ctx->x0 = 0;
-
-    queue64_push(&ready_queue, (uintptr_t)proc);
-}
-
 static void _notify_sleepers(uint64_t ms_elapsed)
 {
+    dprintk("[scheduler] __notify_sleepers(), current=%i\r\n", current ? current->pid : 0);
     struct deque64_entry *entry = NULL;
 
     while ((entry = deque64_next(&sleep_queue, entry)))
     {
         struct process *proc = (struct process *)entry->value;
 
+        dprintk("[scheduler] pid=%i, sleep_for=%i, ms_elapsed=%i\r\n", proc->pid, proc->sleep_for, ms_elapsed);
+
         if (proc->sleep_for < ms_elapsed)
         {
+            dprintk("[scheduler] notifying pid %i\r\n", proc->pid);
+
             deque64_remove(&sleep_queue, entry);
-            _notify_sleeper(proc);
+
+            proc->state = PROC_READY;
+            proc->sleep_for = 0;
+            proc->ctx->x0 = 0;
+
+            queue64_push(&ready_queue, (uintptr_t)proc);
         }
         else
             proc->sleep_for -= ms_elapsed;
@@ -111,7 +113,11 @@ struct cpu_context *scheduler_handler(struct cpu_context *ctx, time_t ms_elapsed
     }
 
     if (ready_queue.length == 0)
-        return ctx;
+    {
+        dprintk("[scheduler] idle()\r\n");
+        idle_ctx->elr = (uint64_t)&halt;
+        return idle_ctx;
+    }
 
     current = (struct process *)queue64_pop(&ready_queue);
 
@@ -241,7 +247,7 @@ struct cpu_context *fork_handler(struct cpu_context *ctx)
 {
     if (current == NULL)
     {
-        dprintk("[scheduler] no current process for fork!\r\n");
+        dprintk("[scheduler] no current process to fork!\r\n");
         ctx->x0 = -1;
         return ctx;
     }
