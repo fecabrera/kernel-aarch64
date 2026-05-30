@@ -2,6 +2,21 @@
 
 #include <stdint.h>
 
+// Endian conversion macros. On a little-endian host (AArch64 in LE mode),
+// _be32/_be64 byte-swap to/from big-endian (e.g. DTB fields);
+// _le32/_le64 are no-ops. Reversed on a big-endian host.
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+#define _be32(x) __builtin_bswap32(x)
+#define _be64(x) __builtin_bswap64(x)
+#define _le32(x) x
+#define _le64(x) x
+#else
+#define _be32(x) x
+#define _be64(x) x
+#define _le32(x) __builtin_bswap32(x)
+#define _le64(x) __builtin_bswap64(x)
+#endif
+
 static inline void wfe() { __asm__ volatile("wfe"); }
 static inline void wfi() { __asm__ volatile("wfi"); }
 
@@ -12,13 +27,13 @@ static inline void irq_disable() { __asm__ volatile("msr daifset, #2"); }
  * Halts the CPU in a low-power loop using wfi, waking only to service
  * interrupts before returning to sleep.
  */
-void halt();
+void halt() __attribute__((noreturn));
 
 /**
  * Spins forever with interrupts disabled. Used for unrecoverable errors
  * where the system must stop completely.
  */
-void hang();
+void hang() __attribute__((noreturn));
 
 /**
  * Reads the timer frequency register (cntfrq_el0).

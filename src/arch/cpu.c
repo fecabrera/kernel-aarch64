@@ -28,17 +28,15 @@ void set_cntp_ctl_el0(const uint64_t value)
 void halt()
 {
     while (1)
-    {
         wfi();
-    }
+
     __builtin_unreachable();
 }
 
 void hang()
 {
     while (1)
-    {
         wfe();
-    }
+
     __builtin_unreachable();
 }

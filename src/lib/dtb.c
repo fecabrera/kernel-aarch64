@@ -5,12 +5,6 @@
 #include <arch/cpu.h>
 #include <drivers/virtio_mmio.h>
 
-// DTB is big-endian, host is little-endian — must swap
-static uint32_t be32(uint32_t x)
-{
-    return ((x & 0xFF000000) >> 24) | ((x & 0x00FF0000) >> 8) | ((x & 0x0000FF00) << 8) | ((x & 0x000000FF) << 24);
-}
-
 static const struct fdt_header *hdr;
 static const char *strings; // string table base
 static const uint32_t *struct_base;
@@ -21,14 +15,14 @@ int dtb_init()
 {
     hdr = (const struct fdt_header *)dtb_ptr;
 
-    if (be32(hdr->magic) != FDT_MAGIC)
+    if (_be32(hdr->magic) != FDT_MAGIC)
     {
         dprintk("[dtb] bad magic!\r\n");
         return -1;
     }
 
-    strings = (const char *)dtb_ptr + be32(hdr->off_dt_strings);
-    struct_base = (const uint32_t *)((uint8_t *)dtb_ptr + be32(hdr->off_dt_struct));
+    strings = (const char *)dtb_ptr + _be32(hdr->off_dt_strings);
+    struct_base = (const uint32_t *)((uint8_t *)dtb_ptr + _be32(hdr->off_dt_struct));
 
     struct fdt_prop prop;
     if (dtb_find_prop("", "model", &prop) == 0)
@@ -65,7 +59,7 @@ int dtb_find_prop(const char *node_path, const char *prop_name, struct fdt_prop 
 
     while (1)
     {
-        uint32_t token = be32(*p++);
+        uint32_t token = _be32(*p++);
 
         switch (token)
         {
@@ -98,8 +92,8 @@ int dtb_find_prop(const char *node_path, const char *prop_name, struct fdt_prop 
 
         case FDT_PROP:
         {
-            uint32_t prop_len = be32(*p++);
-            uint32_t name_off = be32(*p++);
+            uint32_t prop_len = _be32(*p++);
+            uint32_t name_off = _be32(*p++);
             const char *name = strings + name_off;
             const void *data = p;
 
@@ -133,7 +127,7 @@ void dtb_dump()
 
     while (1)
     {
-        uint32_t token = be32(*p++);
+        uint32_t token = _be32(*p++);
 
         if (token == FDT_BEGIN_NODE)
         {
@@ -153,8 +147,8 @@ void dtb_dump()
         }
         else if (token == FDT_PROP)
         {
-            uint32_t len = be32(*p++);
-            uint32_t nameoff = be32(*p++);
+            uint32_t len = _be32(*p++);
+            uint32_t nameoff = _be32(*p++);
             for (int i = 0; i < depth; i++)
                 dprintk("  ");
             dprintk("  %s ( %i bytes)\r\n", strings + nameoff, len);
@@ -175,8 +169,8 @@ int dtb_get_memory_register(struct memreg *ptr)
     if (ret == 0)
     {
         const uint32_t *cells = (const uint32_t *)prop.data;
-        ptr->base = (uint64_t)(be32(cells[0]) << 32) | be32(cells[1]);
-        ptr->size = (uint64_t)(be32(cells[2]) << 32) | be32(cells[3]);
+        ptr->base = ((uint64_t)_be32(cells[0]) << 32) | _be32(cells[1]);
+        ptr->size = ((uint64_t)_be32(cells[2]) << 32) | _be32(cells[3]);
     }
     return ret;
 }
@@ -184,9 +178,9 @@ int dtb_get_memory_register(struct memreg *ptr)
 uint32_t dtb_get_irq_number(const struct fdt_prop *prop, uint32_t index)
 {
     const uint32_t *cells = (const uint32_t *)prop->data + index * 3;
-    uint32_t type = be32(cells[0]);   // 0=SPI, 1=PPI
-    uint32_t number = be32(cells[1]); // interrupt number
-    // uint32_t flags = be32(cells[2]); // trigger type (edge/level)
+    uint32_t type = _be32(cells[0]);   // 0=SPI, 1=PPI
+    uint32_t number = _be32(cells[1]); // interrupt number
+    // uint32_t flags = _be32(cells[2]); // trigger type (edge/level)
 
     if (type == DT_IRQ_TYPE_SPI)
         return GIC_SPI_BASE + number;
