@@ -107,6 +107,7 @@ src/
     string.c/h      — freestanding string library (memcpy, memset, strcmp, ...)
     stdlib.c/h      — itoa, vsprintf, sprintf (freestanding; uses __builtin_va_* instead of <stdarg.h>)
     stdint.h        — stdint-style typedefs (uint8_t … uint64_t, intptr_t)
+    uchar.h         — char8_t, char16_t, char32_t typedefs (for UTF-8/16/32)
     limits.h        — integer limit macros (AArch64/LP64; unsigned char default)
     time.h          — time_t typedef (uint64_t)
     sys/types.h     — pid_t typedef (int64_t)
