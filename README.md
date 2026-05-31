@@ -55,6 +55,7 @@ make run
 - **ARM generic timer** — 10ms tick via EL1 physical timer (PPI 30)
 - **PL031 RTC** — match alarm interrupt
 - **virtio MMIO** — scans all 32 MMIO slots; validates magic, version, and device ID; negotiates features; sets up per-slot 64-entry virtqueues (`struct virtq` with desc/avail/used rings); `virtio_mmio_read` submits synchronous block reads via 3-descriptor chains; IRQ handler acks `VIRTIO_INTERRUPT_STATUS`
+- **FAT32** — MBR/BPB parsing (`mbr_boot_sector`, `fat32_extended_boot_record`); packed structs with aligned mirrors for safe field access on AArch64; `fat32_dump_boot_sector` for debug inspection
 - **Heap allocator** — first-fit free-list with 4MB region, block splitting, and coalescing (`kmalloc`/`kfree`/`krealloc`); `kfree` returns error codes for NULL, out-of-range, and double-free
 - **Exception handling** — full save/restore of all 31 registers + ELR/SPSR; IRQ handlers return `struct cpu_context *` for context switching; IABT/DABT terminate the faulting process via `exit_handler`; unknown exceptions dump the full register context
 - **Preemptive scheduler** — FIFO run queue, timer-driven; tracks the running process via a `current` pointer; dedicated 4KB IRQ stack; `create_process`/`duplicate_process`/`destroy_process` with 16-byte aligned task stacks; idles via `halt` when the ready queue is empty
@@ -112,6 +113,9 @@ src/
   sched/            — scheduler and process management
     process.c/h     — process struct, create/duplicate/config/destroy
     scheduler.c/h   — FIFO ready queue (dsa/queue64) and wait queue (dsa/deque64), scheduler_enqueue/dequeue/spawn, context switch via timer and yield/exit/waitpid/fork syscalls
+
+  fs/               — filesystem drivers
+    fat32.c/h       — MBR/BPB structs (packed + aligned mirrors), partition type and media descriptor defines, fat32_dump_boot_sector
 ```
 
 ## Memory map (QEMU virt)
