@@ -6,13 +6,17 @@
 // _be32/_be64 byte-swap to/from big-endian (e.g. DTB fields);
 // _le32/_le64 are no-ops. Reversed on a big-endian host.
 #if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+#define _be16(x) __builtin_bswap16(x)
 #define _be32(x) __builtin_bswap32(x)
 #define _be64(x) __builtin_bswap64(x)
+#define _le16(x) x
 #define _le32(x) x
 #define _le64(x) x
 #else
+#define _be16(x) x
 #define _be32(x) x
 #define _be64(x) x
+#define _le16(x) __builtin_bswap16(x)
 #define _le32(x) __builtin_bswap32(x)
 #define _le64(x) __builtin_bswap64(x)
 #endif
