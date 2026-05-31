@@ -12,6 +12,7 @@
 #include <mm/mem.h>
 #include <sched/process.h>
 #include <sched/scheduler.h>
+#include <fs/fat32.h>
 #include "kernel.h"
 
 void kernel_init()
@@ -65,7 +66,23 @@ void init()
     int64_t exit_status = syscall_waitpid(fork_pid);
     printk("[init] child process (pid %i) terminated with status %i\r\n", fork_pid, exit_status);
 
+    initialize_ramdisk();
+
     syscall_exit(0);
+}
+
+void initialize_ramdisk()
+{
+    uint8_t buff[512];
+    uint32_t status = virtio_mmio_read(31, 0, (uint8_t *)&buff);
+
+    if (status != VIRTIO_BLK_S_OK)
+    {
+        printk("[init] virtio_mmio_read() returned %i!\r\n", status);
+        return;
+    }
+
+    fat32_dump_boot_sector((struct mbr_boot_sector *)buff);
 }
 
 void child()
