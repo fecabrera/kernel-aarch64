@@ -96,6 +96,25 @@
 #define VIRTIO_BLK_F_DISCARD (1 << 13)
 #define VIRTIO_BLK_F_WRITE_ZEROES (1 << 14)
 
+//
+#define VIRTIO_MMIO_BLK_SECTOR_SIZE 512
+
+// Block request types — written into virtio_blk_req_header.type
+#define VIRTIO_BLK_T_IN 0  // read from device into driver buffer
+#define VIRTIO_BLK_T_OUT 1 // write from driver buffer to device
+
+// Block request statuses — written by the device into the status byte of the request
+#define VIRTIO_BLK_S_OK 0      // success
+#define VIRTIO_BLK_S_IOERR 1   // device I/O error
+#define VIRTIO_BLK_S_UNSUPP 2  // unsupported request type
+#define VIRTIO_BLK_S_NONE 0xFF // sentinel: device has not yet responded
+
+// ── Virtqueue descriptor flags ───────────────────────────────────────────────
+
+#define VIRTQ_DESC_F_NEXT (1 << 0)     // descriptor is part of a chain; .next is valid
+#define VIRTQ_DESC_F_WRITE (1 << 1)    // device writes to this buffer (driver-read-only if clear)
+#define VIRTQ_DESC_F_INDIRECT (1 << 2) // buffer contains a table of descriptors
+
 // Probing errors
 
 #define VIRTIO_MMIO_BAD_MAGIC -1
@@ -131,6 +150,20 @@ struct virtq_used
     } ring[DEFAULT_VIRTIO_QUEUE_NUM];
 };
 
+struct virtq
+{
+    struct virtq_desc desc[DEFAULT_VIRTIO_QUEUE_NUM];
+    struct virtq_avail avail;
+    struct virtq_used used;
+};
+
+struct virtio_blk_req_header
+{
+    uint32_t type; // VIRTIO_BLK_T_IN (0) = read, VIRTIO_BLK_T_OUT (1) = write
+    uint32_t reserved;
+    uint64_t sector; // 512-byte sector number to start from
+};
+
 typedef struct cpu_context *(*virtio_mmio_handler_t)(int i, struct cpu_context *);
 
 /**
@@ -140,6 +173,21 @@ typedef struct cpu_context *(*virtio_mmio_handler_t)(int i, struct cpu_context *
  * and before irq_enable.
  */
 void virtio_mmio_init();
+
+/**
+ * Submits a synchronous read request to the virtio-blk device at the given
+ * slot. Builds a 3-descriptor chain (request header → data buffer → status),
+ * posts it to the available ring, kicks the device via QUEUE_NOTIFY, then
+ * polls the used ring until the device marks the request complete.
+ *
+ * @param slot:          virtio MMIO slot index (e.g. VIRTIO_MMIO_SLOT_BLK)
+ * @param sector_number: 512-byte sector to read from
+ * @param data:          output buffer of at least VIRTIO_MMIO_BLK_SECTOR_SIZE bytes
+ *
+ * @return VIRTIO_BLK_S_OK (0) on success, VIRTIO_BLK_S_IOERR or
+ *         VIRTIO_BLK_S_UNSUPP on device error, -1 if slot is not initialized.
+ */
+int virtio_mmio_read(int slot, uint64_t sector_number, uint8_t *data);
 
 /**
  * IRQ handler for virtio MMIO device interrupts. Uses the IRQ ID to find
