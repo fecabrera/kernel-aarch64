@@ -55,7 +55,7 @@ make run
 - **ARM generic timer** — 10ms tick via EL1 physical timer (PPI 30)
 - **PL031 RTC** — match alarm interrupt
 - **virtio MMIO** — scans all 32 MMIO slots; validates magic, version, and device ID; negotiates features; sets up per-slot 64-entry virtqueues (`struct virtq` with desc/avail/used rings); `virtio_mmio_read` submits synchronous block reads via 3-descriptor chains; IRQ handler acks `VIRTIO_INTERRUPT_STATUS`
-- **FAT32** — MBR/BPB parsing (`mbr_boot_sector`, `fat32_extended_boot_record`); packed structs with aligned mirrors for safe field access on AArch64; `fat32_dump_boot_sector` for debug inspection
+- **FAT32** — MBR/BPB parsing (`mbr_boot_sector`, `fat32_extended_boot_record`); 8.3 and LFN directory entry structs (`fat32_dir_entry`, `fat32_lfn_entry`) with `FAT32_ATTR_*`, `FAT32_DIRENT_*`, and `FAT32_LFN_*` defines; packed structs with aligned mirrors for safe field access on AArch64; `fat32_dump_boot_sector`, `fat32_dump_extended_boot_record`, `fat32_dump_dir_entry`, `fat32_dump_lfn_entry` for debug inspection
 - **Heap allocator** — first-fit free-list with 4MB region, block splitting, and coalescing (`kmalloc`/`kfree`/`krealloc`); `kfree` returns error codes for NULL, out-of-range, and double-free
 - **Exception handling** — full save/restore of all 31 registers + ELR/SPSR; IRQ handlers return `struct cpu_context *` for context switching; IABT/DABT terminate the faulting process via `exit_handler`; unknown exceptions dump the full register context
 - **Preemptive scheduler** — FIFO run queue, timer-driven; tracks the running process via a `current` pointer; dedicated 4KB IRQ stack; `create_process`/`duplicate_process`/`destroy_process` with 16-byte aligned task stacks; idles via `halt` when the ready queue is empty
@@ -107,7 +107,7 @@ src/
     string.c/h      — freestanding string library (memcpy, memset, strcmp, ...)
     stdlib.c/h      — itoa, vsprintf, sprintf (freestanding; uses __builtin_va_* instead of <stdarg.h>)
     stdint.h        — stdint-style typedefs (uint8_t … uint64_t, intptr_t)
-    uchar.h         — char8_t, char16_t, char32_t typedefs (for UTF-8/16/32)
+    uchar.c/h       — char8_t/16_t/32_t typedefs; utf16to8 conversion; utf16lencpy/utf16bencpy (UTF-16LE/BE to ASCII)
     limits.h        — integer limit macros (AArch64/LP64; unsigned char default)
     time.h          — time_t typedef (uint64_t)
     sys/types.h     — pid_t typedef (int64_t)
@@ -117,7 +117,7 @@ src/
     scheduler.c/h   — FIFO ready queue (dsa/queue64) and wait queue (dsa/deque64), scheduler_enqueue/dequeue/spawn, context switch via timer and yield/exit/waitpid/fork syscalls
 
   fs/               — filesystem drivers
-    fat32.c/h       — MBR/BPB structs (packed + aligned mirrors), partition type and media descriptor defines, fat32_dump_boot_sector
+    fat32.c/h       — MBR/BPB structs (packed + aligned mirrors), 8.3 and LFN dir entry structs, partition type/media descriptor/attribute/LFN defines, dump functions for boot sector/EBR/dir/LFN entries
 ```
 
 ## Memory map (QEMU virt)

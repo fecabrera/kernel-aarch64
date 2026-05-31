@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <uchar.h>
 
 // Partition type byte
 #define MBR_PARTITION_TYPE_EMPTY 0
@@ -59,49 +60,72 @@ struct __attribute__((packed)) mbr_boot_sector
     uint16_t n_root_dir_entries;   // root directory entries (0 for FAT32)
     uint16_t total_sectors_16;     // total sectors if < 65536, else 0 (use total_sectors_32)
     uint8_t media_dtor_type;       // media descriptor byte (see MBR_MEDIA_DESCRIPTOR_*)
-    uint16_t n_sectors_per_fat;    // sectors per FAT (FAT12/16 only; 0 for FAT32)
+    uint16_t table_size_16;        // sectors per FAT (FAT12/16 only; 0 for FAT32)
     uint16_t n_sectors_per_track;  // sectors per track (CHS geometry)
     uint16_t n_heads;              // number of heads (CHS geometry)
-    uint16_t n_hidden_sectors;     // hidden sectors preceding this partition
+    uint32_t n_hidden_sectors;     // hidden sectors preceding this partition
     uint32_t total_sectors_32;     // total sectors if >= 65536 (FAT32 always uses this)
-    uint8_t boot_code[476];        // bootstrap code + EBR (for FAT32, EBR starts at offset 36)
+    uint8_t boot_code[474];        // bootstrap code + EBR (for FAT32, EBR starts at offset 36)
     uint16_t mbr_signature_word;   // boot sector signature (must be 0xAA55)
 };
 
-// ── Aligned copies ───────────────────────────────────────────────────────────
-// Mirrors of the packed structs above without __attribute__((packed)).
-// Use memcpy to transfer fields from a packed struct into one of these before
-// accessing multi-byte fields, to avoid alignment faults on AArch64.
-struct _aligned_fat32_extended_boot_record
+// ── Directory entry attributes ────────────────────────────────────────────────
+
+#define FAT32_ATTR_READ_ONLY (1 << 0) // file is read-only
+#define FAT32_ATTR_HIDDEN (1 << 1)    // file is hidden
+#define FAT32_ATTR_SYSTEM (1 << 2)    // file is a system file
+#define FAT32_ATTR_VOLUME_ID (1 << 3) // entry is a volume label
+#define FAT32_ATTR_DIRECTORY (1 << 4) // entry is a subdirectory
+#define FAT32_ATTR_ARCHIVE (1 << 5)   // file has been modified since last backup
+// combination used to mark a long file name entry
+#define FAT32_ATTR_LFN (FAT32_ATTR_READ_ONLY | FAT32_ATTR_HIDDEN | FAT32_ATTR_SYSTEM | FAT32_ATTR_VOLUME_ID)
+
+// ── Special first-byte values for dir_entry.name[0] ──────────────────────────
+
+#define FAT32_DIRENT_FREE 0xE5 // entry was deleted (slot is free)
+#define FAT32_DIRENT_END 0x00  // no more entries in this directory
+#define FAT32_DIRENT_DOT 0x2E  // "." or ".." entry
+
+// ── LFN sequence number flags ─────────────────────────────────────────────────
+
+#define FAT32_LFN_LAST_ENTRY 0x40 // OR'd into lfn_entry.order for the last (highest) LFN entry
+
+/**
+ * FAT32 8.3 short-name directory entry (32 bytes).
+ * All multi-byte fields are little-endian.
+ * Use memcpy when accessing uint16_t/uint32_t fields through a pointer.
+ */
+struct __attribute__((packed)) fat32_dir_entry
 {
-    uint32_t table_size_32;
-    uint16_t extended_flags;
-    uint16_t fat_version;
-    uint32_t root_cluster;
-    uint16_t fat_info;
-    uint16_t backup_bs_sector;
-    uint8_t drive_number;
-    uint8_t reserved_1;
-    uint8_t boot_signature;
-    uint32_t volume_id;
+    uint8_t name[11];       // short name: 8 chars name + 3 chars extension, space-padded
+    uint8_t attributes;     // FAT32_ATTR_* flags
+    uint8_t reserved;       // reserved for Windows NT
+    uint8_t create_time_cs; // creation time, 10ms units (0–199)
+    uint16_t create_time;   // creation time: bits[15:11]=hour, [10:5]=minute, [4:0]=second/2
+    uint16_t create_date;   // creation date: bits[15:9]=year-1980, [8:5]=month, [4:0]=day
+    uint16_t access_date;   // last access date (same format as create_date)
+    uint16_t cluster_high;  // high 16 bits of first cluster (FAT32 only)
+    uint16_t modify_time;   // last modified time (same format as create_time)
+    uint16_t modify_date;   // last modified date (same format as create_date)
+    uint16_t cluster_low;   // low 16 bits of first cluster
+    uint32_t file_size;     // file size in bytes (0 for directories)
 };
 
-struct _aligned_mbr_boot_sector
+/**
+ * FAT32 long file name (LFN) directory entry (32 bytes).
+ * LFN entries precede their corresponding 8.3 entry in reverse order.
+ * Name characters are UTF-16LE; unused trailing chars are 0xFFFF.
+ */
+struct __attribute__((packed)) fat32_lfn_entry
 {
-    uint8_t mbr_jump_boot[3];
-    uint16_t n_bytes_per_sector;
-    uint8_t n_sectors_per_cluster;
-    uint16_t n_reserved_sectors;
-    uint8_t n_fat;
-    uint16_t n_root_dir_entries;
-    uint16_t total_sectors_16;
-    uint8_t media_dtor_type;
-    uint16_t n_sectors_per_fat;
-    uint16_t n_sectors_per_track;
-    uint16_t n_heads;
-    uint16_t n_hidden_sectors;
-    uint32_t total_sectors_32;
-    uint16_t mbr_signature_word;
+    uint8_t order;      // sequence number (1-based); OR'd with FAT32_LFN_LAST_ENTRY if last
+    char16_t name1[5];  // UTF-16LE name characters 1–5
+    uint8_t attributes; // always FAT32_ATTR_LFN (0x0F)
+    uint8_t type;       // always 0
+    uint8_t checksum;   // checksum of the 8.3 short name
+    char16_t name2[6];  // UTF-16LE name characters 6–11
+    uint16_t cluster;   // always 0x0000
+    char16_t name3[2];  // UTF-16LE name characters 12–13
 };
 
 /**
@@ -110,4 +134,34 @@ struct _aligned_mbr_boot_sector
  *
  * @param boot_sector: pointer to a packed MBR boot sector read from disk
  */
+
+/**
+ * Prints all BPB fields of the MBR boot sector to the kernel log via printk.
+ * Reads multi-byte fields with memcpy to avoid alignment faults.
+ *
+ * @param boot_sector: pointer to a packed MBR boot sector read from disk
+ */
 void fat32_dump_boot_sector(struct mbr_boot_sector *boot_sector);
+
+/**
+ * Prints all fields of a FAT32 extended boot record to the kernel log.
+ * Reads multi-byte fields with memcpy to avoid alignment faults.
+ *
+ * @param ext_br: pointer to the EBR, typically at &boot_sector->boot_code[0]
+ */
+void fat32_dump_extended_boot_record(struct fat32_extended_boot_record *ext_br);
+
+/**
+ * Prints all fields of an 8.3 directory entry to the kernel log.
+ * Reads multi-byte fields with memcpy to avoid alignment faults.
+ *
+ * @param dir_entry: pointer to a packed fat32_dir_entry
+ */
+void fat32_dump_dir_entry(struct fat32_dir_entry *dir_entry);
+
+/**
+ * Prints all fields of a long file name directory entry to the kernel log.
+ *
+ * @param lfn_dir_entry: pointer to a packed fat32_lfn_entry
+ */
+void fat32_dump_lfn_entry(struct fat32_lfn_entry *lfn_dir_entry);
