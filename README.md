@@ -81,7 +81,7 @@ src/
   vectors.S         — exception vector table, save/restore_context macros
 
   arch/             — AArch64-specific
-    cpu.c/h         — system register accessors (cntfrq, cntp, DAIF), SPSR defines, halt/hang
+    cpu.c/h         — system register accessors (cntpct, cntfrq, cntp, DAIF), SPSR defines, halt/hang
     irq.c/h         — exception handlers, IRQ dispatch table, cpu_context, irq_init
     syscall.c/h     — syscall dispatch table, syscall_handler, syscall_register_handler, syscall_yield, syscall_exit, syscall_getpid, syscall_waitpid, syscall_fork
 

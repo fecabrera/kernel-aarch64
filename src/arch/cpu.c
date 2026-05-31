@@ -1,6 +1,13 @@
 #include <stdint.h>
 #include "cpu.h"
 
+uint64_t get_cntpct_el0()
+{
+    uint64_t count;
+    __asm__ volatile("mrs %0, cntpct_el0" : "=r"(count));
+    return count;
+}
+
 uint64_t get_cntfrq_el0()
 {
     uint64_t freq;

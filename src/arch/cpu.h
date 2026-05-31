@@ -40,6 +40,15 @@ void halt() __attribute__((noreturn));
 void hang() __attribute__((noreturn));
 
 /**
+ * Reads the physical count register (cntpct_el0).
+ * Increments at the frequency reported by cntfrq_el0 (typically 24 MHz on
+ * QEMU virt). Divide by get_cntfrq_el0() to convert ticks to seconds.
+ *
+ * @return Current 64-bit physical counter value.
+ */
+uint64_t get_cntpct_el0();
+
+/**
  * Reads the timer frequency register (cntfrq_el0).
  *
  * @return Timer frequency in Hz as set by firmware.
