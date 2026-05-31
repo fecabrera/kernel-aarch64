@@ -59,6 +59,17 @@ int vsprintf(char *str, const char *format, __builtin_va_list args)
 
         format++;
 
+        // parse optional zero-pad: %0<width><conv> e.g. %08x
+        char pad_char = ' ';
+        int pad_width = 0;
+        if (*format == '0')
+        {
+            pad_char = '0';
+            format++;
+            while (*format >= '0' && *format <= '9')
+                pad_width = pad_width * 10 + (*format++ - '0');
+        }
+
         switch (*format++)
         {
         case 'd':
@@ -66,6 +77,11 @@ int vsprintf(char *str, const char *format, __builtin_va_list args)
         {
             int val = __builtin_va_arg(args, int);
             itoa((int64_t)val, tmp, 10);
+            int len = 0;
+            for (char *p = tmp; *p; p++)
+                len++;
+            for (int i = len; i < pad_width; i++)
+                *out++ = pad_char;
             for (char *p = tmp; *p; p++)
                 *out++ = *p;
             break;
@@ -74,6 +90,11 @@ int vsprintf(char *str, const char *format, __builtin_va_list args)
         {
             unsigned int val = __builtin_va_arg(args, unsigned int);
             itoa((int64_t)val, tmp, 10);
+            int len = 0;
+            for (char *p = tmp; *p; p++)
+                len++;
+            for (int i = len; i < pad_width; i++)
+                *out++ = pad_char;
             for (char *p = tmp; *p; p++)
                 *out++ = *p;
             break;
@@ -82,6 +103,11 @@ int vsprintf(char *str, const char *format, __builtin_va_list args)
         {
             unsigned int val = __builtin_va_arg(args, unsigned int);
             itoa((int64_t)val, tmp, 16);
+            int len = 0;
+            for (char *p = tmp; *p; p++)
+                len++;
+            for (int i = len; i < pad_width; i++)
+                *out++ = pad_char;
             for (char *p = tmp; *p; p++)
                 *out++ = *p;
             break;
