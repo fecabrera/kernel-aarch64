@@ -14,6 +14,7 @@
  *   SYSCALL_WAITPID          → waitpid_handler
  *   SYSCALL_FORK             → fork_handler
  *   SYSCALL_SLEEP            → sleep_handler
+ *   SYSCALL_MSLEEP           → msleep_handler
  */
 void scheduler_init();
 
@@ -132,3 +133,17 @@ struct cpu_context *fork_handler(struct cpu_context *ctx);
  *         currently scheduled
  */
 struct cpu_context *sleep_handler(struct cpu_context *ctx);
+
+/**
+ * Syscall handler for SYSCALL_MSLEEP. Sets current->sleep_for directly to
+ * ctx->x1 ms, moves current to the sleep queue, and calls scheduler_handler
+ * to run the next task. The process is woken by _notify_sleepers inside
+ * scheduler_handler once sleep_for reaches zero.
+ *
+ * @param ctx: saved context of the calling process; ctx->x1 holds the sleep
+ *             duration in milliseconds
+ *
+ * @return ctx of the next task to run, or ctx unchanged if no process is
+ *         currently scheduled
+ */
+struct cpu_context *msleep_handler(struct cpu_context *ctx);

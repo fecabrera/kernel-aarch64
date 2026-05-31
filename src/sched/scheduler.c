@@ -30,6 +30,7 @@ void scheduler_init()
     syscall_register_handler(SYSCALL_WAITPID, &waitpid_handler);
     syscall_register_handler(SYSCALL_FORK, &fork_handler);
     syscall_register_handler(SYSCALL_SLEEP, &sleep_handler);
+    syscall_register_handler(SYSCALL_MSLEEP, &msleep_handler);
 }
 
 int scheduler_enqueue(struct process *proc)
@@ -268,7 +269,7 @@ struct cpu_context *fork_handler(struct cpu_context *ctx)
 
 struct cpu_context *sleep_handler(struct cpu_context *ctx)
 {
-    int64_t seconds = ctx->x1;
+    time_t seconds = ctx->x1;
 
     if (current == NULL)
     {
@@ -281,6 +282,29 @@ struct cpu_context *sleep_handler(struct cpu_context *ctx)
 
     current->state = PROC_BLOCKED;
     current->sleep_for = seconds * 1000;
+    current->ctx = ctx;
+
+    deque64_add_right(&sleep_queue, (uintptr_t)current);
+    current = NULL;
+
+    return scheduler_handler(ctx, 0);
+}
+
+struct cpu_context *msleep_handler(struct cpu_context *ctx)
+{
+    mseconds_t mseconds = ctx->x1;
+
+    if (current == NULL)
+    {
+        dprintk("[scheduler] no current process for msleep!\r\n");
+        ctx->x0 = -1;
+        return ctx;
+    }
+
+    dprintk("[scheduler] msleep(%i)\r\n", mseconds);
+
+    current->state = PROC_BLOCKED;
+    current->sleep_for = mseconds;
     current->ctx = ctx;
 
     deque64_add_right(&sleep_queue, (uintptr_t)current);

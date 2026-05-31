@@ -67,6 +67,7 @@ make run
   - `syscall_waitpid(pid)` blocks the caller until the target process exits
   - `syscall_fork()` duplicates the calling process (child resumes at the fork site with return value 0)
   - `syscall_sleep(seconds)` blocks the caller in a sleep queue; the timer tick decrements `sleep_for` until it reaches zero
+  - `syscall_msleep(ms)` same as `syscall_sleep` but duration is in milliseconds
   - `syscall_time()` returns the current Unix timestamp from the RTC
 
 ## Source layout

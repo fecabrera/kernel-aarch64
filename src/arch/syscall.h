@@ -12,7 +12,8 @@
 #define SYSCALL_WAITPID 3
 #define SYSCALL_FORK 4
 #define SYSCALL_SLEEP 5
-#define SYSCALL_TIME 6
+#define SYSCALL_MSLEEP 6
+#define SYSCALL_TIME 7
 
 /**
  * Dispatches a syscall based on the number in ctx->x0.
@@ -104,6 +105,19 @@ pid_t syscall_fork();
  * @return 0 on wakeup, or -1 if no process is currently scheduled.
  */
 int64_t syscall_sleep(time_t seconds);
+
+/**
+ * Blocks the calling process for the given number of milliseconds via
+ * SYSCALL_MSLEEP (svc #0). Traps into EL1, where msleep_handler sets
+ * process->sleep_for directly to the given value and moves the caller
+ * to the sleep queue. The timer tick decrements sleep_for on each tick;
+ * process is enqueued when it reaches zero.
+ *
+ * @param ms: number of milliseconds to sleep
+ *
+ * @return 0 on wakeup, or -1 if no process is currently scheduled.
+ */
+int64_t syscall_msleep(mseconds_t ms);
 
 /**
  * Returns the current Unix timestamp via SYSCALL_TIME (svc #0).
