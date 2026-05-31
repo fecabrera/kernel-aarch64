@@ -7,10 +7,12 @@
 
 static int _irq_to_slot[256] = {0};
 static virtio_mmio_handler_t _handlers[32];
-static struct virtq _queues[32];
+static struct virtio_mmio_device _devices[32] = {0};
 
-static int _virtio_mmio_init(int slot)
+static int _virtio_mmio_probe_device(int slot)
 {
+    struct virtio_mmio_device *device = &_devices[slot];
+
     uint32_t magic = VIRTIO_MAGIC(slot);
     uint32_t version = VIRTIO_VERSION(slot);
     uint32_t device_id = VIRTIO_DEVICE_ID(slot);
@@ -80,7 +82,7 @@ static int _virtio_mmio_init(int slot)
 
     VIRTIO_QUEUE_NUM(slot) = DEFAULT_VIRTIO_QUEUE_NUM;
 
-    struct virtq *q = &_queues[slot];
+    struct virtq *q = &device->queue;
 
     // Write physical addresses (split into low/high 32-bit halves)
     VIRTIO_QUEUE_DESC_LOW(slot) = (uint32_t)((uintptr_t)&q->desc);
@@ -109,17 +111,38 @@ static int _virtio_mmio_init(int slot)
     irq_register_handler(virtio_mmio_irq, &virtio_mmio_irq_handler);
     gic_enable_irq(virtio_mmio_irq);
 
+    // if everything goes well we add it to our table
+    device->irq_id = virtio_mmio_irq;
+    device->device_id = device_id;
+
     return 0;
 }
 
 void virtio_mmio_init()
 {
     for (int slot = 0; slot < 32; slot++)
-        _virtio_mmio_init(slot);
+        _virtio_mmio_probe_device(slot);
+}
+
+int virtio_mmio_find_next_slot(uint32_t device_id, int start)
+{
+    for (int idx = start + 1; idx < 32; idx++)
+        if (_devices[idx].device_id == device_id)
+            return idx;
+
+    return -1;
 }
 
 int virtio_mmio_read(int slot, uint64_t sector_number, uint8_t *data)
 {
+    struct virtio_mmio_device *device = &_devices[slot];
+
+    if (device->device_id == VIRTIO_DEVICE_ID_INVALID)
+    {
+        dprintk("[virtio_mmio] Device slot %i is invalid!\r\n", slot);
+        return VIRTIO_MMIO_INVALID_DEVICE;
+    }
+
     // 1. Fill the header
     struct virtio_blk_req_header hdr = {
         .type = 0,
@@ -127,7 +150,7 @@ int virtio_mmio_read(int slot, uint64_t sector_number, uint8_t *data)
     };
     uint8_t status = 0xFF; // device writes 0 on success, 1 on error, 2 = unsupported
 
-    struct virtq *q = &_queues[slot];
+    struct virtq *q = &device->queue;
 
     // 2. Fill descriptor chain (indices 0, 1, 2)
     q->desc[0].addr = (uintptr_t)&hdr;
@@ -155,7 +178,7 @@ int virtio_mmio_read(int slot, uint64_t sector_number, uint8_t *data)
     // 5. Poll or wait for IRQ — device writes to used ring when done
     // In the IRQ handler, check used.idx advanced and read status byte
     while (status == VIRTIO_BLK_S_NONE)
-        syscall_sleep(1);
+        syscall_msleep(1);
 
     dprintk("[virtio_mmio@%x] status = %u\r\n", status);
 
@@ -170,7 +193,7 @@ struct cpu_context *virtio_mmio_irq_handler(int irq, struct cpu_context *ctx)
     uint32_t status = VIRTIO_INTERRUPT_STATUS(slot);
     VIRTIO_INTERRUPT_ACK(slot) = status;
 
-    printk("[virtio_mmio@%x] IRQ handler, status = %u\r\n", VIRTIO_MMIO_ADDR(slot), status);
+    dprintk("[virtio_mmio@%x] IRQ handler, status = %u\r\n", VIRTIO_MMIO_ADDR(slot), status);
 
     if (fnc == NULL)
     {
