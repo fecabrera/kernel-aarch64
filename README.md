@@ -69,6 +69,7 @@ make run
   - `syscall_sleep(seconds)` blocks the caller in a sleep queue; the timer tick decrements `sleep_for` until it reaches zero
   - `syscall_msleep(ms)` same as `syscall_sleep` but duration is in milliseconds
   - `syscall_time()` returns the current Unix timestamp from the RTC
+  - `syscall_uptime()` returns system uptime in milliseconds, computed from `cntpct_el0` ticks since boot
 
 ## Source layout
 

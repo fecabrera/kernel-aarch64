@@ -40,6 +40,16 @@ void timer_init();
 struct cpu_context *timer_irq_handler(int irq, struct cpu_context *ctx);
 
 /**
+ * Syscall handler for SYSCALL_UPTIME. Reads the current cntpct_el0 tick count,
+ * computes elapsed milliseconds since timer_init, and returns the result in x0.
+ *
+ * @param ctx: saved register frame of the calling process
+ *
+ * @return ctx with x0 set to the system uptime in milliseconds
+ */
+struct cpu_context *syscall_uptime_handler(struct cpu_context *ctx);
+
+/**
  * Sets the timer tick interval in milliseconds.
  * Must be called before timer_init().
  *

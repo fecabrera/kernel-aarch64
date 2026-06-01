@@ -14,6 +14,7 @@
 #define SYSCALL_SLEEP 5
 #define SYSCALL_MSLEEP 6
 #define SYSCALL_TIME 7
+#define SYSCALL_UPTIME 8
 
 /**
  * Dispatches a syscall based on the number in ctx->x0.
@@ -127,3 +128,12 @@ int64_t syscall_msleep(mseconds_t ms);
  * @return current Unix timestamp, or -1 on failure.
  */
 time_t syscall_time();
+
+/**
+ * Returns the system uptime in milliseconds via SYSCALL_UPTIME (svc #0).
+ * Traps into EL1, where syscall_uptime_handler reads cntpct_el0 and computes
+ * elapsed milliseconds since timer_init.
+ *
+ * @return system uptime in milliseconds
+ */
+time_t syscall_uptime();

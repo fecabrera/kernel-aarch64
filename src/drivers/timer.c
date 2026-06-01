@@ -2,6 +2,7 @@
 #include <debug.h>
 #include <arch/cpu.h>
 #include <arch/irq.h>
+#include <arch/syscall.h>
 #include <sched/scheduler.h>
 #include "timer.h"
 #include "gic.h"
@@ -24,6 +25,9 @@ void timer_init()
 
     // Enable timer, unmask interrupt
     set_cntp_ctl_el0(CNTP_CTL_ENABLE);
+
+    // register uptime syscall
+    syscall_register_handler(SYSCALL_UPTIME, &syscall_uptime_handler);
 
     if (dtb_get_timer_irq_number(&timer_irq) == 0)
     {
@@ -55,6 +59,20 @@ struct cpu_context *timer_irq_handler(__attribute__((unused)) int irq, struct cp
     set_cntp_tval_el0(_time_quantum(1));
 
     return next_ctx;
+}
+
+struct cpu_context *syscall_uptime_handler(struct cpu_context *ctx)
+{
+    uint64_t ticks = get_cntpct_el0();
+    time_t uptime = (ticks - tinfo.initial_ticks) * 1000 / tinfo.frequency;
+
+    dprintk("[timer] ticks           = %d\r\n", ticks);
+    dprintk("[timer] initial_ticks   = %d\r\n", tinfo.initial_ticks);
+    dprintk("[timer] uptime          = %d ms\r\n", uptime);
+
+    ctx->x0 = uptime;
+
+    return ctx;
 }
 
 void timer_set_interval(time_t interval)

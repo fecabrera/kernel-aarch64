@@ -132,7 +132,7 @@ int64_t syscall_msleep(mseconds_t ms)
         "svc #0\n"
         "mov %0, x0"
         : "=r"(ret)
-        : "r"((uint64_t)SYSCALL_SLEEP), "r"(ms)
+        : "r"((uint64_t)SYSCALL_MSLEEP), "r"(ms)
         : "x0", "x1");
     return ret;
 }
@@ -146,6 +146,19 @@ time_t syscall_time()
         "mov %0, x0"
         : "=r"(ret)
         : "r"((uint64_t)SYSCALL_TIME)
+        : "x0");
+    return ret;
+}
+
+time_t syscall_uptime()
+{
+    time_t ret;
+    __asm__ volatile(
+        "mov x0, %1\n"
+        "svc #0\n"
+        "mov %0, x0"
+        : "=r"(ret)
+        : "r"((uint64_t)SYSCALL_UPTIME)
         : "x0");
     return ret;
 }
