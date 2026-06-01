@@ -144,50 +144,64 @@ void initialize_ramdisk()
         return;
     }
 
-    struct fat32_lfn_entry *root_dir_lfn;
-    struct fat32_dir_entry *root_dir = (struct fat32_dir_entry *)buff;
-
-    uint8_t attributes;
-    memcpy(&attributes, &root_dir->attributes, 1);
-
-    // dump root dir entry
-    if (attributes == FAT32_ATTR_LFN)
+    int idx = 0, cnt = 0;
+    while (idx < 16)
     {
-        root_dir_lfn = (struct fat32_lfn_entry *)root_dir;
-        root_dir = root_dir + 1;
+        struct fat32_lfn_entry *root_dir_lfn = NULL;
+        struct fat32_dir_entry *root_dir = ((struct fat32_dir_entry *)buff) + idx++;
+
+        if (root_dir->name[0] == FAT32_DIRENT_FREE)
+            continue;
+
+        if (root_dir->name[0] == FAT32_DIRENT_END)
+            break;
+
+        cnt++;
+
+        uint8_t attributes;
         memcpy(&attributes, &root_dir->attributes, 1);
-        fat32_dump_lfn_entry(root_dir_lfn);
+
+        // dump root dir entry
+        if (attributes == FAT32_ATTR_LFN)
+        {
+            idx++;
+            root_dir_lfn = (struct fat32_lfn_entry *)root_dir;
+            root_dir = (struct fat32_dir_entry *)root_dir + 1;
+            memcpy(&attributes, &root_dir->attributes, 1);
+            fat32_dump_lfn_entry(root_dir_lfn);
+        }
+        else
+        {
+            fat32_dump_dir_entry(root_dir);
+        }
+
+        uint16_t cluster_low, cluster_high;
+        uint32_t file_size;
+        memcpy(&cluster_low, &root_dir->cluster_low, 2);
+        memcpy(&cluster_high, &root_dir->cluster_high, 2);
+        memcpy(&file_size, &root_dir->file_size, 4);
+
+        char dir_name[12] = {0};
+        char lfn_dir_name[52] = {0};
+        char16_t _lfn_dir_name[26] = {0};
+
+        strncpy(dir_name, (char *)root_dir->name, 11);
+        if (root_dir_lfn != NULL)
+        {
+            memcpy(_lfn_dir_name, root_dir_lfn->name1, 10);
+            memcpy(_lfn_dir_name + 5, root_dir_lfn->name2, 12);
+            memcpy(_lfn_dir_name + 11, root_dir_lfn->name3, 4);
+            utf16lencpy(lfn_dir_name, (char16_t *)_lfn_dir_name, 26);
+        }
+
+        printk("idx         = %d\r\n", cnt);
+        printk("name        = \"%s\"\r\n", dir_name);
+        if (root_dir_lfn != NULL)
+            printk("lfn_name    = \"%s\"\r\n", lfn_dir_name);
+        printk("attributes  = 0x%02x\r\n", attributes);
+        printk("cluster     = %d\r\n", ((uint32_t)_le16(cluster_high) << 16) | _le16(cluster_low));
+        printk("size        = %d B\r\n", _le32(file_size));
     }
-    else
-    {
-        fat32_dump_dir_entry(root_dir);
-    }
-
-    uint16_t cluster_low, cluster_high;
-    uint32_t file_size;
-    memcpy(&cluster_low, &root_dir->cluster_low, 2);
-    memcpy(&cluster_high, &root_dir->cluster_high, 2);
-    memcpy(&file_size, &root_dir->file_size, 4);
-
-    char dir_name[12] = {0};
-    char lfn_dir_name[52] = {0};
-    char16_t _lfn_dir_name[26] = {0};
-
-    strncpy(dir_name, (char *)root_dir->name, 11);
-    if (root_dir_lfn != NULL)
-    {
-        memcpy(_lfn_dir_name, root_dir_lfn->name1, 10);
-        memcpy(_lfn_dir_name + 5, root_dir_lfn->name2, 12);
-        memcpy(_lfn_dir_name + 6, root_dir_lfn->name3, 2);
-        utf16lencpy(lfn_dir_name, (char16_t *)_lfn_dir_name, 26);
-    }
-
-    printk("name        = \"%s\"\r\n", dir_name);
-    if (root_dir_lfn != NULL)
-        printk("lfn_name    = \"%s\"\r\n", lfn_dir_name);
-    printk("attributes  = 0x%02x\r\n", attributes);
-    printk("cluster     = %d\r\n", ((uint32_t)_le16(cluster_high) << 16) | _le16(cluster_low));
-    printk("size        = %d B\r\n", _le32(file_size));
 }
 
 void child()
