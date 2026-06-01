@@ -207,11 +207,11 @@ void child()
     {
         printk("[child] going to sleep\r\n");
 
-        time_t t0 = syscall_time();
+        time_t t0 = syscall_uptime();
         syscall_sleep(2);
-        time_t t1 = syscall_time();
+        time_t t1 = syscall_uptime();
 
-        printk("[child] back from sleep, elapsed = %is\r\n", t1 - t0);
+        printk("[child] slept for %dms\r\n", t1 - t0);
         syscall_exit(0);
     }
     else
