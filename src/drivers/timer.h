@@ -6,6 +6,18 @@
 #define DEFAULT_TIMER_INTERVAL 10
 
 /**
+ * Timing state maintained by the timer driver across each tick interrupt.
+ * Used to compute the real elapsed interval and system uptime in milliseconds.
+ */
+struct sched_info
+{
+    uint64_t ticks;         // cntpct_el0 value captured at the last tick interrupt
+    uint64_t initial_ticks; // cntpct_el0 value captured at timer_init time
+    uint64_t frequency;     // counter frequency in Hz, read from cntfrq_el0
+    time_t interval;        // desired tick interval in milliseconds
+};
+
+/**
  * Initializes the ARM generic timer. Reads the timer frequency from cntfrq_el0,
  * sets the countdown from the current interval (default: DEFAULT_TIMER_INTERVAL),
  * enables the timer, and registers the IRQ with the GIC using the IRQ number

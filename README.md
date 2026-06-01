@@ -52,7 +52,7 @@ make run
 - **DTB parsing** — reads device tree at boot to discover IRQ numbers, memory layout, and peripheral addresses at runtime
 - **GIC-400** — interrupt controller driver with a dynamic dispatch table (`irq_register_handler`)
 - **PL011 UART** — interrupt-driven RX, polled TX, 115200 8N1
-- **ARM generic timer** — 10ms tick via EL1 physical timer (PPI 30)
+- **ARM generic timer** — 10ms tick via EL1 physical timer (PPI 30); tracks `initial_ticks` at boot and `ticks` per interrupt via `cntpct_el0` to compute real elapsed interval and system uptime in milliseconds
 - **PL031 RTC** — match alarm interrupt
 - **virtio MMIO** — scans all 32 MMIO slots; validates magic, version, and device ID; negotiates features; sets up per-slot 64-entry virtqueues (`struct virtq` with desc/avail/used rings); `virtio_mmio_read` submits synchronous block reads via 3-descriptor chains; IRQ handler acks `VIRTIO_INTERRUPT_STATUS`
 - **FAT32** — MBR/BPB parsing (`mbr_boot_sector`, `fat32_extended_boot_record`); 8.3 and LFN directory entry structs (`fat32_dir_entry`, `fat32_lfn_entry`) with `FAT32_ATTR_*`, `FAT32_DIRENT_*`, and `FAT32_LFN_*` defines; packed structs with aligned mirrors for safe field access on AArch64; `fat32_dump_boot_sector`, `fat32_dump_extended_boot_record`, `fat32_dump_dir_entry`, `fat32_dump_lfn_entry` for debug inspection

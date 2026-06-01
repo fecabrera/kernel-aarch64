@@ -74,10 +74,11 @@ pid_t scheduler_spawn(proc_entry entry)
     return proc->pid;
 }
 
-static void _notify_sleepers(uint64_t ms_elapsed)
+static void _notify_sleepers(time_t ms_elapsed)
 {
-    dprintk("[scheduler] __notify_sleepers(), current=%i\r\n", current ? current->pid : 0);
     struct deque64_entry *entry = NULL;
+
+    dprintk("[scheduler] __notify_sleepers(), current=%i\r\n", current ? current->pid : 0);
 
     while ((entry = deque64_next(&sleep_queue, entry)))
     {

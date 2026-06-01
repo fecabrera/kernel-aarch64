@@ -7,16 +7,17 @@
 #include "gic.h"
 
 static uint32_t timer_irq;
-static time_t timer_freq;
-static time_t timer_interval = DEFAULT_TIMER_INTERVAL;
 
-#define _time_quanta (timer_freq * timer_interval / 1000)
+static struct sched_info tinfo = {.interval = DEFAULT_TIMER_INTERVAL};
+
+#define _time_quanta (tinfo.frequency * tinfo.interval / 1000)
 #define _time_quantum(n) (n * _time_quanta)
 
 void timer_init()
 {
     // Get frequency
-    timer_freq = get_cntfrq_el0();
+    tinfo.initial_ticks = get_cntpct_el0();
+    tinfo.frequency = get_cntfrq_el0();
 
     // Set timer countdown
     set_cntp_tval_el0(_time_quantum(1));
@@ -38,7 +39,17 @@ void timer_init()
 
 struct cpu_context *timer_irq_handler(__attribute__((unused)) int irq, struct cpu_context *ctx)
 {
-    struct cpu_context *next_ctx = scheduler_handler(ctx, timer_interval);
+    uint64_t last_ticks = tinfo.ticks;
+
+    tinfo.ticks = get_cntpct_el0();
+    tinfo.frequency = get_cntfrq_el0();
+
+    time_t interval = (tinfo.ticks - last_ticks) * 1000 / tinfo.frequency;
+    time_t uptime = (tinfo.ticks - tinfo.initial_ticks) * 1000 / tinfo.frequency;
+
+    dprintk("[scheduler] interval = %d ms, uptime = %d ms\r\n", interval, uptime);
+
+    struct cpu_context *next_ctx = scheduler_handler(ctx, interval);
 
     // Set timer countdown
     set_cntp_tval_el0(_time_quantum(1));
@@ -48,5 +59,5 @@ struct cpu_context *timer_irq_handler(__attribute__((unused)) int irq, struct cp
 
 void timer_set_interval(time_t interval)
 {
-    timer_interval = interval;
+    tinfo.interval = interval;
 }
