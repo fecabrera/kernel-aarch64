@@ -105,18 +105,15 @@ void initialize_ramdisk()
     char volume_label[12] = {0};
     strncpy(volume_label, (char *)ext_br->volume_label, 11);
 
+    uint8_t drive_number;
+    memcpy(&drive_number, &ext_br->drive_number, 1);
+
     uint16_t n_bytes_per_sector;
     uint32_t total_sectors_32;
     memcpy(&n_bytes_per_sector, &bs->n_bytes_per_sector, 2);
     memcpy(&total_sectors_32, &bs->total_sectors_32, 4);
 
     uint32_t size = total_sectors_32 * n_bytes_per_sector;
-
-    int i;
-    for (i = 0; (size >> 10) > 0; i++)
-        size >>= 10;
-
-    printk("[init] volume \"%s\", size = %d %s\r\n", volume_label, size, size_strs[i]);
 
     // find root dir
     uint32_t root_cluster, table_size_32;
@@ -129,11 +126,42 @@ void initialize_ramdisk()
     memcpy(&n_fat, &bs->n_fat, 1);
 
     // extract data
+    uint32_t first_fat_sector = n_reserved_sectors;
     uint32_t first_data_sector = n_reserved_sectors + (table_size_32 * n_fat);
+
     uint32_t data_sectors = total_sectors_32 - first_data_sector;
     uint32_t total_clusters = data_sectors / n_sectors_per_cluster;
 
-    printk("[init] first_data_sector=%d, data_sectors=%d, total_clusters=%d\r\n", first_data_sector, data_sectors, total_clusters);
+    printk("volume \"%s\":\r\n", volume_label);
+    printk("  size              = %d B\r\n", size);
+    printk("  drive_number      = 0x%02x\r\n", drive_number);
+    printk("  n_fat             = %d\r\n", n_fat);
+    printk("  table_size        = %d\r\n", table_size_32);
+    printk("  first_fat_sector  = %d\r\n", n_reserved_sectors);
+    printk("  first_data_sector = %d\r\n", first_data_sector);
+    printk("  root_cluster      = %d\r\n", root_cluster);
+    printk("  data_sectors      = %d\r\n", data_sectors);
+    printk("  total_clusters    = %d\r\n", total_clusters);
+    printk("\r\n");
+
+    // read fat sectors
+    int n_sectors_to_read = 4 * table_size_32 / n_bytes_per_sector;
+    for (int i = 0; i < n_sectors_to_read; i++)
+    {
+        printk("clusters %d-%d:\r\n", i * n_bytes_per_sector / 4, ((i + 1) * n_bytes_per_sector / 4) - 1);
+        status = virtio_mmio_read(slot, first_fat_sector + i, (uint8_t *)&buff);
+
+        uint32_t *cluster = (uint32_t *)buff;
+
+        int n_entries_per_sector = n_bytes_per_sector / 4;
+        for (int j = 0; j < n_entries_per_sector; j++)
+        {
+            uint32_t value = cluster[j] & 0x0FFFFFFF;
+            if (value > 0)
+                printk("  #%d: 0x%08x\r\n", j, value);
+        }
+        printk("\r\n");
+    }
 
     // read root dir sector
     status = virtio_mmio_read(slot, first_data_sector, (uint8_t *)&buff);
@@ -194,13 +222,14 @@ void initialize_ramdisk()
             utf16lencpy(lfn_dir_name, (char16_t *)_lfn_dir_name, 26);
         }
 
-        printk("idx         = %d\r\n", cnt);
-        printk("name        = \"%s\"\r\n", dir_name);
+        printk("%d:\r\n", cnt);
+        printk("  name          = \"%s\"\r\n", dir_name);
         if (root_dir_lfn != NULL)
-            printk("lfn_name    = \"%s\"\r\n", lfn_dir_name);
-        printk("attributes  = 0x%02x\r\n", attributes);
-        printk("cluster     = %d\r\n", ((uint32_t)_le16(cluster_high) << 16) | _le16(cluster_low));
-        printk("size        = %d B\r\n", _le32(file_size));
+            printk("  lfn_name      = \"%s\"\r\n", lfn_dir_name);
+        printk("  attributes    = 0x%02x\r\n", attributes);
+        printk("  cluster       = %d\r\n", ((uint32_t)_le16(cluster_high) << 16) | _le16(cluster_low));
+        printk("  size          = %d B\r\n", _le32(file_size));
+        printk("\r\n");
     }
 }
 
