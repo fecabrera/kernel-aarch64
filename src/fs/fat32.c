@@ -43,11 +43,11 @@ struct _aligned_mbr_boot_sector
 
 void fat32_dump_boot_sector(struct mbr_boot_sector *boot_sector)
 {
-    printk("\r\n=== fat32 dump ===\r\n");
+    dprintk("\r\n=== fat32 dump ===\r\n");
 
     // for (int i = 0; i < VIRTIO_MMIO_BLK_SECTOR_SIZE; i++)
-    //     printk("%02x ", ((uint8_t *)&boot_sector)[i]);
-    // printk("\r\n\r\n");
+    //     dprintk("%02x ", ((uint8_t *)&boot_sector)[i]);
+    // dprintk("\r\n\r\n");
 
     // ARM doesn't like unaligned memory access
     struct _aligned_mbr_boot_sector data;
@@ -66,35 +66,35 @@ void fat32_dump_boot_sector(struct mbr_boot_sector *boot_sector)
     memcpy(&data.total_sectors_32, &boot_sector->total_sectors_32, 4);
     memcpy(&data.mbr_signature_word, &boot_sector->mbr_signature_word, 2);
 
-    printk("boot sector:\r\n");
-    printk("  jump_boot               = %02x %02x %02x\r\n", data.mbr_jump_boot[0], data.mbr_jump_boot[1], data.mbr_jump_boot[2]);
-    printk("  oem_name                = ");
+    dprintk("boot sector:\r\n");
+    dprintk("  jump_boot               = %02x %02x %02x\r\n", data.mbr_jump_boot[0], data.mbr_jump_boot[1], data.mbr_jump_boot[2]);
+    dprintk("  oem_name                = ");
     for (int i = 0; i < 8; i++)
-        printk("%02x ", boot_sector->oem_name[i]);
-    printk("\r\n");
-    printk("  n_bytes_per_sector      = %d\r\n", _le16(data.n_bytes_per_sector));
-    printk("  n_sectors_per_cluster   = %d\r\n", data.n_sectors_per_cluster);
-    printk("  n_reserved_sectors      = %d\r\n", _le16(data.n_reserved_sectors));
-    printk("  n_fat                   = %d\r\n", data.n_fat);
-    printk("  n_root_dir_entries      = %d\r\n", _le16(data.n_root_dir_entries));
-    printk("  total_sectors_16        = %d\r\n", _le16(data.total_sectors_16));
-    printk("  media_dtor_type         = %02x\r\n", data.media_dtor_type);
-    printk("  table_size_16           = %d\r\n", _le16(data.table_size_16));
-    printk("  n_sectors_per_track     = %d\r\n", _le16(data.n_sectors_per_track));
-    printk("  n_heads                 = %d\r\n", _le16(data.n_heads));
-    printk("  n_hidden_sectors        = %d\r\n", _le32(data.n_hidden_sectors));
-    printk("  total_sectors_32        = %d\r\n", _le32(data.total_sectors_32));
-    printk("  signature               = %04x\r\n", _le16(data.mbr_signature_word));
+        dprintk("%02x ", boot_sector->oem_name[i]);
+    dprintk("\r\n");
+    dprintk("  n_bytes_per_sector      = %d\r\n", _le16(data.n_bytes_per_sector));
+    dprintk("  n_sectors_per_cluster   = %d\r\n", data.n_sectors_per_cluster);
+    dprintk("  n_reserved_sectors      = %d\r\n", _le16(data.n_reserved_sectors));
+    dprintk("  n_fat                   = %d\r\n", data.n_fat);
+    dprintk("  n_root_dir_entries      = %d\r\n", _le16(data.n_root_dir_entries));
+    dprintk("  total_sectors_16        = %d\r\n", _le16(data.total_sectors_16));
+    dprintk("  media_dtor_type         = %02x\r\n", data.media_dtor_type);
+    dprintk("  table_size_16           = %d\r\n", _le16(data.table_size_16));
+    dprintk("  n_sectors_per_track     = %d\r\n", _le16(data.n_sectors_per_track));
+    dprintk("  n_heads                 = %d\r\n", _le16(data.n_heads));
+    dprintk("  n_hidden_sectors        = %d\r\n", _le32(data.n_hidden_sectors));
+    dprintk("  total_sectors_32        = %d\r\n", _le32(data.total_sectors_32));
+    dprintk("  signature               = %04x\r\n", _le16(data.mbr_signature_word));
 
     if (data.total_sectors_32 > 0)
     {
-        printk("\r\n");
+        dprintk("\r\n");
 
         struct fat32_extended_boot_record *ext_br = (struct fat32_extended_boot_record *)&boot_sector->boot_code;
         fat32_dump_extended_boot_record(ext_br);
     }
 
-    printk("=================\r\n\r\n");
+    dprintk("=================\r\n\r\n");
 }
 
 void fat32_dump_extended_boot_record(struct fat32_extended_boot_record *ext_br)
@@ -111,54 +111,54 @@ void fat32_dump_extended_boot_record(struct fat32_extended_boot_record *ext_br)
     memcpy(&ext_data.drive_number, &ext_br->drive_number, 1);
     memcpy(&ext_data.boot_signature, &ext_br->boot_signature, 2);
 
-    printk("extended boot record:\r\n");
-    printk("  table_size_32           = %d\r\n", _le32(ext_data.table_size_32));
-    printk("  extended_flags          = %04x\r\n", _le16(ext_data.extended_flags));
-    printk("  fat_version             = %d\r\n", _le16(ext_data.fat_version));
-    printk("  root_cluster            = %d\r\n", _le32(ext_data.root_cluster));
-    printk("  fat_info                = %04x\r\n", _le16(ext_data.fat_info));
-    printk("  backup_bs_sector        = %d\r\n", _le16(ext_data.backup_bs_sector));
-    printk("  drive_number            = %d\r\n", ext_data.drive_number);
-    printk("  boot_signature          = %02x\r\n", ext_data.boot_signature);
-    printk("  volume_id               = %08x\r\n", _le32(ext_data.volume_id));
-    printk("  volume_label            = ");
+    dprintk("extended boot record:\r\n");
+    dprintk("  table_size_32           = %d\r\n", _le32(ext_data.table_size_32));
+    dprintk("  extended_flags          = %04x\r\n", _le16(ext_data.extended_flags));
+    dprintk("  fat_version             = %d\r\n", _le16(ext_data.fat_version));
+    dprintk("  root_cluster            = %d\r\n", _le32(ext_data.root_cluster));
+    dprintk("  fat_info                = %04x\r\n", _le16(ext_data.fat_info));
+    dprintk("  backup_bs_sector        = %d\r\n", _le16(ext_data.backup_bs_sector));
+    dprintk("  drive_number            = %d\r\n", ext_data.drive_number);
+    dprintk("  boot_signature          = %02x\r\n", ext_data.boot_signature);
+    dprintk("  volume_id               = %08x\r\n", _le32(ext_data.volume_id));
+    dprintk("  volume_label            = ");
     for (int i = 0; i < 11; i++)
-        printk("%02x ", ext_br->volume_label[i]);
-    printk("\r\n");
-    printk("  fat_type_label          = ");
+        dprintk("%02x ", ext_br->volume_label[i]);
+    dprintk("\r\n");
+    dprintk("  fat_type_label          = ");
     for (int i = 0; i < 8; i++)
-        printk("%02x ", ext_br->fat_type_label[i]);
-    printk("\r\n");
+        dprintk("%02x ", ext_br->fat_type_label[i]);
+    dprintk("\r\n");
 }
 
 static void _fat32_dump_dir_entry(struct fat32_dir_entry *dir_entry)
 {
     // thankfully the fat32_dir_entry is fairly aligned so we don't need to memcpy its data :)
-    printk("dir entry:\r\n");
-    printk("  name                    = ");
+    dprintk("dir entry:\r\n");
+    dprintk("  name                    = ");
     for (int i = 0; i < 11; i++)
-        printk("%02x ", dir_entry->name[i]);
-    printk("\r\n");
-    printk("  attributes              = %02x\r\n", dir_entry->attributes);
-    printk("  reserved                = %02x\r\n", dir_entry->reserved);
-    printk("  create_time_cs          = %02x\r\n", dir_entry->create_time_cs);
-    printk("  create_time             = %d\r\n", _le16(dir_entry->create_time));
-    printk("  create_date             = %d\r\n", _le16(dir_entry->create_date));
-    printk("  access_date             = %d\r\n", _le16(dir_entry->access_date));
-    printk("  cluster_high            = %04x\r\n", _le16(dir_entry->cluster_high));
-    printk("  modify_time             = %d\r\n", _le16(dir_entry->modify_time));
-    printk("  modify_date             = %d\r\n", _le16(dir_entry->modify_date));
-    printk("  cluster_low             = %04x\r\n", _le16(dir_entry->cluster_low));
-    printk("  file_size               = %d\r\n", _le32(dir_entry->file_size));
+        dprintk("%02x ", dir_entry->name[i]);
+    dprintk("\r\n");
+    dprintk("  attributes              = %02x\r\n", dir_entry->attributes);
+    dprintk("  reserved                = %02x\r\n", dir_entry->reserved);
+    dprintk("  create_time_cs          = %02x\r\n", dir_entry->create_time_cs);
+    dprintk("  create_time             = %d\r\n", _le16(dir_entry->create_time));
+    dprintk("  create_date             = %d\r\n", _le16(dir_entry->create_date));
+    dprintk("  access_date             = %d\r\n", _le16(dir_entry->access_date));
+    dprintk("  cluster_high            = %04x\r\n", _le16(dir_entry->cluster_high));
+    dprintk("  modify_time             = %d\r\n", _le16(dir_entry->modify_time));
+    dprintk("  modify_date             = %d\r\n", _le16(dir_entry->modify_date));
+    dprintk("  cluster_low             = %04x\r\n", _le16(dir_entry->cluster_low));
+    dprintk("  file_size               = %d\r\n", _le32(dir_entry->file_size));
 }
 
 void fat32_dump_dir_entry(struct fat32_dir_entry *dir_entry)
 {
-    printk("\r\n=== fat32 dump ===\r\n");
+    dprintk("\r\n=== fat32 dump ===\r\n");
 
     _fat32_dump_dir_entry(dir_entry);
 
-    printk("=================\r\n\r\n");
+    dprintk("=================\r\n\r\n");
 }
 
 static void _fat32_dump_lfn_entry(struct fat32_lfn_entry *lfn_dir_entry)
@@ -170,32 +170,32 @@ static void _fat32_dump_lfn_entry(struct fat32_lfn_entry *lfn_dir_entry)
     memcpy((void *)name2, (void *)lfn_dir_entry->name2, 12);
     memcpy((void *)name3, (void *)lfn_dir_entry->name3, 4);
 
-    printk("lfn dir entry:\r\n");
-    printk("  order                   = %02x\r\n", lfn_dir_entry->order);
-    printk("  name1                   = ");
+    dprintk("lfn dir entry:\r\n");
+    dprintk("  order                   = %02x\r\n", lfn_dir_entry->order);
+    dprintk("  name1                   = ");
     for (int i = 0; i < 5; i++)
-        printk("%04x ", _le16(name1[i]));
-    printk("\r\n");
-    printk("  attributes              = %02x\r\n", lfn_dir_entry->attributes);
-    printk("  type                    = %02x\r\n", lfn_dir_entry->type);
-    printk("  checksum                = %02x\r\n", lfn_dir_entry->checksum);
-    printk("  name2                   = ");
+        dprintk("%04x ", _le16(name1[i]));
+    dprintk("\r\n");
+    dprintk("  attributes              = %02x\r\n", lfn_dir_entry->attributes);
+    dprintk("  type                    = %02x\r\n", lfn_dir_entry->type);
+    dprintk("  checksum                = %02x\r\n", lfn_dir_entry->checksum);
+    dprintk("  name2                   = ");
     for (int i = 0; i < 6; i++)
-        printk("%04x ", _le16(name2[i]));
-    printk("\r\n");
-    printk("  cluster                 = %d\r\n", _le16(lfn_dir_entry->cluster));
-    printk("  name3                   = ");
+        dprintk("%04x ", _le16(name2[i]));
+    dprintk("\r\n");
+    dprintk("  cluster                 = %d\r\n", _le16(lfn_dir_entry->cluster));
+    dprintk("  name3                   = ");
     for (int i = 0; i < 2; i++)
-        printk("%04x ", _le16(name3[i]));
-    printk("\r\n\r\n");
+        dprintk("%04x ", _le16(name3[i]));
+    dprintk("\r\n\r\n");
 }
 
 void fat32_dump_lfn_entry(struct fat32_lfn_entry *lfn_dir_entry)
 {
-    printk("\r\n=== fat32 dump ===\r\n");
+    dprintk("\r\n=== fat32 dump ===\r\n");
 
     _fat32_dump_lfn_entry(lfn_dir_entry);
     _fat32_dump_dir_entry((struct fat32_dir_entry *)(lfn_dir_entry + 1));
 
-    printk("=================\r\n\r\n");
+    dprintk("=================\r\n\r\n");
 }
