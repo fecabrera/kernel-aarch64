@@ -106,6 +106,7 @@ src/
     debug.c/h       — printk (always on) and dprintk (DEBUG=1 only), both backed by pl011_vprintf
     dtb.c/h         — FDT parser (node/property walker); IRQ number lookup for timer, RTC, and virtio MMIO slots
     string.c/h      — freestanding string library (memcpy, memset, strcmp, ...)
+    ctype.c/h       — freestanding character classification and conversion (isalpha, isdigit, isspace, tolower, toupper, ...)
     stdlib.c/h      — itoa, vsprintf, sprintf (freestanding; uses __builtin_va_* instead of <stdarg.h>)
     stdint.h        — stdint-style typedefs (uint8_t … uint64_t, intptr_t)
     uchar.c/h       — char8_t/16_t/32_t typedefs; utf16to8 conversion; utf16lencpy/utf16bencpy (UTF-16LE/BE to ASCII)
