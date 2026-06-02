@@ -254,3 +254,19 @@ void fat32_parse_boot_sector(uint8_t *buff, struct fat32_bs_info *bs_info)
     bs_info->data_sectors = data_sectors;
     bs_info->total_clusters = total_clusters;
 }
+
+uint32_t fat32_read_fat_table(struct fat32_bs_info *bs_info, uint8_t *buff, uint32_t sector_offset, uint32_t *fat_table)
+{
+    uint32_t i;
+
+    uint16_t n_entries_per_sector = bs_info->n_bytes_per_sector / 4;
+    uint32_t offset = sector_offset * n_entries_per_sector;
+
+    uint32_t *_fat_table = fat_table + offset;
+    uint32_t *_cluster = (uint32_t *)buff;
+
+    for (i = 0; i < n_entries_per_sector && offset + i < bs_info->table_size_32; i++)
+        _fat_table[i] = _cluster[i] & 0x0FFFFFFF;
+
+    return i;
+}

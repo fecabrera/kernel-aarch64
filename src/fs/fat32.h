@@ -200,3 +200,18 @@ void fat32_dump_lfn_entry(struct fat32_lfn_entry *lfn_dir_entry);
  * @param bs_info: output struct populated with parsed and derived fields
  */
 void fat32_parse_boot_sector(uint8_t *buff, struct fat32_bs_info *bs_info);
+
+/**
+ * Copies FAT entries from a single pre-read sector buffer into fat_table.
+ * Masks each entry to 28 bits (ignoring the reserved top 4 bits per spec).
+ * Appends entries starting at fat_table[sector_offset * n_entries_per_sector].
+ * Call once per FAT sector, in order, to build the full table.
+ *
+ * @param bs_info:       parsed boot sector info (used for sector/entry sizes)
+ * @param buff:          512-byte buffer containing the FAT sector already read from disk
+ * @param sector_offset: index of this sector within the FAT (0-based)
+ * @param fat_table:     output array; must be large enough for all FAT entries
+ *
+ * @return number of entries written into fat_table
+ */
+uint32_t fat32_read_fat_table(struct fat32_bs_info *bs_info, uint8_t *buff, uint32_t sector_offset, uint32_t *fat_table);
