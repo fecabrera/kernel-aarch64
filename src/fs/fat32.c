@@ -273,18 +273,24 @@ void fat32_parse_boot_sector(uint8_t *buff, struct fat32_bs_info *bs_info)
     bs_info->total_clusters = total_clusters;
 }
 
-uint32_t fat32_read_fat_table(struct fat32_bs_info *bs_info, uint8_t *buff, uint32_t sector_offset, uint32_t *fat_table)
+uint32_t fat32_read_fat_table(struct fat32_bs_info *bs_info, uint8_t *buff, uint32_t sector_offset, fat_table_entry_t *fat_table)
 {
-    uint32_t i;
-
     uint16_t n_entries_per_sector = bs_info->n_bytes_per_sector / 4;
     uint32_t offset = sector_offset * n_entries_per_sector;
 
-    uint32_t *_fat_table = fat_table + offset;
-    uint32_t *_cluster = (uint32_t *)buff;
+    dprintk("fat sector %d (0x%08x):\r\n", sector_offset, (bs_info->first_fat_sector + sector_offset) * n_entries_per_sector);
 
+    fat_table_entry_t *_fat_table = fat_table + offset;
+    uint32_t *_entry = (uint32_t *)buff;
+
+    uint32_t i;
     for (i = 0; i < n_entries_per_sector && offset + i < bs_info->table_size_32; i++)
-        _fat_table[i] = _cluster[i] & 0x0FFFFFFF;
+    {
+        uint32_t entry_value = _le32(_entry[i]) & 0x0FFFFFFF;
+        if (entry_value)
+            dprintk("FAT entry %d: 0x%08x\r\n", offset + i, entry_value);
+        _fat_table[i] = entry_value;
+    }
 
     return i;
 }

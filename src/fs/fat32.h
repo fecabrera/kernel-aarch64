@@ -86,6 +86,13 @@ struct __attribute__((packed)) mbr_boot_sector
 #define FAT32_DIRENT_END 0x00  // no more entries in this directory
 #define FAT32_DIRENT_DOT 0x2E  // "." or ".." entry
 
+// ── FAT entry values ──────────────────────────────────────────────────────────
+
+#define FAT32_FAT_ENTRY_FREE 0x00000000     // cluster is free
+#define FAT32_FAT_ENTRY_RESERVED 0x00000001 // reserved, do not use
+#define FAT32_FAT_ENTRY_BAD 0x0FFFFFF7      // cluster is bad
+#define FAT32_FAT_ENTRY_EOC 0x0FFFFFF8      // end of chain (any value >= this is EOC)
+
 // ── LFN sequence number flags ─────────────────────────────────────────────────
 
 #define FAT32_LFN_LAST_ENTRY 0x40 // OR'd into lfn_entry.order for the last (highest) LFN entry
@@ -157,6 +164,8 @@ struct fat32_bs_info
     uint32_t total_clusters;
 };
 
+typedef uint32_t fat_table_entry_t; // bitfield: see FAT_TABLE_ENTRY_TYPE_* and FAT_TABLE_ENTRY_MASK_*
+
 /**
  * Prints all BPB fields of the MBR boot sector to the kernel log via printk.
  * Reads multi-byte fields with memcpy to avoid alignment faults.
@@ -213,16 +222,18 @@ int fat32_is_boot_sector(uint8_t *buff);
 void fat32_parse_boot_sector(uint8_t *buff, struct fat32_bs_info *bs_info);
 
 /**
- * Copies FAT entries from a single pre-read sector buffer into fat_table.
- * Masks each entry to 28 bits (ignoring the reserved top 4 bits per spec).
+ * Copies raw FAT cluster chain values from a single pre-read sector buffer
+ * into fat_table, applying _le32 and masking to 28 bits per the spec.
  * Appends entries starting at fat_table[sector_offset * n_entries_per_sector].
+ * Each entry holds the raw next-cluster value; compare against FAT32_FAT_ENTRY_*
+ * to interpret (free, bad, EOC, or next cluster number).
  * Call once per FAT sector, in order, to build the full table.
  *
  * @param bs_info:       parsed boot sector info (used for sector/entry sizes)
  * @param buff:          512-byte buffer containing the FAT sector already read from disk
  * @param sector_offset: index of this sector within the FAT (0-based)
- * @param fat_table:     output array; must be large enough for all FAT entries
+ * @param fat_table:     output array; must hold at least bs_info->table_size_32 entries
  *
  * @return number of entries written into fat_table
  */
-uint32_t fat32_read_fat_table(struct fat32_bs_info *bs_info, uint8_t *buff, uint32_t sector_offset, uint32_t *fat_table);
+uint32_t fat32_read_fat_table(struct fat32_bs_info *bs_info, uint8_t *buff, uint32_t sector_offset, fat_table_entry_t *fat_table);
