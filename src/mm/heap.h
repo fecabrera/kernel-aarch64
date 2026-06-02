@@ -11,8 +11,9 @@ struct block_header
 };
 
 #define HEADER_SIZE sizeof(struct block_header)
-#define MIN_BLOCK_SIZE 16     // don't create fragments smaller than this
-#define HEAP_MAGIC 0xDEADBEEF // used later for overflow detection
+#define HEAP_SIZE 16 * (1 << 20) // 16 MiB heap
+#define MIN_BLOCK_SIZE 16        // don't create fragments smaller than this
+#define HEAP_MAGIC 0xDEADBEEF    // used later for overflow detection
 
 #define BLOCK_FREE 1
 #define BLOCK_USED 0
@@ -63,12 +64,15 @@ int kfree(void *ptr);
 void *krealloc(void *ptr, size_t new_size);
 
 /**
- * Allocates size bytes aligned to a power-of-two boundary.
- * Allocates extra space internally to guarantee alignment; the gap is not
- * recoverable by kfree (acceptable for long-lived aligned allocations).
+ * Allocates at least size bytes from the heap with the given alignment.
+ * Rounds size up to the next multiple of align before calling kmalloc.
+ * Safe for any align that is a multiple of 8 (e.g. 8, 16, 64, 4096) —
+ * because HEADER_SIZE is a multiple of 8 and every block base is 8-byte
+ * aligned, the payload address inherits the alignment without any gap or
+ * stored offset. The returned pointer can be passed directly to kfree.
  *
- * @param size: number of bytes to allocate
- * @param align: required alignment (must be a power of two)
+ * @param size:  number of bytes to allocate
+ * @param align: required alignment; must be a power of two and a multiple of 8
  *
  * @return aligned pointer to allocated memory, or NULL on failure.
  */

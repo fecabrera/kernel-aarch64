@@ -36,8 +36,8 @@ SECTIONS {
     . += 0x1000;            /* 4KB IRQ stack */
     _irq_stack_top = .;
 
-    . = ALIGN(16);
-    _heap_start = .;
-    . += 0x400000;          /* 4MB heap */
-    _heap_end = .;
+    /* . = ALIGN(16); */
+    /* _heap_start = .; */
+    /* . += 0x400000; */          /* 4MB heap */
+    /* _heap_end = .; */
 }
