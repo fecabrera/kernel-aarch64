@@ -52,7 +52,7 @@ make run
 - **DTB parsing** — reads device tree at boot to discover IRQ numbers, memory layout, and peripheral addresses at runtime
 - **GIC-400** — interrupt controller driver with a dynamic dispatch table (`irq_register_handler`)
 - **PL011 UART** — interrupt-driven RX, polled TX, 115200 8N1
-- **ARM generic timer** — 10ms tick via EL1 physical timer (PPI 30); tracks `initial_ticks` at boot and `ticks` per interrupt via `cntpct_el0` to compute real elapsed interval and system uptime in milliseconds
+- **ARM generic timer** — 10ms tick via EL1 physical timer (PPI 30); tracks `initial_ticks` at boot and `ticks` per interrupt via `cntpct_el0`; `timer_get_uptime()` returns milliseconds since boot and is used by the scheduler for absolute-timestamp sleep wakeups
 - **PL031 RTC** — match alarm interrupt
 - **virtio MMIO** — scans all 32 MMIO slots; validates magic, version, and device ID; negotiates features; sets up per-slot 64-entry virtqueues (`struct virtq` with desc/avail/used rings); `virtio_mmio_read` submits synchronous block reads via 3-descriptor chains; IRQ handler acks `VIRTIO_INTERRUPT_STATUS`
 - **FAT32** — MBR/BPB parsing (`mbr_boot_sector`, `fat32_ext_bs`); `fat32_parse_boot_sector` extracts BPB/EBR fields and computes derived values into `fat32_bs_info`; 8.3 and LFN directory entry structs (`fat32_dir_entry`, `fat32_lfn_entry`) with `FAT32_ATTR_*`, `FAT32_DIRENT_*`, and `FAT32_LFN_*` defines; packed structs with aligned mirrors for safe field access on AArch64; dump functions for boot sector, EBR, dir, and LFN entries
@@ -66,7 +66,7 @@ make run
   - `syscall_getpid()` returns the calling process's PID
   - `syscall_waitpid(pid)` blocks the caller until the target process exits
   - `syscall_fork()` duplicates the calling process (child resumes at the fork site with return value 0)
-  - `syscall_sleep(seconds)` blocks the caller in a sleep queue; the timer tick decrements `sleep_for` until it reaches zero
+  - `syscall_sleep(seconds)` blocks the caller in a sleep queue; wakes when `timer_get_uptime()` reaches the absolute `sleep_until` timestamp
   - `syscall_msleep(ms)` same as `syscall_sleep` but duration is in milliseconds
   - `syscall_time()` returns the current Unix timestamp from the RTC
   - `syscall_uptime()` returns system uptime in milliseconds, computed from `cntpct_el0` ticks since boot

@@ -43,7 +43,7 @@ struct process
     struct cpu_context *ctx;
     size_t stack_size;
     pid_t wait_pid;
-    time_t sleep_for;
+    time_t sleep_until; // absolute uptime (ms) at which the process should wake; 0 if not sleeping
 };
 
 /**

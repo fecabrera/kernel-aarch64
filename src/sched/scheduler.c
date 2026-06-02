@@ -3,6 +3,7 @@
 #include <dsa/queue.h>
 #include <dsa/deque.h>
 #include <drivers/gic.h>
+#include <drivers/timer.h>
 #include <arch/syscall.h>
 #include "scheduler.h"
 
@@ -74,8 +75,9 @@ pid_t scheduler_spawn(proc_entry entry)
     return proc->pid;
 }
 
-static void _notify_sleepers(time_t ms_elapsed)
+static void _notify_sleepers()
 {
+    time_t uptime = timer_get_uptime();
     struct deque64_entry *entry = NULL;
 
     dprintk("[scheduler] __notify_sleepers(), current=%i\r\n", current ? current->pid : 0);
@@ -84,29 +86,27 @@ static void _notify_sleepers(time_t ms_elapsed)
     {
         struct process *proc = (struct process *)entry->value;
 
-        dprintk("[scheduler] pid=%i, sleep_for=%i, ms_elapsed=%i\r\n", proc->pid, proc->sleep_for, ms_elapsed);
+        dprintk("[scheduler] pid=%i, sleep_until=%i, uptime=%i\r\n", proc->pid, proc->sleep_until, uptime);
 
-        if (proc->sleep_for < ms_elapsed)
+        if (proc->sleep_until <= uptime)
         {
             dprintk("[scheduler] notifying pid %i\r\n", proc->pid);
 
             deque64_remove(&sleep_queue, entry);
 
             proc->state = PROC_READY;
-            proc->sleep_for = 0;
+            proc->sleep_until = 0;
             proc->ctx->x0 = 0;
 
             queue64_push(&ready_queue, (uintptr_t)proc);
         }
-        else
-            proc->sleep_for -= ms_elapsed;
     }
 }
 
 struct cpu_context *scheduler_handler(struct cpu_context *ctx, time_t ms_elapsed)
 {
     if (ms_elapsed > 0 && !deque64_is_empty(&sleep_queue))
-        _notify_sleepers(ms_elapsed);
+        _notify_sleepers();
 
     if (current != NULL)
     {
@@ -281,8 +281,9 @@ struct cpu_context *sleep_handler(struct cpu_context *ctx)
 
     dprintk("[scheduler] sleep(%i)\r\n", seconds);
 
+    time_t sleep_duration = seconds * 1000;
     current->state = PROC_BLOCKED;
-    current->sleep_for = seconds * 1000;
+    current->sleep_until = timer_get_uptime() + sleep_duration;
     current->ctx = ctx;
 
     deque64_add_right(&sleep_queue, (uintptr_t)current);
@@ -305,7 +306,7 @@ struct cpu_context *msleep_handler(struct cpu_context *ctx)
     dprintk("[scheduler] msleep(%i)\r\n", mseconds);
 
     current->state = PROC_BLOCKED;
-    current->sleep_for = mseconds;
+    current->sleep_until = timer_get_uptime() + mseconds;
     current->ctx = ctx;
 
     deque64_add_right(&sleep_queue, (uintptr_t)current);

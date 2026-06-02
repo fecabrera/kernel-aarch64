@@ -41,6 +41,12 @@ void timer_init()
     }
 }
 
+time_t timer_get_uptime()
+{
+    uint64_t ticks = get_cntpct_el0();
+    return (ticks - tinfo.initial_ticks) * 1000 / tinfo.frequency;
+}
+
 struct cpu_context *timer_irq_handler(__attribute__((unused)) int irq, struct cpu_context *ctx)
 {
     uint64_t last_ticks = tinfo.ticks;
@@ -63,12 +69,9 @@ struct cpu_context *timer_irq_handler(__attribute__((unused)) int irq, struct cp
 
 struct cpu_context *syscall_uptime_handler(struct cpu_context *ctx)
 {
-    uint64_t ticks = get_cntpct_el0();
-    time_t uptime = (ticks - tinfo.initial_ticks) * 1000 / tinfo.frequency;
+    time_t uptime = timer_get_uptime();
 
-    dprintk("[timer] ticks           = %d\r\n", ticks);
-    dprintk("[timer] initial_ticks   = %d\r\n", tinfo.initial_ticks);
-    dprintk("[timer] uptime          = %d ms\r\n", uptime);
+    dprintk("[timer] uptime = %d ms\r\n", uptime);
 
     ctx->x0 = uptime;
 

@@ -27,6 +27,14 @@ struct sched_info
 void timer_init();
 
 /**
+ * Returns the system uptime in milliseconds, computed from cntpct_el0 ticks
+ * elapsed since timer_init was called.
+ *
+ * @return system uptime in milliseconds
+ */
+time_t timer_get_uptime();
+
+/**
  * IRQ handler for the EL1 physical timer. Increments the tick counter,
  * prints a message every second, reloads the countdown register, and
  * calls scheduler_handler to preempt the current task.
