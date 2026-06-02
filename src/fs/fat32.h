@@ -128,9 +128,19 @@ struct __attribute__((packed)) fat32_lfn_entry
     char16_t name3[2];  // UTF-16LE name characters 12–13
 };
 
+// struct fat32_node
+// {
+//     size_t entry_cluster;
+//     size_t entry_index;
+//     size_t data_cluster;
+//     size_t size;
+//     char name[256];
+// };
+
 struct fat32_bs_info
 {
     // fields from MBR boot sector
+    char volume_label[12]; // volume label from EBR, null-terminated
     uint8_t n_fat;
     uint8_t n_sectors_per_cluster;
     uint16_t n_reserved_sectors;
@@ -183,6 +193,8 @@ void fat32_dump_lfn_entry(struct fat32_lfn_entry *lfn_dir_entry);
  * Reads BPB fields from mbr_boot_sector and EBR fields from the embedded
  * fat32_ext_bs using memcpy to avoid alignment faults. Also computes derived
  * fields: first_fat_sector, first_data_sector, data_sectors, total_clusters.
+ * Copies the EBR volume label into bs_info->volume_label, null-terminated
+ * and with trailing spaces stripped.
  *
  * @param buff:    512-byte buffer containing the boot sector read from disk
  * @param bs_info: output struct populated with parsed and derived fields

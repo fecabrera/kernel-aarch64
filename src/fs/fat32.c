@@ -2,6 +2,7 @@
 #include <uchar.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include <arch/cpu.h>
 #include "fat32.h"
 
@@ -204,6 +205,17 @@ void fat32_parse_boot_sector(uint8_t *buff, struct fat32_bs_info *bs_info)
 {
     struct mbr_boot_sector *bs = (struct mbr_boot_sector *)buff;
     struct fat32_ext_bs *ext_br = (struct fat32_ext_bs *)bs->boot_code;
+
+    // extract volume label from EBR, which is more likely to be human-friendly than the OEM name in the MBR boot sector. Also trim trailing spaces.
+    int last_char_idx = 0;
+    for (int i = 0; i < 11; i++)
+    {
+        char ch = ext_br->volume_label[i];
+        if (isprint(ch) && !isspace(ch))
+            last_char_idx = i;
+    }
+    strncpy(bs_info->volume_label, (char *)ext_br->volume_label, last_char_idx + 1);
+    bs_info->volume_label[last_char_idx + 1] = '\0';
 
     // ARM doesn't like unaligned memory access, so we need to memcpy the fields into local variables before using them
     uint8_t n_fat, n_sectors_per_cluster;
