@@ -197,7 +197,7 @@ struct cpu_context *virtio_mmio_irq_handler(int irq, struct cpu_context *ctx)
 
     if (fnc == NULL)
     {
-        dprintk("[virtio_mmio@%x] Handler not found for slot %i!", VIRTIO_MMIO_ADDR(slot), slot);
+        dprintk("[virtio_mmio@%x] Handler not found for slot %i!\r\n", VIRTIO_MMIO_ADDR(slot), slot);
         return ctx;
     }
 
