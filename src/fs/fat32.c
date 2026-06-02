@@ -201,6 +201,24 @@ void fat32_dump_lfn_entry(struct fat32_lfn_entry *lfn_dir_entry)
     dprintk("=================\r\n\r\n");
 }
 
+int fat32_is_boot_sector(uint8_t *buff)
+{
+    struct mbr_boot_sector *bs = (struct mbr_boot_sector *)buff;
+
+    // check boot sector signature
+    uint16_t signature;
+    memcpy(&signature, &bs->mbr_signature_word, 2);
+    if (_le16(signature) != 0xAA55)
+        return 0;
+
+    // check FAT32-specific fields in the extended boot record
+    struct fat32_ext_bs *ext_br = (struct fat32_ext_bs *)bs->boot_code;
+    if (ext_br->table_size_32 == 0 || ext_br->root_cluster == 0)
+        return 0;
+
+    return 1;
+}
+
 void fat32_parse_boot_sector(uint8_t *buff, struct fat32_bs_info *bs_info)
 {
     struct mbr_boot_sector *bs = (struct mbr_boot_sector *)buff;

@@ -189,6 +189,17 @@ void fat32_dump_dir_entry(struct fat32_dir_entry *dir_entry);
 void fat32_dump_lfn_entry(struct fat32_lfn_entry *lfn_dir_entry);
 
 /**
+ * Checks whether a 512-byte sector buffer contains a valid FAT32 boot sector.
+ * Verifies the boot signature (0xAA55), and that the EBR fields table_size_32
+ * and root_cluster are non-zero.
+ *
+ * @param buff: 512-byte sector buffer to inspect
+ *
+ * @return non-zero if the buffer looks like a valid FAT32 boot sector, zero otherwise
+ */
+int fat32_is_boot_sector(uint8_t *buff);
+
+/**
  * Parses a raw 512-byte boot sector buffer into a fat32_bs_info struct.
  * Reads BPB fields from mbr_boot_sector and EBR fields from the embedded
  * fat32_ext_bs using memcpy to avoid alignment faults. Also computes derived
