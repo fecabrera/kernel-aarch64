@@ -26,7 +26,7 @@
  * FAT32 volume boot sector, immediately after the common BPB fields.
  * All multi-byte fields are little-endian.
  */
-struct __attribute__((packed)) fat32_extended_boot_record
+struct __attribute__((packed)) fat32_ext_bs
 {
     uint32_t table_size_32;    // sectors per FAT (FAT32 only)
     uint16_t extended_flags;   // mirroring flags; bit 7: single active FAT, bits 3:0: active FAT number
@@ -128,12 +128,24 @@ struct __attribute__((packed)) fat32_lfn_entry
     char16_t name3[2];  // UTF-16LE name characters 12–13
 };
 
-/**
- * Prints all fields of the MBR boot sector to the kernel log via printk.
- * Reads multi-byte fields with memcpy to avoid alignment faults.
- *
- * @param boot_sector: pointer to a packed MBR boot sector read from disk
- */
+struct fat32_bs_info
+{
+    // fields from MBR boot sector
+    uint8_t n_fat;
+    uint8_t n_sectors_per_cluster;
+    uint16_t n_reserved_sectors;
+    uint16_t n_bytes_per_sector;
+    uint32_t total_sectors_32;
+    // fields from FAT32 extended boot record
+    uint8_t drive_number;
+    uint32_t root_cluster;
+    uint32_t table_size_32;
+    // derived fields
+    uint32_t first_fat_sector;
+    uint32_t first_data_sector;
+    uint32_t data_sectors;
+    uint32_t total_clusters;
+};
 
 /**
  * Prints all BPB fields of the MBR boot sector to the kernel log via printk.
@@ -149,7 +161,7 @@ void fat32_dump_boot_sector(struct mbr_boot_sector *boot_sector);
  *
  * @param ext_br: pointer to the EBR, typically at &boot_sector->boot_code[0]
  */
-void fat32_dump_extended_boot_record(struct fat32_extended_boot_record *ext_br);
+void fat32_dump_extended_boot_record(struct fat32_ext_bs *ext_br);
 
 /**
  * Prints all fields of an 8.3 directory entry to the kernel log.
@@ -165,3 +177,14 @@ void fat32_dump_dir_entry(struct fat32_dir_entry *dir_entry);
  * @param lfn_dir_entry: pointer to a packed fat32_lfn_entry
  */
 void fat32_dump_lfn_entry(struct fat32_lfn_entry *lfn_dir_entry);
+
+/**
+ * Parses a raw 512-byte boot sector buffer into a fat32_bs_info struct.
+ * Reads BPB fields from mbr_boot_sector and EBR fields from the embedded
+ * fat32_ext_bs using memcpy to avoid alignment faults. Also computes derived
+ * fields: first_fat_sector, first_data_sector, data_sectors, total_clusters.
+ *
+ * @param buff:    512-byte buffer containing the boot sector read from disk
+ * @param bs_info: output struct populated with parsed and derived fields
+ */
+void fat32_parse_boot_sector(uint8_t *buff, struct fat32_bs_info *bs_info);

@@ -55,7 +55,7 @@ make run
 - **ARM generic timer** — 10ms tick via EL1 physical timer (PPI 30); tracks `initial_ticks` at boot and `ticks` per interrupt via `cntpct_el0` to compute real elapsed interval and system uptime in milliseconds
 - **PL031 RTC** — match alarm interrupt
 - **virtio MMIO** — scans all 32 MMIO slots; validates magic, version, and device ID; negotiates features; sets up per-slot 64-entry virtqueues (`struct virtq` with desc/avail/used rings); `virtio_mmio_read` submits synchronous block reads via 3-descriptor chains; IRQ handler acks `VIRTIO_INTERRUPT_STATUS`
-- **FAT32** — MBR/BPB parsing (`mbr_boot_sector`, `fat32_extended_boot_record`); 8.3 and LFN directory entry structs (`fat32_dir_entry`, `fat32_lfn_entry`) with `FAT32_ATTR_*`, `FAT32_DIRENT_*`, and `FAT32_LFN_*` defines; packed structs with aligned mirrors for safe field access on AArch64; `fat32_dump_boot_sector`, `fat32_dump_extended_boot_record`, `fat32_dump_dir_entry`, `fat32_dump_lfn_entry` for debug inspection
+- **FAT32** — MBR/BPB parsing (`mbr_boot_sector`, `fat32_ext_bs`); `fat32_parse_boot_sector` extracts BPB/EBR fields and computes derived values into `fat32_bs_info`; 8.3 and LFN directory entry structs (`fat32_dir_entry`, `fat32_lfn_entry`) with `FAT32_ATTR_*`, `FAT32_DIRENT_*`, and `FAT32_LFN_*` defines; packed structs with aligned mirrors for safe field access on AArch64; dump functions for boot sector, EBR, dir, and LFN entries
 - **Heap allocator** — first-fit free-list with 16 MiB static region, block splitting, and coalescing (`kmalloc`/`kfree`/`krealloc`); `kfree` returns error codes for NULL, out-of-range, and double-free; `kmalloc_aligned` rounds size up to the alignment boundary — safe for any power-of-two multiple of 8, result is directly `kfree`-able
 - **Exception handling** — full save/restore of all 31 registers + ELR/SPSR; IRQ handlers return `struct cpu_context *` for context switching; IABT/DABT terminate the faulting process via `exit_handler`; unknown exceptions dump the full register context
 - **Preemptive scheduler** — FIFO run queue, timer-driven; tracks the running process via a `current` pointer; dedicated 4KB IRQ stack; `create_process`/`duplicate_process`/`destroy_process` with 16-byte aligned task stacks; idles via `halt` when the ready queue is empty
@@ -118,7 +118,7 @@ src/
     scheduler.c/h   — FIFO ready queue (dsa/queue64) and wait queue (dsa/deque64), scheduler_enqueue/dequeue/spawn, context switch via timer and yield/exit/waitpid/fork syscalls
 
   fs/               — filesystem drivers
-    fat32.c/h       — MBR/BPB structs (packed + aligned mirrors), 8.3 and LFN dir entry structs, partition type/media descriptor/attribute/LFN defines, dump functions for boot sector/EBR/dir/LFN entries
+    fat32.c/h       — MBR/BPB structs (packed + aligned mirrors), fat32_bs_info, fat32_parse_boot_sector, 8.3 and LFN dir entry structs, partition type/media descriptor/attribute/LFN defines, dump functions
 ```
 
 ## Memory map (QEMU virt)
