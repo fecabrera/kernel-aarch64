@@ -13,6 +13,7 @@
 #include <sched/process.h>
 #include <sched/scheduler.h>
 #include <fs/fat32.h>
+#include <dsa/queue.h>
 #include "kernel.h"
 
 // static char size_strs[4][10] = {"B", "KiB", "MiB", "GiB"};
@@ -68,7 +69,11 @@ void init()
     int64_t exit_status = syscall_waitpid(fork_pid);
     printk("[init] child process (pid %i) terminated with status %i\r\n", fork_pid, exit_status);
 
+    time_t t0 = syscall_uptime();
     initialize_ramdisk();
+    time_t t1 = syscall_uptime();
+
+    printk("[init] took %dms\r\n", t1 - t0);
 
     syscall_exit(0);
 }
@@ -96,6 +101,14 @@ void initialize_ramdisk()
         return;
     }
 
+    // check boot sector signature
+    if (!fat32_is_boot_sector(buff))
+    {
+        printk("[init] not a FAT32 boot sector!\r\n");
+        kfree(buff);
+        return;
+    }
+
     // parse boot sector
     struct fat32_bs_info *bs_info = (struct fat32_bs_info *)kmalloc(sizeof(struct fat32_bs_info));
     fat32_parse_boot_sector(buff, bs_info);
@@ -107,12 +120,13 @@ void initialize_ramdisk()
     printk("  first_fat_sector  = %d\r\n", bs_info->first_fat_sector);
     printk("  first_data_sector = %d\r\n", bs_info->first_data_sector);
     printk("  root_cluster      = %d\r\n", bs_info->root_cluster);
+    printk("  table_size_32     = %d\r\n", bs_info->table_size_32);
     printk("  data_sectors      = %d\r\n", bs_info->data_sectors);
     printk("  total_clusters    = %d\r\n", bs_info->total_clusters);
     printk("\r\n");
 
-    // read fat sectors
-    uint32_t *fat_table = (uint32_t *)kmalloc(bs_info->table_size_32 * sizeof(uint32_t));
+    // read fat table
+    fat_table_entry_t *fat_table = (fat_table_entry_t *)kmalloc(bs_info->table_size_32 * sizeof(fat_table_entry_t));
     if (fat_table == NULL)
     {
         printk("[init] kmalloc() failed for fat_table!\r\n");
@@ -121,106 +135,90 @@ void initialize_ramdisk()
         return;
     }
 
-    uint32_t n_sectors_to_read = 4 * bs_info->table_size_32 / bs_info->n_bytes_per_sector;
-    uint16_t n_entries_per_sector = bs_info->n_bytes_per_sector / 4;
+    // parse fat table sector by sector, copying entries into fat_table.
+    // We need to read the FAT32 table one sector at a time because the virtio_mmio_read()
+    // buffer must be 512-byte aligned, and the FAT32 table entries are 4 bytes each so a
+    // sector contains 128 entries.
+    uint16_t n_clusters_per_sector = bs_info->n_bytes_per_sector / 4;
 
-    printk("n_sectors_to_read = %d\r\n", n_sectors_to_read);
+    uint32_t i = 0;
+    while (i < bs_info->table_size_32)
+    {
+        uint32_t sector_offset = i / n_clusters_per_sector;
+
+        status = virtio_mmio_read(slot, bs_info->first_fat_sector + sector_offset, (uint8_t *)buff);
+        if (status != VIRTIO_BLK_S_OK)
+        {
+            printk("[init] virtio_mmio_read() returned %i!\r\n", status);
+            kfree(buff);
+            kfree(fat_table);
+            kfree(bs_info);
+            return;
+        }
+
+        i += fat32_read_fat_table(bs_info, buff, sector_offset, fat_table);
+    }
+
+    printk("copied %d entries to fat table\r\n", i);
+
+    struct queue64 fat_q;
+    queue64_init(&fat_q, 10);
 
     for (uint32_t i = 0; i < bs_info->table_size_32; i++)
     {
-        uint32_t sector = (i * 4) / bs_info->n_bytes_per_sector;
-        status = virtio_mmio_read(slot, bs_info->first_fat_sector + sector, (uint8_t *)buff);
-
-        printk("clusters %d-%d:\r\n", sector * bs_info->n_bytes_per_sector / 4, ((sector + 1) * bs_info->n_bytes_per_sector / 4) - 1);
-
-        uint32_t *cluster = (uint32_t *)buff;
-        for (int j = 0; j < n_entries_per_sector && i < bs_info->table_size_32; j++)
-        {
-            int offset = i++ % bs_info->n_bytes_per_sector;
-            fat_table[i] = cluster[j] & 0x0FFFFFFF;
-            if (fat_table[i] > 0)
-                printk("  #%d: 0x%08x\r\n", offset, fat_table[i]);
-        }
-        printk("\r\n");
-    }
-
-    // read root dir sector
-    printk("first_data_sector = %d\r\n", bs_info->first_data_sector);
-    status = virtio_mmio_read(slot, bs_info->first_data_sector, buff);
-
-    if (status != VIRTIO_BLK_S_OK)
-    {
-        printk("[init] virtio_mmio_read() returned %i!\r\n", status);
-        kfree(buff);
-        kfree(fat_table);
-        kfree(bs_info);
-        return;
-    }
-
-    printk("root dir:\r\n");
-
-    int idx = 0, cnt = 0;
-    while (idx < 16)
-    {
-        struct fat32_lfn_entry *lfn_entry = NULL;
-        struct fat32_dir_entry *dir_entry = ((struct fat32_dir_entry *)buff) + idx++;
-
-        if (dir_entry->name[0] == FAT32_DIRENT_FREE)
-            continue;
-
-        if (dir_entry->name[0] == FAT32_DIRENT_END)
+        uint32_t value = fat_table[i] & 0x0FFFFFFF;
+        if (value == FAT32_FAT_ENTRY_RESERVED || value == FAT32_FAT_ENTRY_BAD)
             break;
 
-        cnt++;
+        queue64_push(&fat_q, i);
 
-        uint8_t attributes;
-        memcpy(&attributes, &dir_entry->attributes, 1);
-
-        // dump root dir entry
-        if (attributes == FAT32_ATTR_LFN)
-        {
-            idx++;
-            lfn_entry = (struct fat32_lfn_entry *)dir_entry;
-            dir_entry = (struct fat32_dir_entry *)dir_entry + 1;
-            memcpy(&attributes, &dir_entry->attributes, 1);
-            fat32_dump_lfn_entry(lfn_entry);
-        }
-        else
-        {
-            fat32_dump_dir_entry(dir_entry);
-        }
-
-        uint16_t cluster_low, cluster_high;
-        uint32_t file_size;
-        memcpy(&cluster_low, &dir_entry->cluster_low, 2);
-        memcpy(&cluster_high, &dir_entry->cluster_high, 2);
-        memcpy(&file_size, &dir_entry->file_size, 4);
-
-        char dir_name[12] = {0};
-        char lfn_dir_name[52] = {0};
-        char16_t _lfn_dir_name[26] = {0};
-
-        strncpy(dir_name, (char *)dir_entry->name, 11);
-        if (lfn_entry != NULL)
-        {
-            memcpy(_lfn_dir_name, lfn_entry->name1, 10);
-            memcpy(_lfn_dir_name + 5, lfn_entry->name2, 12);
-            memcpy(_lfn_dir_name + 11, lfn_entry->name3, 4);
-            utf16lencpy(lfn_dir_name, (char16_t *)_lfn_dir_name, 26);
-        }
-
-        printk("%d:\r\n", cnt);
-        printk("  name          = \"%s\"\r\n", dir_name);
-        if (lfn_entry != NULL)
-            printk("  lfn_name      = \"%s\"\r\n", lfn_dir_name);
-        printk("  attributes    = 0x%02x\r\n", attributes);
-        printk("  cluster       = %d\r\n", ((uint32_t)_le16(cluster_high) << 16) | _le16(cluster_low));
-        printk("  size          = %d B\r\n", _le32(file_size));
-        printk("\r\n");
+        while (value < FAT32_FAT_ENTRY_EOC && i < bs_info->table_size_32)
+            i++;
     }
 
-    kfree(buff);
+    printk("clusters = [");
+    for (uint32_t i = 0; i < fat_q.length; i++)
+    {
+        uint64_t cluster = queue64_at(&fat_q, i);
+        if (i)
+            printk(",");
+        printk(" %d", cluster);
+    }
+    printk(" ]\r\n");
+
+    // read directories
+    for (uint32_t i = bs_info->root_cluster; i < fat_q.length; i++)
+    {
+        uint32_t cluster = queue64_at(&fat_q, i);
+
+        uint32_t j = 0;
+        while (1)
+        {
+            cluster += j;
+            uint32_t sector_offset = cluster - bs_info->root_cluster;
+
+            printk("cluster %d (0x%08x):\r\n", cluster, (bs_info->first_data_sector + sector_offset) * bs_info->n_bytes_per_sector);
+
+            status = virtio_mmio_read(slot, bs_info->first_data_sector + sector_offset, buff);
+            if (status != VIRTIO_BLK_S_OK)
+            {
+                printk("[init] virtio_mmio_read() returned %i!\r\n", status);
+                kfree(buff);
+                kfree(fat_table);
+                kfree(bs_info);
+                return;
+            }
+
+            if (fat32_read_cluster(bs_info, buff) != 0)
+                break;
+
+            j++;
+        }
+    }
+
+    queue64_destroy(&fat_q);
     kfree(fat_table);
+    kfree(buff);
     kfree(bs_info);
 }
 
