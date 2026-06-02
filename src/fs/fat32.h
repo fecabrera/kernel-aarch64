@@ -237,3 +237,17 @@ void fat32_parse_boot_sector(uint8_t *buff, struct fat32_bs_info *bs_info);
  * @return number of entries written into fat_table
  */
 uint32_t fat32_read_fat_table(struct fat32_bs_info *bs_info, uint8_t *buff, uint32_t sector_offset, fat_table_entry_t *fat_table);
+
+/**
+ * Iterates over all 32-byte directory entries in a single cluster sector
+ * buffer, printing each entry's name, attributes, first cluster, and size.
+ * Handles one preceding LFN entry per 8.3 entry (single-fragment LFN only).
+ * Stops and returns 1 when FAT32_DIRENT_END is encountered; returns 0
+ * after processing all entries in the sector without hitting the end marker.
+ *
+ * @param bs_info: parsed boot sector info (used for entries-per-sector count)
+ * @param buff:    512-byte buffer containing the directory cluster sector
+ *
+ * @return 1 if the end-of-directory marker was found, 0 otherwise
+ */
+int fat32_read_cluster(struct fat32_bs_info *bs_info, uint8_t *buff);

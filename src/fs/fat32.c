@@ -294,3 +294,65 @@ uint32_t fat32_read_fat_table(struct fat32_bs_info *bs_info, uint8_t *buff, uint
 
     return i;
 }
+
+int fat32_read_cluster(struct fat32_bs_info *bs_info, uint8_t *buff)
+{
+    uint16_t n_entries_per_sector = bs_info->n_bytes_per_sector / 32;
+
+    struct fat32_dir_entry *first_entry = (struct fat32_dir_entry *)buff;
+    for (int offset = 0; offset < n_entries_per_sector; offset++)
+    {
+        struct fat32_lfn_entry *lfn_entry = NULL;
+        struct fat32_dir_entry *dir_entry = first_entry + offset;
+
+        if ((dir_entry->name[0] == FAT32_DIRENT_END))
+            return 1;
+
+        if ((dir_entry->name[0] == FAT32_DIRENT_FREE))
+            continue;
+
+        printk("entry #%d: \r\n", offset);
+
+        uint8_t attributes;
+        memcpy(&attributes, &dir_entry->attributes, 1);
+
+        if (attributes == FAT32_ATTR_LFN)
+        {
+            offset++;
+            lfn_entry = (struct fat32_lfn_entry *)dir_entry;
+            dir_entry = (struct fat32_dir_entry *)dir_entry + 1;
+            memcpy(&attributes, &dir_entry->attributes, 1);
+        }
+
+        uint16_t cluster_low, cluster_high;
+        uint32_t file_size;
+        memcpy(&cluster_low, &dir_entry->cluster_low, 2);
+        memcpy(&cluster_high, &dir_entry->cluster_high, 2);
+        memcpy(&file_size, &dir_entry->file_size, 4);
+
+        char dir_name[12] = {0};
+        char lfn_dir_name[52] = {0};
+        char16_t _lfn_dir_name[26] = {0};
+
+        strncpy(dir_name, (char *)dir_entry->name, 11);
+        if (lfn_entry != NULL)
+        {
+            memcpy(_lfn_dir_name, lfn_entry->name1, 10);
+            memcpy(_lfn_dir_name + 5, lfn_entry->name2, 12);
+            memcpy(_lfn_dir_name + 11, lfn_entry->name3, 4);
+            utf16lencpy(lfn_dir_name, (char16_t *)_lfn_dir_name, 26);
+        }
+
+        uint32_t next_cluster = ((uint32_t)_le16(cluster_high) << 16) | _le16(cluster_low);
+
+        printk("  name          = \"%s\"\r\n", dir_name);
+        if (lfn_entry != NULL)
+            printk("  lfn_name      = \"%s\"\r\n", lfn_dir_name);
+        printk("  attributes    = 0x%02x\r\n", attributes);
+        printk("  next_cluster  = %d\r\n", next_cluster);
+        printk("  size          = %d B\r\n", _le32(file_size));
+        printk("\r\n");
+    }
+
+    return 0;
+}
