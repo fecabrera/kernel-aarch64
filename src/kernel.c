@@ -97,45 +97,46 @@ void initialize_ramdisk()
     }
 
     // parse boot sector
-    struct fat32_bs_info bs_info = {0};
-    fat32_parse_boot_sector(buff, &bs_info);
+    struct fat32_bs_info *bs_info = (struct fat32_bs_info *)kmalloc(sizeof(struct fat32_bs_info));
+    fat32_parse_boot_sector(buff, bs_info);
 
-    printk("volume \"%s\":\r\n", bs_info.volume_label);
-    printk("  size              = %d B\r\n", bs_info.total_sectors_32 * bs_info.n_bytes_per_sector);
-    printk("  drive_number      = 0x%02x\r\n", bs_info.drive_number);
-    printk("  table_size        = %d\r\n", bs_info.table_size_32);
-    printk("  first_fat_sector  = %d\r\n", bs_info.first_fat_sector);
-    printk("  first_data_sector = %d\r\n", bs_info.first_data_sector);
-    printk("  root_cluster      = %d\r\n", bs_info.root_cluster);
-    printk("  data_sectors      = %d\r\n", bs_info.data_sectors);
-    printk("  total_clusters    = %d\r\n", bs_info.total_clusters);
+    printk("volume \"%s\":\r\n", bs_info->volume_label);
+    printk("  size              = %d B\r\n", bs_info->total_sectors_32 * bs_info->n_bytes_per_sector);
+    printk("  drive_number      = 0x%02x\r\n", bs_info->drive_number);
+    printk("  table_size        = %d\r\n", bs_info->table_size_32);
+    printk("  first_fat_sector  = %d\r\n", bs_info->first_fat_sector);
+    printk("  first_data_sector = %d\r\n", bs_info->first_data_sector);
+    printk("  root_cluster      = %d\r\n", bs_info->root_cluster);
+    printk("  data_sectors      = %d\r\n", bs_info->data_sectors);
+    printk("  total_clusters    = %d\r\n", bs_info->total_clusters);
     printk("\r\n");
 
     // read fat sectors
-    uint32_t *fat_table = (uint32_t *)kmalloc(bs_info.table_size_32 * sizeof(uint32_t));
+    uint32_t *fat_table = (uint32_t *)kmalloc(bs_info->table_size_32 * sizeof(uint32_t));
     if (fat_table == NULL)
     {
         printk("[init] kmalloc() failed for fat_table!\r\n");
         kfree(buff);
+        kfree(bs_info);
         return;
     }
 
-    uint32_t n_sectors_to_read = 4 * bs_info.table_size_32 / bs_info.n_bytes_per_sector;
-    uint16_t n_entries_per_sector = bs_info.n_bytes_per_sector / 4;
+    uint32_t n_sectors_to_read = 4 * bs_info->table_size_32 / bs_info->n_bytes_per_sector;
+    uint16_t n_entries_per_sector = bs_info->n_bytes_per_sector / 4;
 
     printk("n_sectors_to_read = %d\r\n", n_sectors_to_read);
 
-    for (uint32_t i = 0; i < bs_info.table_size_32; i++)
+    for (uint32_t i = 0; i < bs_info->table_size_32; i++)
     {
-        uint32_t sector = (i * 4) / bs_info.n_bytes_per_sector;
-        status = virtio_mmio_read(slot, bs_info.first_fat_sector + sector, (uint8_t *)buff);
+        uint32_t sector = (i * 4) / bs_info->n_bytes_per_sector;
+        status = virtio_mmio_read(slot, bs_info->first_fat_sector + sector, (uint8_t *)buff);
 
-        printk("clusters %d-%d:\r\n", sector * bs_info.n_bytes_per_sector / 4, ((sector + 1) * bs_info.n_bytes_per_sector / 4) - 1);
+        printk("clusters %d-%d:\r\n", sector * bs_info->n_bytes_per_sector / 4, ((sector + 1) * bs_info->n_bytes_per_sector / 4) - 1);
 
         uint32_t *cluster = (uint32_t *)buff;
-        for (int j = 0; j < n_entries_per_sector && i < bs_info.table_size_32; j++)
+        for (int j = 0; j < n_entries_per_sector && i < bs_info->table_size_32; j++)
         {
-            int offset = i++ % bs_info.n_bytes_per_sector;
+            int offset = i++ % bs_info->n_bytes_per_sector;
             fat_table[i] = cluster[j] & 0x0FFFFFFF;
             if (fat_table[i] > 0)
                 printk("  #%d: 0x%08x\r\n", offset, fat_table[i]);
@@ -144,14 +145,15 @@ void initialize_ramdisk()
     }
 
     // read root dir sector
-    printk("first_data_sector = %d\r\n", bs_info.first_data_sector);
-    status = virtio_mmio_read(slot, bs_info.first_data_sector, buff);
+    printk("first_data_sector = %d\r\n", bs_info->first_data_sector);
+    status = virtio_mmio_read(slot, bs_info->first_data_sector, buff);
 
     if (status != VIRTIO_BLK_S_OK)
     {
         printk("[init] virtio_mmio_read() returned %i!\r\n", status);
         kfree(buff);
         kfree(fat_table);
+        kfree(bs_info);
         return;
     }
 
@@ -160,56 +162,56 @@ void initialize_ramdisk()
     int idx = 0, cnt = 0;
     while (idx < 16)
     {
-        struct fat32_lfn_entry *root_dir_lfn = NULL;
-        struct fat32_dir_entry *root_dir = ((struct fat32_dir_entry *)buff) + idx++;
+        struct fat32_lfn_entry *lfn_entry = NULL;
+        struct fat32_dir_entry *dir_entry = ((struct fat32_dir_entry *)buff) + idx++;
 
-        if (root_dir->name[0] == FAT32_DIRENT_FREE)
+        if (dir_entry->name[0] == FAT32_DIRENT_FREE)
             continue;
 
-        if (root_dir->name[0] == FAT32_DIRENT_END)
+        if (dir_entry->name[0] == FAT32_DIRENT_END)
             break;
 
         cnt++;
 
         uint8_t attributes;
-        memcpy(&attributes, &root_dir->attributes, 1);
+        memcpy(&attributes, &dir_entry->attributes, 1);
 
         // dump root dir entry
         if (attributes == FAT32_ATTR_LFN)
         {
             idx++;
-            root_dir_lfn = (struct fat32_lfn_entry *)root_dir;
-            root_dir = (struct fat32_dir_entry *)root_dir + 1;
-            memcpy(&attributes, &root_dir->attributes, 1);
-            fat32_dump_lfn_entry(root_dir_lfn);
+            lfn_entry = (struct fat32_lfn_entry *)dir_entry;
+            dir_entry = (struct fat32_dir_entry *)dir_entry + 1;
+            memcpy(&attributes, &dir_entry->attributes, 1);
+            fat32_dump_lfn_entry(lfn_entry);
         }
         else
         {
-            fat32_dump_dir_entry(root_dir);
+            fat32_dump_dir_entry(dir_entry);
         }
 
         uint16_t cluster_low, cluster_high;
         uint32_t file_size;
-        memcpy(&cluster_low, &root_dir->cluster_low, 2);
-        memcpy(&cluster_high, &root_dir->cluster_high, 2);
-        memcpy(&file_size, &root_dir->file_size, 4);
+        memcpy(&cluster_low, &dir_entry->cluster_low, 2);
+        memcpy(&cluster_high, &dir_entry->cluster_high, 2);
+        memcpy(&file_size, &dir_entry->file_size, 4);
 
         char dir_name[12] = {0};
         char lfn_dir_name[52] = {0};
         char16_t _lfn_dir_name[26] = {0};
 
-        strncpy(dir_name, (char *)root_dir->name, 11);
-        if (root_dir_lfn != NULL)
+        strncpy(dir_name, (char *)dir_entry->name, 11);
+        if (lfn_entry != NULL)
         {
-            memcpy(_lfn_dir_name, root_dir_lfn->name1, 10);
-            memcpy(_lfn_dir_name + 5, root_dir_lfn->name2, 12);
-            memcpy(_lfn_dir_name + 11, root_dir_lfn->name3, 4);
+            memcpy(_lfn_dir_name, lfn_entry->name1, 10);
+            memcpy(_lfn_dir_name + 5, lfn_entry->name2, 12);
+            memcpy(_lfn_dir_name + 11, lfn_entry->name3, 4);
             utf16lencpy(lfn_dir_name, (char16_t *)_lfn_dir_name, 26);
         }
 
         printk("%d:\r\n", cnt);
         printk("  name          = \"%s\"\r\n", dir_name);
-        if (root_dir_lfn != NULL)
+        if (lfn_entry != NULL)
             printk("  lfn_name      = \"%s\"\r\n", lfn_dir_name);
         printk("  attributes    = 0x%02x\r\n", attributes);
         printk("  cluster       = %d\r\n", ((uint32_t)_le16(cluster_high) << 16) | _le16(cluster_low));
@@ -219,6 +221,7 @@ void initialize_ramdisk()
 
     kfree(buff);
     kfree(fat_table);
+    kfree(bs_info);
 }
 
 void child()
