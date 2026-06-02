@@ -87,8 +87,8 @@ void initialize_ramdisk()
     uint8_t *buff = (uint8_t *)kmalloc(512);
     uint32_t status;
 
+    // read boot sector
     status = virtio_mmio_read(slot, 0, buff);
-
     if (status != VIRTIO_BLK_S_OK)
     {
         printk("[init] virtio_mmio_read() returned %i!\r\n", status);
@@ -96,20 +96,11 @@ void initialize_ramdisk()
         return;
     }
 
-    struct mbr_boot_sector *bs = (struct mbr_boot_sector *)buff;
-    struct fat32_ext_bs *ext_br = (struct fat32_ext_bs *)&bs->boot_code;
-
-    // dump boot sector
-    fat32_dump_boot_sector(bs);
-
-    // volume name
-    char volume_label[12] = {0};
-    strncpy(volume_label, (char *)ext_br->volume_label, 11);
-
-    struct fat32_bs_info bs_info;
+    // parse boot sector
+    struct fat32_bs_info bs_info = {0};
     fat32_parse_boot_sector(buff, &bs_info);
 
-    printk("volume \"%s\":\r\n", volume_label);
+    printk("volume \"%s\":\r\n", bs_info.volume_label);
     printk("  size              = %d B\r\n", bs_info.total_sectors_32 * bs_info.n_bytes_per_sector);
     printk("  drive_number      = 0x%02x\r\n", bs_info.drive_number);
     printk("  table_size        = %d\r\n", bs_info.table_size_32);
@@ -129,8 +120,8 @@ void initialize_ramdisk()
         return;
     }
 
-    int n_sectors_to_read = 4 * bs_info.table_size_32 / bs_info.n_bytes_per_sector;
-    int n_entries_per_sector = bs_info.n_bytes_per_sector / 4;
+    uint32_t n_sectors_to_read = 4 * bs_info.table_size_32 / bs_info.n_bytes_per_sector;
+    uint16_t n_entries_per_sector = bs_info.n_bytes_per_sector / 4;
 
     printk("n_sectors_to_read = %d\r\n", n_sectors_to_read);
 
