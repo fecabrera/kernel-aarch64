@@ -47,6 +47,18 @@ char *strncpy(char *dest, const char *src, size_t count);
 size_t strlen(const char *str);
 
 /**
+ * Returns the length of str, but reads at most count bytes.
+ * Unlike strlen, will not read past count bytes even if no null terminator
+ * is found — safe for buffers that may not be null-terminated.
+ *
+ * @param str:   pointer to the string to measure
+ * @param count: maximum number of bytes to inspect
+ *
+ * @return number of characters before the null terminator, or count if none found
+ */
+size_t strnlen(const char *str, size_t count);
+
+/**
  * Compares two null-terminated strings lexicographically.
  *
  * @param lhs: pointer to the first null-terminated string

@@ -8,6 +8,14 @@ size_t strlen(const char *s)
     return n;
 }
 
+size_t strnlen(const char *str, size_t count)
+{
+    size_t n = 0;
+    while (n < count && *str++)
+        n++;
+    return n;
+}
+
 int memcmp(const void *lhs, const void *rhs, size_t count)
 {
     const uint8_t *a = lhs;
