@@ -14,31 +14,31 @@ irq_handler_t irq_table[NUM_IRQS] = {NULL};
 
 static void ctx_dump(struct cpu_context *ctx)
 {
-    dprintk("\r\n=== ctx dump ===\r\n");
-    dprintk("x0  = 0x%x\r\n", ctx->x0);
-    dprintk("x1  = 0x%x\r\n", ctx->x1);
-    dprintk("x2  = 0x%x\r\n", ctx->x2);
-    dprintk("x3  = 0x%x\r\n", ctx->x3);
-    dprintk("x4  = 0x%x\r\n", ctx->x4);
-    dprintk("x5  = 0x%x\r\n", ctx->x5);
-    dprintk("x6  = 0x%x\r\n", ctx->x6);
-    dprintk("x7  = 0x%x\r\n", ctx->x7);
-    dprintk("x8  = 0x%x\r\n", ctx->x8);
-    dprintk("x9  = 0x%x\r\n", ctx->x9);
-    dprintk("x10 = 0x%x\r\n", ctx->x10);
-    dprintk("x11 = 0x%x\r\n", ctx->x11);
-    dprintk("x12 = 0x%x\r\n", ctx->x12);
-    dprintk("x13 = 0x%x\r\n", ctx->x13);
-    dprintk("x14 = 0x%x\r\n", ctx->x14);
-    dprintk("x15 = 0x%x\r\n", ctx->x15);
-    dprintk("lr  = 0x%x\r\n", ctx->lr);
-    dprintk("elr = 0x%x\r\n", ctx->elr);
-    dprintk("spsr= 0b");
+    printk("\r\n=== ctx dump ===\r\n");
+    printk("x0  = 0x%x\r\n", ctx->x0);
+    printk("x1  = 0x%x\r\n", ctx->x1);
+    printk("x2  = 0x%x\r\n", ctx->x2);
+    printk("x3  = 0x%x\r\n", ctx->x3);
+    printk("x4  = 0x%x\r\n", ctx->x4);
+    printk("x5  = 0x%x\r\n", ctx->x5);
+    printk("x6  = 0x%x\r\n", ctx->x6);
+    printk("x7  = 0x%x\r\n", ctx->x7);
+    printk("x8  = 0x%x\r\n", ctx->x8);
+    printk("x9  = 0x%x\r\n", ctx->x9);
+    printk("x10 = 0x%x\r\n", ctx->x10);
+    printk("x11 = 0x%x\r\n", ctx->x11);
+    printk("x12 = 0x%x\r\n", ctx->x12);
+    printk("x13 = 0x%x\r\n", ctx->x13);
+    printk("x14 = 0x%x\r\n", ctx->x14);
+    printk("x15 = 0x%x\r\n", ctx->x15);
+    printk("lr  = 0x%x\r\n", ctx->lr);
+    printk("elr = 0x%x\r\n", ctx->elr);
+    printk("spsr= 0b");
     for (int i = sizeof(uint64_t) * 8 - 1; i >= 0; i--)
     {
-        dprintk((ctx->spsr & (1UL << i)) ? "1" : "0");
+        printk((ctx->spsr & (1UL << i)) ? "1" : "0");
     }
-    dprintk("\r\n=================\r\n");
+    printk("\r\n=================\r\n");
 }
 
 // ── Install vector table ────────────────────────────
@@ -73,8 +73,7 @@ struct cpu_context *sync_handler(struct cpu_context *ctx, uint64_t esr, uint64_t
         ctx = exit_handler(ctx);
         break;
     default:
-        dprintk("[sync] esr = 0x%x, elr = 0x%x, far = 0x%x, ec = 0x%x\r\n", esr, elr, far, ec);
-
+        printk("[sync] esr = 0x%x, elr = 0x%x, far = 0x%x, ec = 0x%x\r\n", esr, elr, far, ec);
         ctx_dump(ctx);
 
         hang();
