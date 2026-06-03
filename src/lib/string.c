@@ -1,4 +1,5 @@
 #include <string.h>
+#include <ctype.h>
 
 size_t strlen(const char *s)
 {
@@ -72,6 +73,28 @@ char *strncpy(char *dest, const char *source, size_t count)
     while (count--)
         *d++ = '\0';
     return dest;
+}
+
+size_t strntrimend(char *dest, const char *src, size_t count)
+{
+    int last_char_idx = -1;
+    for (size_t i = 0; i < count; i++)
+    {
+        char ch = src[i];
+        if (isprint(ch) && !isspace(ch))
+            last_char_idx = i;
+    }
+
+    if (last_char_idx < 0)
+    {
+        dest[0] = '\0';
+        return 0;
+    }
+
+    strncpy(dest, src, last_char_idx + 1);
+    dest[last_char_idx + 1] = '\0';
+
+    return last_char_idx + 1;
 }
 
 void *memset(void *dest, int ch, size_t count)

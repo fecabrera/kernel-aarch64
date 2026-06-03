@@ -156,7 +156,7 @@ src/
   lib/              — architecture-independent libraries
     debug.c/h       — printk (always on) and dprintk (DEBUG=1 only), both backed by pl011_vprintf
     dtb.c/h         — FDT parser (node/property walker); IRQ number lookup for timer, RTC, and virtio MMIO slots
-    string.c/h      — freestanding string library (memcpy, memset, strcmp, ...)
+    string.c/h      — freestanding string library (memcpy, memset, strcmp, strntrimend, ...)
     ctype.c/h       — freestanding character classification and conversion (isalpha, isdigit, isspace, tolower, toupper, ...)
     stdlib.c/h      — itoa, vsprintf, sprintf (freestanding; uses __builtin_va_* instead of <stdarg.h>)
     stdint.h        — stdint-style typedefs (uint8_t … uint64_t, intptr_t)
