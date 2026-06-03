@@ -49,27 +49,78 @@ make run
 
 ## Features
 
-- **DTB parsing** — reads device tree at boot to discover IRQ numbers, memory layout, and peripheral addresses at runtime
-- **GIC-400** — interrupt controller driver with a dynamic dispatch table (`irq_register_handler`)
-- **PL011 UART** — interrupt-driven RX, polled TX, 115200 8N1
-- **ARM generic timer** — 10ms tick via EL1 physical timer (PPI 30); tracks `initial_ticks` at boot and `ticks` per interrupt via `cntpct_el0`; `timer_get_uptime()` returns milliseconds since boot and is used by the scheduler for absolute-timestamp sleep wakeups
-- **PL031 RTC** — match alarm interrupt
-- **virtio MMIO** — scans all 32 MMIO slots; validates magic, version, and device ID; negotiates features; sets up per-slot 64-entry virtqueues (`struct virtq` with desc/avail/used rings); `virtio_mmio_read` submits synchronous block reads via 3-descriptor chains; IRQ handler acks `VIRTIO_INTERRUPT_STATUS`
-- **FAT32** — MBR/BPB parsing (`mbr_boot_sector`, `fat32_ext_bs`); `fat32_is_boot_sector` validates the 0xAA55 signature and EBR sanity fields; `fat32_parse_boot_sector` extracts BPB/EBR fields and computes derived values into `fat32_bs_info`; `fat32_read_fat_table` copies one FAT sector into a flat `uint32_t` array (28-bit masked, compare against `FAT32_FAT_ENTRY_*`); `fat32_read_cluster` iterates directory entries in a sector buffer; 8.3 and LFN directory entry structs (`fat32_dir_entry`, `fat32_lfn_entry`) with `FAT32_ATTR_*`, `FAT32_DIRENT_*`, and `FAT32_LFN_*` defines; packed structs with aligned mirrors for safe field access on AArch64; dump functions for boot sector, EBR, dir, and LFN entries
-- **Heap allocator** — first-fit free-list with 16 MiB static region, block splitting, and coalescing (`kmalloc`/`kfree`/`krealloc`); `kfree` returns error codes for NULL, out-of-range, and double-free; `kmalloc_aligned` rounds size up to the alignment boundary — safe for any power-of-two multiple of 8, result is directly `kfree`-able
-- **Exception handling** — full save/restore of all 31 registers + ELR/SPSR; IRQ handlers return `struct cpu_context *` for context switching; IABT/DABT terminate the faulting process via `exit_handler`; unknown exceptions dump the full register context
-- **Preemptive scheduler** — FIFO run queue, timer-driven; tracks the running process via a `current` pointer; dedicated 4KB IRQ stack; `create_process`/`duplicate_process`/`destroy_process` with 16-byte aligned task stacks; idles via `halt` when the ready queue is empty
-- **Syscall interface**
-  - `svc #0` dispatch table (`syscall_register_handler`)
-  - `syscall_yield()` triggers an immediate context switch
-  - `syscall_exit(status)` terminates the calling process and schedules the next one
-  - `syscall_getpid()` returns the calling process's PID
-  - `syscall_waitpid(pid)` blocks the caller until the target process exits
-  - `syscall_fork()` duplicates the calling process (child resumes at the fork site with return value 0)
-  - `syscall_sleep(seconds)` blocks the caller in a sleep queue; wakes when `timer_get_uptime()` reaches the absolute `sleep_until` timestamp
-  - `syscall_msleep(ms)` same as `syscall_sleep` but duration is in milliseconds
-  - `syscall_time()` returns the current Unix timestamp from the RTC
-  - `syscall_uptime()` returns system uptime in milliseconds, computed from `cntpct_el0` ticks since boot
+### **DTB parsing**
+
+- Reads device tree at boot to discover IRQ numbers, memory layout, and peripheral addresses at runtime.
+
+### **GIC-400**
+
+- Interrupt controller driver with a dynamic dispatch table (`irq_register_handler`).
+
+### **PL011 UART**
+
+- Interrupt-driven RX, polled TX, 115200 8N1.
+
+### **ARM generic timer**
+
+- 10ms tick via EL1 physical timer (PPI 30); tracks `initial_ticks` at boot and `ticks` per interrupt via `cntpct_el0`.
+- `timer_get_uptime()` returns milliseconds since boot and is used by the scheduler for absolute-timestamp sleep wakeups.
+
+### **PL031 RTC**
+
+- Match alarm interrupt.
+
+### **virtio MMIO**
+
+- Scans all 32 MMIO slots, validates magic, version, and device ID.
+- Negotiates features, sets up per-slot 64-entry virtqueues (`struct virtq` with desc/avail/used rings).
+- `virtio_mmio_read` submits synchronous block reads via 3-descriptor chains.
+- IRQ handler acks `VIRTIO_INTERRUPT_STATUS`.
+
+### **FAT32**
+
+- MBR/BPB parsing (`mbr_boot_sector`, `fat32_ext_bs`).
+- `fat32_is_boot_sector` validates the 0xAA55 signature and EBR sanity fields.
+- `fat32_parse_boot_sector` extracts BPB/EBR fields and computes derived values into `fat32_bs_info`.
+- `fat32_read_fat_table` copies one FAT sector into a flat `uint32_t` array (28-bit masked, compare against `FAT32_FAT_ENTRY_*`).
+- `fat32_read_cluster` iterates directory entries in a sector buffer.
+- 8.3 and LFN directory entry structs (`fat32_dir_entry`, `fat32_lfn_entry`) with `FAT32_ATTR_*`, `FAT32_DIRENT_*`, and `FAT32_LFN_*` defines.
+- Packed structs with aligned mirrors for safe field access on AArch64.
+- Dump functions for boot sector, EBR, dir, and LFN entries.
+
+### **Heap allocator**
+
+- First-fit free-list with 16 MiB static region, block splitting, and coalescing (`kmalloc`/`kfree`/`krealloc`).
+- `kfree` returns error codes for NULL, out-of-range, and double-free.
+- `kmalloc_aligned` rounds size up to the alignment boundary.
+- Safe for any power-of-two multiple of 8, result is directly `kfree`-able.
+
+### **Exception handling**
+
+- Full save/restore of all 31 registers + ELR/SPSR; IRQ handlers return `struct cpu_context *` for context switching.
+- IABT/DABT terminate the faulting process via `exit_handler`.
+- Unknown exceptions dump the full register context.
+
+### **Preemptive scheduler**
+
+- FIFO run queue, timer-driven.
+- Tracks the running process via a `current` pointer.
+- Dedicated 4KB IRQ stack.
+- `create_process`/`duplicate_process`/`destroy_process` with 16-byte aligned task stacks.
+- Idles via `halt` when the ready queue is empty.
+
+### **Syscall interface**
+
+- `svc #0` dispatch table (`syscall_register_handler`).
+- `syscall_yield()` triggers an immediate context switch.
+- `syscall_exit(status)` terminates the calling process and schedules the next one.
+- `syscall_getpid()` returns the calling process's PID.
+- `syscall_waitpid(pid)` blocks the caller until the target process exits.
+- `syscall_fork()` duplicates the calling process (child resumes at the fork site with return value 0).
+- `syscall_sleep(seconds)` blocks the caller in a sleep queue; wakes when `timer_get_uptime()` reaches the absolute `sleep_until` timestamp.
+- `syscall_msleep(ms)` same as `syscall_sleep` but duration is in milliseconds.
+- `syscall_time()` returns the current Unix timestamp from the RTC.
+- `syscall_uptime()` returns system uptime in milliseconds, computed from `cntpct_el0` ticks since boot.
 
 ## Source layout
 
@@ -119,7 +170,7 @@ src/
     scheduler.c/h   — FIFO ready queue (dsa/queue64) and wait queue (dsa/deque64), scheduler_enqueue/dequeue/spawn, context switch via timer and yield/exit/waitpid/fork syscalls
 
   fs/               — filesystem drivers
-    fat32.c/h       — MBR/BPB structs (packed + aligned mirrors), fat32_bs_info, fat32_parse_boot_sector, fat32_read_fat_table, 8.3 and LFN dir entry structs, partition type/media descriptor/attribute/LFN defines, dump functions
+    fat32.c/h       — MBR/BPB structs (packed + aligned mirrors), fat32_bs_info, fat32_is_boot_sector, fat32_parse_boot_sector, fat32_read_fat_table, fat32_read_cluster, 8.3 and LFN dir entry structs, partition type/media descriptor/attribute/LFN defines, dump functions
 ```
 
 ## Memory map (QEMU virt)
