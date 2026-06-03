@@ -77,13 +77,23 @@ make run
 - `virtio_mmio_read` submits synchronous block reads via 3-descriptor chains.
 - IRQ handler acks `VIRTIO_INTERRUPT_STATUS`.
 
+### **Filesystem abstraction**
+
+- Generic in-memory tree of `fs_node` structs; each node carries a heap-allocated name, `attrs` (type + flags), and `next`/`child` pointers.
+- Node types: `FS_NODE_ATTRS_TYPE_FILE`, `FS_NODE_ATTRS_TYPE_FOLDER`; flag bits: `FS_NODE_ATTRS_FLAG_LINK`, `FS_NODE_ATTRS_FLAG_HIDDEN`, `FS_NODE_ATTRS_FLAG_READONLY`.
+- `fs_create_file` / `fs_create_folder` allocate nodes; folders are initialised with "." and ".." children (the ".." child's `child` pointer references its parent).
+- `fs_add_file_to_folder` / `fs_add_subfolder` append to a folder's child list.
+- `fs_node_rename` replaces a node's heap-allocated name in place.
+- `fs_destroy_node` frees a single node (non-recursive).
+- `fs_dump_node` prints the full subtree to the kernel log with path prefixes.
+
 ### **FAT32**
 
 - MBR/BPB parsing (`mbr_boot_sector`, `fat32_ext_bs`).
 - `fat32_is_boot_sector` validates the 0xAA55 signature and EBR sanity fields.
 - `fat32_parse_boot_sector` extracts BPB/EBR fields and computes derived values into `fat32_bs_info`.
 - `fat32_read_fat_table` copies one FAT sector into a flat `uint32_t` array (28-bit masked, compare against `FAT32_FAT_ENTRY_*`).
-- `fat32_read_cluster` iterates directory entries in a sector buffer.
+- `fat32_read_cluster` iterates directory entries in a sector buffer and populates a caller-supplied `fs_node` root with files and subfolders; skips "." and ".." entries.
 - 8.3 and LFN directory entry structs (`fat32_dir_entry`, `fat32_lfn_entry`) with `FAT32_ATTR_*`, `FAT32_DIRENT_*`, and `FAT32_LFN_*` defines.
 - Packed structs with aligned mirrors for safe field access on AArch64.
 - Dump functions for boot sector, EBR, dir, and LFN entries.
@@ -170,6 +180,7 @@ src/
     scheduler.c/h   — FIFO ready queue (dsa/queue64) and wait queue (dsa/deque64), scheduler_enqueue/dequeue/spawn, context switch via timer and yield/exit/waitpid/fork syscalls
 
   fs/               — filesystem drivers
+    filesystem.c/h  — generic fs_node tree: fs_create_node/file/folder, fs_add_file_to_folder, fs_add_subfolder, fs_node_rename, fs_destroy_node, fs_dump_node
     fat32.c/h       — MBR/BPB structs (packed + aligned mirrors), fat32_bs_info, fat32_is_boot_sector, fat32_parse_boot_sector, fat32_read_fat_table, fat32_read_cluster, 8.3 and LFN dir entry structs, partition type/media descriptor/attribute/LFN defines, dump functions
 ```
 

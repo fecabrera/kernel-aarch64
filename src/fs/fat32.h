@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 #include <uchar.h>
+#include <fs/filesystem.h>
 
 // Partition type byte
 #define MBR_PARTITION_TYPE_EMPTY 0
@@ -250,4 +251,4 @@ uint32_t fat32_read_fat_table(struct fat32_bs_info *bs_info, uint8_t *buff, uint
  *
  * @return 1 if the end-of-directory marker was found, 0 otherwise
  */
-int fat32_read_cluster(struct fat32_bs_info *bs_info, uint8_t *buff);
+int fat32_read_cluster(struct fat32_bs_info *bs_info, uint8_t *buff, struct fs_node *root_node);

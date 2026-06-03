@@ -4,6 +4,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <arch/cpu.h>
+#include <mm/heap.h>
 #include "fat32.h"
 
 // ── Aligned copies ───────────────────────────────────────────────────────────
@@ -287,7 +288,7 @@ uint32_t fat32_read_fat_table(struct fat32_bs_info *bs_info, uint8_t *buff, uint
     return i;
 }
 
-int fat32_read_cluster(struct fat32_bs_info *bs_info, uint8_t *buff)
+int fat32_read_cluster(struct fat32_bs_info *bs_info, uint8_t *buff, struct fs_node *root_node)
 {
     uint16_t n_entries_per_sector = bs_info->n_bytes_per_sector / 32;
 
@@ -335,15 +336,43 @@ int fat32_read_cluster(struct fat32_bs_info *bs_info, uint8_t *buff)
             utf16lencpy(lfn_dir_name, (char16_t *)_lfn_dir_name, 26);
         }
 
+        char *name;
+        if (lfn_entry != NULL)
+        {
+            size_t len = strlen(lfn_dir_name);
+            name = (char *)kmalloc(len + 1);
+            strncpy(name, lfn_dir_name, len + 1);
+        }
+        else
+        {
+            name = (char *)kmalloc(13);
+            size_t name_len = strntrimend(name, dir_name, 8);
+            if (strntrimend(name + name_len + 1, dir_name + 8, 3) > 0)
+                name[name_len] = '.';
+            else
+                name[name_len] = '\0';
+        }
+
+        if (strncmp(name, ".", 2) && strncmp(name, "..", 3))
+        {
+            if (attributes & FAT32_ATTR_DIRECTORY)
+                fs_add_subfolder(root_node, name, strlen(name), 0);
+            else
+                fs_add_file_to_folder(root_node, name, strlen(name), 0);
+        }
+
         uint32_t next_cluster = ((uint32_t)_le16(cluster_high) << 16) | _le16(cluster_low);
 
-        printk("  name          = \"%s\"\r\n", dir_name);
+        printk("  name          = \"%s\"\r\n", name);
+        printk("  dir_name      = \"%s\"\r\n", dir_name);
         if (lfn_entry != NULL)
             printk("  lfn_name      = \"%s\"\r\n", lfn_dir_name);
         printk("  attributes    = 0x%02x\r\n", attributes);
         printk("  next_cluster  = %d\r\n", next_cluster);
         printk("  size          = %d B\r\n", _le32(file_size));
         printk("\r\n");
+
+        kfree(name);
     }
 
     return 0;

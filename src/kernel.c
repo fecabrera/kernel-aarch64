@@ -13,6 +13,7 @@
 #include <sched/process.h>
 #include <sched/scheduler.h>
 #include <fs/fat32.h>
+#include <fs/filesystem.h>
 #include <dsa/queue.h>
 #include "kernel.h"
 
@@ -186,6 +187,9 @@ void initialize_ramdisk()
     }
     printk(" ]\r\n");
 
+    // create root node
+    struct fs_node *root = fs_create_folder(bs_info->volume_label, strnlen(bs_info->volume_label, 11), 0);
+
     // read directories
     for (uint32_t i = bs_info->root_cluster; i < fat_q.length; i++)
     {
@@ -209,12 +213,14 @@ void initialize_ramdisk()
                 return;
             }
 
-            if (fat32_read_cluster(bs_info, buff) != 0)
+            if (fat32_read_cluster(bs_info, buff, root) != 0)
                 break;
 
             j++;
         }
     }
+
+    fs_dump_node(root);
 
     queue64_destroy(&fat_q);
     kfree(fat_table);
