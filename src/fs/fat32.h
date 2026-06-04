@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 #include <uchar.h>
+#include <dsa/set.h>
 #include <fs/filesystem.h>
 
 // Partition type byte
@@ -136,14 +137,11 @@ struct __attribute__((packed)) fat32_lfn_entry
     char16_t name3[2];  // UTF-16LE name characters 12–13
 };
 
-// struct fat32_node
-// {
-//     size_t entry_cluster;
-//     size_t entry_index;
-//     size_t data_cluster;
-//     size_t size;
-//     char name[256];
-// };
+struct fat32_cluster_chain
+{
+    uint32_t start;
+    uint32_t end;
+};
 
 struct fat32_bs_info
 {
@@ -153,6 +151,7 @@ struct fat32_bs_info
     uint8_t n_sectors_per_cluster;
     uint16_t n_reserved_sectors;
     uint16_t n_bytes_per_sector;
+    uint16_t total_sectors_16;
     uint32_t total_sectors_32;
     // fields from FAT32 extended boot record
     uint8_t drive_number;
@@ -161,6 +160,7 @@ struct fat32_bs_info
     // derived fields
     uint32_t first_fat_sector;
     uint32_t first_data_sector;
+    uint32_t total_sectors;
     uint32_t data_sectors;
     uint32_t total_clusters;
 };
@@ -241,14 +241,18 @@ uint32_t fat32_read_fat_table(struct fat32_bs_info *bs_info, uint8_t *buff, uint
 
 /**
  * Iterates over all 32-byte directory entries in a single cluster sector
- * buffer, printing each entry's name, attributes, first cluster, and size.
- * Handles one preceding LFN entry per 8.3 entry (single-fragment LFN only).
- * Stops and returns 1 when FAT32_DIRENT_END is encountered; returns 0
- * after processing all entries in the sector without hitting the end marker.
+ * buffer. Handles multi-fragment LFN entry sequences (any number of LFN
+ * chunks per 8.3 entry). Files and subfolders (excluding "." and "..") are
+ * appended to parent_node; subfolder nodes are recorded in parent_nodes keyed
+ * by their first cluster number for recursive traversal. Stops and returns 1
+ * when FAT32_DIRENT_END is encountered; returns 0 after processing all entries
+ * in the sector without hitting the end marker.
  *
- * @param bs_info: parsed boot sector info (used for entries-per-sector count)
- * @param buff:    512-byte buffer containing the directory cluster sector
+ * @param bs_info:      parsed boot sector info (used for entries-per-sector count)
+ * @param buff:         512-byte buffer containing the directory cluster sector
+ * @param parent_node:  fs_node to attach discovered files and subfolders to
+ * @param parent_nodes: set64 map of first-cluster → fs_node* for subdirectory lookup
  *
  * @return 1 if the end-of-directory marker was found, 0 otherwise
  */
-int fat32_read_cluster(struct fat32_bs_info *bs_info, uint8_t *buff, struct fs_node *root_node);
+int fat32_read_cluster(struct fat32_bs_info *bs_info, uint8_t *buff, struct fs_node *parent_node, struct set64 *parent_nodes);

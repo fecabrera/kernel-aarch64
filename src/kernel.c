@@ -15,6 +15,7 @@
 #include <fs/fat32.h>
 #include <fs/filesystem.h>
 #include <dsa/queue.h>
+#include <dsa/set.h>
 #include "kernel.h"
 
 // static char size_strs[4][10] = {"B", "KiB", "MiB", "GiB"};
@@ -115,9 +116,8 @@ void initialize_ramdisk()
     fat32_parse_boot_sector(buff, bs_info);
 
     printk("volume \"%s\":\r\n", bs_info->volume_label);
-    printk("  size              = %d B\r\n", bs_info->total_sectors_32 * bs_info->n_bytes_per_sector);
+    printk("  size              = %d B\r\n", bs_info->total_sectors * bs_info->n_bytes_per_sector);
     printk("  drive_number      = 0x%02x\r\n", bs_info->drive_number);
-    printk("  table_size        = %d\r\n", bs_info->table_size_32);
     printk("  first_fat_sector  = %d\r\n", bs_info->first_fat_sector);
     printk("  first_data_sector = %d\r\n", bs_info->first_data_sector);
     printk("  root_cluster      = %d\r\n", bs_info->root_cluster);
@@ -162,6 +162,7 @@ void initialize_ramdisk()
 
     printk("copied %d entries to fat table\r\n", i);
 
+    // build linked list
     struct queue64 fat_q;
     queue64_init(&fat_q, 10);
 
@@ -171,37 +172,44 @@ void initialize_ramdisk()
         if (value == FAT32_FAT_ENTRY_RESERVED || value == FAT32_FAT_ENTRY_BAD)
             break;
 
-        queue64_push(&fat_q, i);
+        struct fat32_cluster_chain *chain = (struct fat32_cluster_chain *)kmalloc(sizeof(struct fat32_cluster_chain));
+        chain->start = i;
 
         while (value < FAT32_FAT_ENTRY_EOC && i < bs_info->table_size_32)
-            i++;
+            value = fat_table[++i] & 0x0FFFFFFF;
+
+        chain->end = i;
+        queue64_push(&fat_q, (uintptr_t)chain);
+
+        printk("cluster [%d, %d]\r\n", chain->start, chain->end);
     }
 
-    printk("clusters = [");
-    for (uint32_t i = 0; i < fat_q.length; i++)
-    {
-        uint64_t cluster = queue64_at(&fat_q, i);
-        if (i)
-            printk(",");
-        printk(" %d", cluster);
-    }
-    printk(" ]\r\n");
-
-    // create root node
+    // create root node and a set that stores the parent folders
     struct fs_node *root = fs_create_folder(bs_info->volume_label, strnlen(bs_info->volume_label, 11), 0);
+
+    struct set64 parent_nodes;
+    set64_init(&parent_nodes, 10);
 
     // read directories
     for (uint32_t i = bs_info->root_cluster; i < fat_q.length; i++)
     {
-        uint32_t cluster = queue64_at(&fat_q, i);
+        struct fat32_cluster_chain *chain = (struct fat32_cluster_chain *)queue64_at(&fat_q, i);
 
-        uint32_t j = 0;
-        while (1)
+        uint64_t parent_node_ptr;
+        struct fs_node *parent_node;
+        if (set64_get(&parent_nodes, chain->start, &parent_node_ptr) == 0)
+            parent_node = root;
+        else
+            parent_node = (struct fs_node *)parent_node_ptr;
+
+        if ((parent_node->attrs & FS_NODE_ATTRS_TYPE_MASK) == FS_NODE_ATTRS_TYPE_FILE)
+            continue;
+
+        for (uint32_t j = chain->start; j <= chain->end; j++)
         {
-            cluster += j;
-            uint32_t sector_offset = cluster - bs_info->root_cluster;
+            uint32_t sector_offset = j - bs_info->root_cluster;
 
-            printk("cluster %d (0x%08x):\r\n", cluster, (bs_info->first_data_sector + sector_offset) * bs_info->n_bytes_per_sector);
+            printk("cluster %d (0x%08x):\r\n", j, (bs_info->first_data_sector + sector_offset) * bs_info->n_bytes_per_sector);
 
             status = virtio_mmio_read(slot, bs_info->first_data_sector + sector_offset, buff);
             if (status != VIRTIO_BLK_S_OK)
@@ -213,16 +221,20 @@ void initialize_ramdisk()
                 return;
             }
 
-            if (fat32_read_cluster(bs_info, buff, root) != 0)
+            if (fat32_read_cluster(bs_info, buff, parent_node, &parent_nodes) != 0)
                 break;
-
-            j++;
         }
     }
 
+    // dump tree
     fs_dump_node(root);
 
+    // clean ptrs
+    for (uint32_t i = bs_info->root_cluster; i < fat_q.length; i++)
+        kfree((void *)queue64_at(&fat_q, i));
+
     queue64_destroy(&fat_q);
+    set64_destroy(&parent_nodes);
     kfree(fat_table);
     kfree(buff);
     kfree(bs_info);

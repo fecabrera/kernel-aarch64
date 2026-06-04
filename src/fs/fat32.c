@@ -4,6 +4,8 @@
 #include <string.h>
 #include <ctype.h>
 #include <arch/cpu.h>
+#include <dsa/stack.h>
+#include <dsa/set.h>
 #include <mm/heap.h>
 #include "fat32.h"
 
@@ -65,6 +67,7 @@ void fat32_dump_boot_sector(struct mbr_boot_sector *boot_sector)
     memcpy(&data.n_sectors_per_track, &boot_sector->n_sectors_per_track, 2);
     memcpy(&data.n_heads, &boot_sector->n_heads, 2);
     memcpy(&data.n_hidden_sectors, &boot_sector->n_hidden_sectors, 4);
+    memcpy(&data.total_sectors_16, &boot_sector->total_sectors_16, 4);
     memcpy(&data.total_sectors_32, &boot_sector->total_sectors_32, 4);
     memcpy(&data.mbr_signature_word, &boot_sector->mbr_signature_word, 2);
 
@@ -85,6 +88,7 @@ void fat32_dump_boot_sector(struct mbr_boot_sector *boot_sector)
     dprintk("  n_sectors_per_track     = %d\r\n", _le16(data.n_sectors_per_track));
     dprintk("  n_heads                 = %d\r\n", _le16(data.n_heads));
     dprintk("  n_hidden_sectors        = %d\r\n", _le32(data.n_hidden_sectors));
+    dprintk("  total_sectors_16        = %d\r\n", _le16(data.total_sectors_16));
     dprintk("  total_sectors_32        = %d\r\n", _le32(data.total_sectors_32));
     dprintk("  signature               = %04x\r\n", _le16(data.mbr_signature_word));
 
@@ -226,16 +230,17 @@ void fat32_parse_boot_sector(uint8_t *buff, struct fat32_bs_info *bs_info)
     struct fat32_ext_bs *ext_br = (struct fat32_ext_bs *)bs->boot_code;
 
     // extract volume label from EBR, which is more likely to be human-friendly than the OEM name in the MBR boot sector. Also trim trailing spaces.
-    size_t last_char_idx = strntrimend(bs_info->volume_label, (char *)ext_br->volume_label, 11);
+    strntrimend(bs_info->volume_label, (char *)ext_br->volume_label, 11);
 
     // ARM doesn't like unaligned memory access, so we need to memcpy the fields into local variables before using them
     uint8_t n_fat, n_sectors_per_cluster;
-    uint16_t n_reserved_sectors, n_bytes_per_sector;
+    uint16_t n_reserved_sectors, n_bytes_per_sector, total_sectors_16;
     uint32_t total_sectors_32;
     memcpy(&n_sectors_per_cluster, &bs->n_sectors_per_cluster, 1);
     memcpy(&n_fat, &bs->n_fat, 1);
     memcpy(&n_reserved_sectors, &bs->n_reserved_sectors, 2);
     memcpy(&n_bytes_per_sector, &bs->n_bytes_per_sector, 2);
+    memcpy(&total_sectors_16, &bs->total_sectors_16, 2);
     memcpy(&total_sectors_32, &bs->total_sectors_32, 4);
 
     // extended boot record fields
@@ -246,9 +251,10 @@ void fat32_parse_boot_sector(uint8_t *buff, struct fat32_bs_info *bs_info)
     memcpy(&table_size_32, &ext_br->table_size_32, 4);
 
     // derived fields
+    uint32_t total_sectors = total_sectors_16 == 0 ? total_sectors_32 : total_sectors_16;
     uint32_t first_fat_sector = n_reserved_sectors;
     uint32_t first_data_sector = n_reserved_sectors + (table_size_32 * n_fat);
-    uint32_t data_sectors = total_sectors_32 - first_data_sector;
+    uint32_t data_sectors = total_sectors - first_data_sector;
     uint32_t total_clusters = data_sectors / n_sectors_per_cluster;
 
     // fill the bs_info struct
@@ -256,12 +262,14 @@ void fat32_parse_boot_sector(uint8_t *buff, struct fat32_bs_info *bs_info)
     bs_info->n_sectors_per_cluster = n_sectors_per_cluster;
     bs_info->n_reserved_sectors = n_reserved_sectors;
     bs_info->n_bytes_per_sector = n_bytes_per_sector;
+    bs_info->total_sectors_16 = total_sectors_16;
     bs_info->total_sectors_32 = total_sectors_32;
     bs_info->drive_number = drive_number;
     bs_info->root_cluster = root_cluster;
     bs_info->table_size_32 = table_size_32;
     bs_info->first_fat_sector = first_fat_sector;
     bs_info->first_data_sector = first_data_sector;
+    bs_info->total_sectors = total_sectors;
     bs_info->data_sectors = data_sectors;
     bs_info->total_clusters = total_clusters;
 }
@@ -281,40 +289,72 @@ uint32_t fat32_read_fat_table(struct fat32_bs_info *bs_info, uint8_t *buff, uint
     {
         uint32_t entry_value = _le32(_entry[i]) & 0x0FFFFFFF;
         if (entry_value)
-            dprintk("FAT entry %d: 0x%08x\r\n", offset + i, entry_value);
+            dprintk("  cluster %d: 0x%08x\r\n", offset + i, entry_value);
         _fat_table[i] = entry_value;
     }
 
     return i;
 }
 
-int fat32_read_cluster(struct fat32_bs_info *bs_info, uint8_t *buff, struct fs_node *root_node)
+int fat32_read_cluster(struct fat32_bs_info *bs_info, uint8_t *buff, struct fs_node *parent_node, struct set64 *parent_nodes)
 {
     uint16_t n_entries_per_sector = bs_info->n_bytes_per_sector / 32;
 
     struct fat32_dir_entry *first_entry = (struct fat32_dir_entry *)buff;
     for (int offset = 0; offset < n_entries_per_sector; offset++)
     {
-        struct fat32_lfn_entry *lfn_entry = NULL;
         struct fat32_dir_entry *dir_entry = first_entry + offset;
 
         if ((dir_entry->name[0] == FAT32_DIRENT_END))
             return 1;
 
-        if ((dir_entry->name[0] == FAT32_DIRENT_FREE))
+        if ((dir_entry->name[0] == FAT32_DIRENT_FREE) ||
+            (dir_entry->name[0] == FAT32_ATTR_SYSTEM) ||
+            (dir_entry->name[0] == FAT32_ATTR_VOLUME_ID))
             continue;
 
         printk("entry #%d: \r\n", offset);
 
+        struct stack64 lfn_entries;
+        stack64_init(&lfn_entries, 10);
+
+        // parse lfn entries
         uint8_t attributes;
+        int n_lfn_entries = 0;
+        while (1)
+        {
+            memcpy(&attributes, &dir_entry->attributes, 1);
+
+            if (attributes != FAT32_ATTR_LFN)
+                break;
+
+            offset++;
+            n_lfn_entries++;
+
+            struct fat32_lfn_entry *lfn_entry = (struct fat32_lfn_entry *)dir_entry;
+            stack64_push(&lfn_entries, (uintptr_t)lfn_entry);
+
+            dir_entry = (struct fat32_dir_entry *)dir_entry + 1;
+        }
+
         memcpy(&attributes, &dir_entry->attributes, 1);
 
-        if (attributes == FAT32_ATTR_LFN)
+        char dir_name[12] = {0};
+        char *lfn_dir_name = (char *)kmalloc(n_lfn_entries * 13 + 1);
+
+        strncpy(dir_name, (char *)dir_entry->name, 12);
+
+        // parse lfn name
+        for (int i = 0; i < n_lfn_entries; i++)
         {
-            offset++;
-            lfn_entry = (struct fat32_lfn_entry *)dir_entry;
-            dir_entry = (struct fat32_dir_entry *)dir_entry + 1;
-            memcpy(&attributes, &dir_entry->attributes, 1);
+            struct fat32_lfn_entry *lfn_entry = (struct fat32_lfn_entry *)stack64_pop(&lfn_entries);
+
+            char16_t _lfn_dir_name[26] = {0};
+            memcpy(_lfn_dir_name, lfn_entry->name1, 10);
+            memcpy(_lfn_dir_name + 5, lfn_entry->name2, 12);
+            memcpy(_lfn_dir_name + 11, lfn_entry->name3, 4);
+
+            utf16lencpy(lfn_dir_name + (i * 13), (char16_t *)_lfn_dir_name, 26);
         }
 
         uint16_t cluster_low, cluster_high;
@@ -323,21 +363,9 @@ int fat32_read_cluster(struct fat32_bs_info *bs_info, uint8_t *buff, struct fs_n
         memcpy(&cluster_high, &dir_entry->cluster_high, 2);
         memcpy(&file_size, &dir_entry->file_size, 4);
 
-        char dir_name[12] = {0};
-        char lfn_dir_name[52] = {0};
-        char16_t _lfn_dir_name[26] = {0};
-
-        strncpy(dir_name, (char *)dir_entry->name, 11);
-        if (lfn_entry != NULL)
-        {
-            memcpy(_lfn_dir_name, lfn_entry->name1, 10);
-            memcpy(_lfn_dir_name + 5, lfn_entry->name2, 12);
-            memcpy(_lfn_dir_name + 11, lfn_entry->name3, 4);
-            utf16lencpy(lfn_dir_name, (char16_t *)_lfn_dir_name, 26);
-        }
-
+        // get actual name
         char *name;
-        if (lfn_entry != NULL)
+        if (n_lfn_entries)
         {
             size_t len = strlen(lfn_dir_name);
             name = (char *)kmalloc(len + 1);
@@ -353,25 +381,30 @@ int fat32_read_cluster(struct fat32_bs_info *bs_info, uint8_t *buff, struct fs_n
                 name[name_len] = '\0';
         }
 
+        uint32_t next_cluster = ((uint32_t)_le16(cluster_high) << 16) | _le16(cluster_low);
+
         if (strncmp(name, ".", 2) && strncmp(name, "..", 3))
         {
-            if (attributes & FAT32_ATTR_DIRECTORY)
-                fs_add_subfolder(root_node, name, strlen(name), 0);
-            else
-                fs_add_file_to_folder(root_node, name, strlen(name), 0);
-        }
+            struct fs_node *node;
 
-        uint32_t next_cluster = ((uint32_t)_le16(cluster_high) << 16) | _le16(cluster_low);
+            if (attributes & FAT32_ATTR_DIRECTORY)
+                node = fs_add_subfolder(parent_node, name, strlen(name), 0);
+            else
+                node = fs_add_file_to_folder(parent_node, name, strlen(name), 0);
+
+            set64_set(parent_nodes, next_cluster, (uintptr_t)node);
+        }
 
         printk("  name          = \"%s\"\r\n", name);
         printk("  dir_name      = \"%s\"\r\n", dir_name);
-        if (lfn_entry != NULL)
+        if (n_lfn_entries)
             printk("  lfn_name      = \"%s\"\r\n", lfn_dir_name);
         printk("  attributes    = 0x%02x\r\n", attributes);
         printk("  next_cluster  = %d\r\n", next_cluster);
         printk("  size          = %d B\r\n", _le32(file_size));
         printk("\r\n");
 
+        kfree(lfn_dir_name);
         kfree(name);
     }
 

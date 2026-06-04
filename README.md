@@ -82,7 +82,7 @@ make run
 - Generic in-memory tree of `fs_node` structs; each node carries a heap-allocated name, `attrs` (type + flags), and `next`/`child` pointers.
 - Node types: `FS_NODE_ATTRS_TYPE_FILE`, `FS_NODE_ATTRS_TYPE_FOLDER`; flag bits: `FS_NODE_ATTRS_FLAG_LINK`, `FS_NODE_ATTRS_FLAG_HIDDEN`, `FS_NODE_ATTRS_FLAG_READONLY`.
 - `fs_create_file` / `fs_create_folder` allocate nodes; folders are initialised with "." and ".." children (the ".." child's `child` pointer references its parent).
-- `fs_add_file_to_folder` / `fs_add_subfolder` append to a folder's child list.
+- `fs_add_file_to_folder` / `fs_add_subfolder` append to a folder's child list and return the new node.
 - `fs_node_rename` replaces a node's heap-allocated name in place.
 - `fs_destroy_node` frees a single node (non-recursive).
 - `fs_dump_node` prints the full subtree to the kernel log with path prefixes.
@@ -93,7 +93,9 @@ make run
 - `fat32_is_boot_sector` validates the 0xAA55 signature and EBR sanity fields.
 - `fat32_parse_boot_sector` extracts BPB/EBR fields and computes derived values into `fat32_bs_info`.
 - `fat32_read_fat_table` copies one FAT sector into a flat `uint32_t` array (28-bit masked, compare against `FAT32_FAT_ENTRY_*`).
-- `fat32_read_cluster` iterates directory entries in a sector buffer and populates a caller-supplied `fs_node` root with files and subfolders; skips "." and ".." entries.
+- `fat32_read_cluster` iterates directory entries in a sector buffer; handles multi-fragment LFN sequences (any number of LFN chunks); populates a caller-supplied `fs_node` with files and subfolders; records subfolder nodes in a `set64` map keyed by first cluster for recursive traversal; skips "." and ".." entries.
+- `fat32_cluster_chain` struct pairs a cluster range (`start`/`end`) for FAT chain traversal.
+- `fat32_bs_info` exposes both `total_sectors_16` and `total_sectors_32` (resolved into `total_sectors`) for volumes using the 16-bit sector count field.
 - 8.3 and LFN directory entry structs (`fat32_dir_entry`, `fat32_lfn_entry`) with `FAT32_ATTR_*`, `FAT32_DIRENT_*`, and `FAT32_LFN_*` defines.
 - Packed structs with aligned mirrors for safe field access on AArch64.
 - Dump functions for boot sector, EBR, dir, and LFN entries.

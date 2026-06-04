@@ -49,11 +49,12 @@ kernel.elf: $(OBJS) linker.ld
 kernel.img: kernel.elf
 	$(OBJCOPY) -O binary $< $@
 
-init.img:
+init.img: init/*
 	dd if=/dev/zero of=$@ bs=1M count=100; \
 	mkfs.fat -F 32 $@; \
 	dev=$$(hdiutil attach $@ | grep -o '/Volumes/.*'); \
-	cp -R init/* "$$dev"; \
+	dot_clean -n init; \
+	cp -R $< "$$dev"; \
 	dot_clean -n "$$dev"; \
 	hdiutil detach "$$dev"
 

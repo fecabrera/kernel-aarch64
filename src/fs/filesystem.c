@@ -41,36 +41,34 @@ struct fs_node *fs_create_folder(char *name, size_t name_size, uint16_t attrs)
     return folder;
 }
 
-int fs_add_file_to_folder(struct fs_node *node, char *name, size_t name_size, uint16_t attrs)
+struct fs_node *fs_add_file_to_folder(struct fs_node *node, char *name, size_t name_size, uint16_t attrs)
 {
     if ((node->attrs & FS_NODE_ATTRS_TYPE_MASK) != FS_NODE_ATTRS_TYPE_FOLDER)
     {
         dprintk("[filesystem] Node is not a folder!\r\n");
-        return -1;
+        return NULL;
     }
 
     struct fs_node *current = node->child;
     while (current->next)
         current = current->next;
 
-    current->next = fs_create_file(name, name_size, attrs);
-    return 0;
+    return (current->next = fs_create_file(name, name_size, attrs));
 }
 
-int fs_add_subfolder(struct fs_node *node, char *name, size_t name_size, uint16_t attrs)
+struct fs_node *fs_add_subfolder(struct fs_node *node, char *name, size_t name_size, uint16_t attrs)
 {
     if ((node->attrs & FS_NODE_ATTRS_TYPE_MASK) != FS_NODE_ATTRS_TYPE_FOLDER)
     {
         dprintk("[filesystem] Node is not a folder!\r\n");
-        return -1;
+        return NULL;
     }
 
     struct fs_node *current = node->child;
     while (current->next)
         current = current->next;
 
-    current->next = fs_create_folder(name, name_size, attrs);
-    return 0;
+    return (current->next = fs_create_folder(name, name_size, attrs));
 }
 
 void fs_node_rename(struct fs_node *node, char *name, size_t name_size)

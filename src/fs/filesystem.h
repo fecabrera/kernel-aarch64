@@ -3,7 +3,7 @@
 #include <string.h>
 #include <stdint.h>
 
-#define FS_NODE_ATTRS_TYPE_MASK 3
+#define FS_NODE_ATTRS_TYPE_MASK (1 << 0)
 #define FS_NODE_ATTRS_TYPE_FOLDER 0
 #define FS_NODE_ATTRS_TYPE_FILE 1
 
@@ -69,9 +69,9 @@ struct fs_node *fs_create_folder(char *name, size_t name_size, uint16_t attrs);
  * @param name_size: maximum number of characters to copy from name (excluding null terminator)
  * @param attrs:     attribute flags for the new file (FS_NODE_ATTRS_FLAG_*)
  *
- * @return 0 on success, non-zero if kmalloc failed
+ * @return pointer to the new file node, or NULL if node is not a folder
  */
-int fs_add_file_to_folder(struct fs_node *node, char *name, size_t name_size, uint16_t attrs);
+struct fs_node *fs_add_file_to_folder(struct fs_node *node, char *name, size_t name_size, uint16_t attrs);
 
 /**
  * Creates a new folder node and appends it to the child list of a folder node.
@@ -82,9 +82,9 @@ int fs_add_file_to_folder(struct fs_node *node, char *name, size_t name_size, ui
  * @param name_size: maximum number of characters to copy from name (excluding null terminator)
  * @param attrs:     attribute flags for the new subfolder (FS_NODE_ATTRS_FLAG_*)
  *
- * @return 0 on success, non-zero if kmalloc failed
+ * @return pointer to the new folder node, or NULL if node is not a folder
  */
-int fs_add_subfolder(struct fs_node *node, char *name, size_t name_size, uint16_t attrs);
+struct fs_node *fs_add_subfolder(struct fs_node *node, char *name, size_t name_size, uint16_t attrs);
 
 /**
  * Replaces the name of an existing fs_node with a new name string.
