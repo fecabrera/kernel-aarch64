@@ -31,10 +31,13 @@ void kernel_init()
     heap_init();
     heap_dump();
 
+    // Initialize syscall system
+    syscall_init();
+
     // Initialize interrupts
     gic_init();
-    virtio_mmio_init();
     irq_init();
+    virtio_mmio_init();
     pl011_init();
     pl031_init();
     scheduler_init();

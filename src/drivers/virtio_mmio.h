@@ -177,7 +177,7 @@ typedef struct cpu_context *(*virtio_mmio_handler_t)(int i, struct cpu_context *
  * Scans all 32 virtio MMIO slots, initializes each valid device found
  * (modern version, non-zero device ID), reads its feature words, and
  * registers its IRQ handler with the GIC. Must be called after gic_init
- * and before irq_enable.
+ * and irq_init, and before irq_enable.
  */
 void virtio_mmio_init();
 

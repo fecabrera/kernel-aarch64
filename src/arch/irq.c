@@ -4,13 +4,14 @@
 #include <drivers/timer.h>
 #include <drivers/pl031.h>
 #include <sched/scheduler.h>
+#include <dsa/set.h>
 #include "cpu.h"
 #include "irq.h"
 #include "syscall.h"
 
 extern void vector_table();
 
-irq_handler_t irq_table[NUM_IRQS] = {NULL};
+static struct set64 _irq_table;
 
 static void ctx_dump(struct cpu_context *ctx)
 {
@@ -50,6 +51,8 @@ void irq_init()
         "msr vbar_el1, %0\n"
         "isb\n" // Instruction sync barrier
         ::"r"(vector_table));
+
+    set64_init(&_irq_table, 10);
 }
 
 // ── ESR_EL1 — decode what caused a sync exception ──
@@ -93,11 +96,30 @@ void fiq_handler()
     dprintk("[FIQ]\r\n");
 }
 
+static irq_handler_t _get_irq_handler(uint64_t irq)
+{
+    uintptr_t irq_handler_ptr;
+    if (set64_get(&_irq_table, irq, &irq_handler_ptr) == 1)
+        return (irq_handler_t)irq_handler_ptr;
+    else
+        return NULL;
+}
+
+static void _set_irq_handler(uint64_t irq, irq_handler_t fnc)
+{
+    set64_set(&_irq_table, irq, (uintptr_t)fnc);
+}
+
+static void _remove_irq_handler(uint64_t irq)
+{
+    set64_remove(&_irq_table, irq);
+}
+
 int irq_register_handler(uint32_t irq, irq_handler_t fnc)
 {
-    if (irq_table[irq] == NULL)
+    if (_get_irq_handler(irq) == NULL)
     {
-        irq_table[irq] = fnc;
+        _set_irq_handler(irq, fnc);
         dprintk("[irq] handler registered for IRQ %i, address = 0x%x\r\n", irq, fnc);
         return 0;
     }
@@ -110,14 +132,14 @@ int irq_register_handler(uint32_t irq, irq_handler_t fnc)
 
 int irq_unregister_handler(uint32_t irq)
 {
-    if (irq_table[irq] == NULL)
+    if (_get_irq_handler(irq) == NULL)
     {
         dprintk("[irq] There's no handler registered for IRQ %i!\r\n", irq);
         return -1;
     }
     else
     {
-        irq_table[irq] = NULL;
+        _remove_irq_handler(irq);
         dprintk("[irq] Handler unregistered for IRQ %i!\r\n", irq);
         return 0;
     }
@@ -127,7 +149,7 @@ struct cpu_context *irq_handler(struct cpu_context *ctx)
 {
     // Ask the GIC which interrupt fired (see below)
     uint32_t irq_id = gic_acknowledge();
-    irq_handler_t fnc = irq_table[irq_id];
+    irq_handler_t fnc = _get_irq_handler(irq_id);
 
     if (fnc == NULL)
         dprintk("[irq] Handler not found for IRQ %i!", irq_id);

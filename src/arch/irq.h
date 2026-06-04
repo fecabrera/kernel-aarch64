@@ -63,6 +63,8 @@ typedef struct cpu_context *(*interrupt_handler_t)(struct cpu_context *);
 /**
  * Installs the exception vector table by writing its address to vbar_el1,
  * followed by an ISB to ensure the CPU sees the new table immediately.
+ * Also initializes the internal set64-backed IRQ dispatch table.
+ * Must be called before irq_register_handler or irq_handler.
  */
 void irq_init();
 
@@ -103,7 +105,7 @@ struct cpu_context *sync_handler(struct cpu_context *ctx, uint64_t esr, uint64_t
 
 /**
  * Handles IRQ exceptions. Acknowledges the interrupt from the GIC,
- * dispatches to the registered handler in irq_table, then signals end of interrupt.
+ * dispatches to the registered handler, then signals end of interrupt.
  * Called from the IRQ vector stub in vectors.S with the saved register frame.
  *
  * @param ctx: pointer to the saved cpu_context on the current task's stack

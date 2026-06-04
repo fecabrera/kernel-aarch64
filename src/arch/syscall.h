@@ -17,6 +17,13 @@
 #define SYSCALL_UPTIME 8
 
 /**
+ * Initializes the syscall subsystem.
+ * Must be called before any syscall_register_handler or syscall_handler
+ * invocations. Initializes the internal syscall dispatch table.
+ */
+void syscall_init();
+
+/**
  * Dispatches a syscall based on the number in ctx->x0.
  * Called from sync_handler when ESR_EC_SVC64 is detected.
  *

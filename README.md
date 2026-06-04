@@ -121,9 +121,19 @@ make run
 - `create_process`/`duplicate_process`/`destroy_process` with 16-byte aligned task stacks.
 - Idles via `halt` when the ready queue is empty.
 
+### **IRQ interface**
+
+- IRQ dispatch table backed by a `set64` hash map; `irq_init()` must be called before any handler registration.
+- `irq_register_handler(irq, fnc)` registers a handler for a GIC IRQ ID; returns -1 if one is already registered.
+- `irq_unregister_handler(irq)` removes the handler; returns -1 if none was registered.
+- `sync_handler` decodes ESR_EL1 and dispatches to the syscall handler (SVC64), abort handler (IABT/DABT), or logs unknown exceptions.
+- `irq_handler` acknowledges the interrupt via the GIC, dispatches to the registered handler, then signals end-of-interrupt.
+- Handlers receive and return `struct cpu_context *`; returning a different pointer triggers a context switch.
+
 ### **Syscall interface**
 
-- `svc #0` dispatch table (`syscall_register_handler`).
+- `svc #0` dispatch table backed by a `set64` hash map; `syscall_init()` must be called before any handler registration.
+- `syscall_register_handler` / `syscall_unregister_handler` add and remove handlers at runtime.
 - `syscall_yield()` triggers an immediate context switch.
 - `syscall_exit(status)` terminates the calling process and schedules the next one.
 - `syscall_getpid()` returns the calling process's PID.
@@ -147,7 +157,7 @@ src/
   arch/             — AArch64-specific
     cpu.c/h         — system register accessors (cntpct, cntfrq, cntp, DAIF), SPSR defines, halt/hang
     irq.c/h         — exception handlers, IRQ dispatch table, cpu_context, irq_init
-    syscall.c/h     — syscall dispatch table, syscall_handler, syscall_register_handler, syscall_yield, syscall_exit, syscall_getpid, syscall_waitpid, syscall_fork
+    syscall.c/h     — syscall dispatch table (set64-backed), syscall_init, syscall_handler, syscall_register_handler, syscall_unregister_handler, syscall_yield, syscall_exit, syscall_getpid, syscall_waitpid, syscall_fork
 
   drivers/          — MMIO peripheral drivers
     pl011.c/h       — PL011 UART
