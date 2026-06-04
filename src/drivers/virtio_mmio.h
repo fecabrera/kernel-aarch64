@@ -223,3 +223,17 @@ int virtio_mmio_read(int slot, uint64_t sector_number, uint8_t *data);
  *         or ctx unchanged if no handler is registered
  */
 struct cpu_context *virtio_mmio_irq_handler(int irq, struct cpu_context *ctx);
+
+/**
+ * Reads the FAT32 filesystem on the virtio-blk device at the given slot.
+ * Validates the boot sector signature, parses the BPB, reads the full FAT
+ * table sector-by-sector, builds a cluster chain queue, then recursively
+ * traverses all directories via fat32_read_cluster, populating an fs_node
+ * tree rooted at the volume label.
+ *
+ * @param slot: virtio MMIO slot index of the block device to read
+ *
+ * @return root fs_node of the parsed filesystem tree, or NULL on any I/O
+ *         error, invalid FAT32 signature, or allocation failure.
+ */
+struct fs_node *virtio_mmio_initialize_fat32_device(int slot);

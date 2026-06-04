@@ -313,7 +313,7 @@ int fat32_read_cluster(struct fat32_bs_info *bs_info, uint8_t *buff, struct fs_n
             (dir_entry->name[0] == FAT32_ATTR_VOLUME_ID))
             continue;
 
-        printk("entry #%d: \r\n", offset);
+        dprintk("entry #%d: \r\n", offset);
 
         struct stack64 lfn_entries;
         stack64_init(&lfn_entries, 10);
@@ -395,14 +395,14 @@ int fat32_read_cluster(struct fat32_bs_info *bs_info, uint8_t *buff, struct fs_n
             set64_set(parent_nodes, next_cluster, (uintptr_t)node);
         }
 
-        printk("  name          = \"%s\"\r\n", name);
-        printk("  dir_name      = \"%s\"\r\n", dir_name);
+        dprintk("  name          = \"%s\"\r\n", name);
+        dprintk("  dir_name      = \"%s\"\r\n", dir_name);
         if (n_lfn_entries)
-            printk("  lfn_name      = \"%s\"\r\n", lfn_dir_name);
-        printk("  attributes    = 0x%02x\r\n", attributes);
-        printk("  next_cluster  = %d\r\n", next_cluster);
-        printk("  size          = %d B\r\n", _le32(file_size));
-        printk("\r\n");
+            dprintk("  lfn_name      = \"%s\"\r\n", lfn_dir_name);
+        dprintk("  attributes    = 0x%02x\r\n", attributes);
+        dprintk("  next_cluster  = %d\r\n", next_cluster);
+        dprintk("  size          = %d B\r\n", _le32(file_size));
+        dprintk("\r\n");
 
         kfree(lfn_dir_name);
         kfree(name);

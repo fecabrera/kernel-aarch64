@@ -14,11 +14,7 @@
 #include <sched/scheduler.h>
 #include <fs/fat32.h>
 #include <fs/filesystem.h>
-#include <dsa/queue.h>
-#include <dsa/set.h>
 #include "kernel.h"
-
-// static char size_strs[4][10] = {"B", "KiB", "MiB", "GiB"};
 
 void kernel_init()
 {
@@ -75,172 +71,22 @@ void init()
     printk("[init] child process (pid %i) terminated with status %i\r\n", fork_pid, exit_status);
 
     time_t t0 = syscall_uptime();
-    initialize_ramdisk();
+    int slot = -1;
+    while ((slot = virtio_mmio_find_next_slot(VIRTIO_DEVICE_ID_BLOCK, slot)) != -1)
+    {
+        printk("[init] reading block device in slot %i\r\n", slot);
+
+        struct fs_node *root_node = virtio_mmio_initialize_fat32_device(slot);
+
+        // dump tree
+        if (root_node)
+            fs_dump_node(root_node);
+    }
     time_t t1 = syscall_uptime();
 
     printk("[init] took %dms\r\n", t1 - t0);
 
     syscall_exit(0);
-}
-
-void initialize_ramdisk()
-{
-    int slot = virtio_mmio_find_next_slot(VIRTIO_DEVICE_ID_BLOCK, -1);
-    if (slot < 0)
-    {
-        printk("[init] no block device found!\r\n");
-        return;
-    }
-
-    printk("[init] slot %i\r\n", slot);
-
-    uint8_t *buff = (uint8_t *)kmalloc(512);
-    uint32_t status;
-
-    // read boot sector
-    status = virtio_mmio_read(slot, 0, buff);
-    if (status != VIRTIO_BLK_S_OK)
-    {
-        printk("[init] virtio_mmio_read() returned %i!\r\n", status);
-        kfree(buff);
-        return;
-    }
-
-    // check boot sector signature
-    if (!fat32_is_boot_sector(buff))
-    {
-        printk("[init] not a FAT32 boot sector!\r\n");
-        kfree(buff);
-        return;
-    }
-
-    // parse boot sector
-    struct fat32_bs_info *bs_info = (struct fat32_bs_info *)kmalloc(sizeof(struct fat32_bs_info));
-    fat32_parse_boot_sector(buff, bs_info);
-
-    printk("volume \"%s\":\r\n", bs_info->volume_label);
-    printk("  size              = %d B\r\n", bs_info->total_sectors * bs_info->n_bytes_per_sector);
-    printk("  drive_number      = 0x%02x\r\n", bs_info->drive_number);
-    printk("  first_fat_sector  = %d\r\n", bs_info->first_fat_sector);
-    printk("  first_data_sector = %d\r\n", bs_info->first_data_sector);
-    printk("  root_cluster      = %d\r\n", bs_info->root_cluster);
-    printk("  table_size_32     = %d\r\n", bs_info->table_size_32);
-    printk("  data_sectors      = %d\r\n", bs_info->data_sectors);
-    printk("  total_clusters    = %d\r\n", bs_info->total_clusters);
-    printk("\r\n");
-
-    // read fat table
-    fat_table_entry_t *fat_table = (fat_table_entry_t *)kmalloc(bs_info->table_size_32 * sizeof(fat_table_entry_t));
-    if (fat_table == NULL)
-    {
-        printk("[init] kmalloc() failed for fat_table!\r\n");
-        kfree(buff);
-        kfree(bs_info);
-        return;
-    }
-
-    // parse fat table sector by sector, copying entries into fat_table.
-    // We need to read the FAT32 table one sector at a time because the virtio_mmio_read()
-    // buffer must be 512-byte aligned, and the FAT32 table entries are 4 bytes each so a
-    // sector contains 128 entries.
-    uint16_t n_clusters_per_sector = bs_info->n_bytes_per_sector / 4;
-
-    uint32_t i = 0;
-    while (i < bs_info->table_size_32)
-    {
-        uint32_t sector_offset = i / n_clusters_per_sector;
-
-        status = virtio_mmio_read(slot, bs_info->first_fat_sector + sector_offset, (uint8_t *)buff);
-        if (status != VIRTIO_BLK_S_OK)
-        {
-            printk("[init] virtio_mmio_read() returned %i!\r\n", status);
-            kfree(buff);
-            kfree(fat_table);
-            kfree(bs_info);
-            return;
-        }
-
-        i += fat32_read_fat_table(bs_info, buff, sector_offset, fat_table);
-    }
-
-    printk("copied %d entries to fat table\r\n", i);
-
-    // build linked list
-    struct queue64 fat_q;
-    queue64_init(&fat_q, 10);
-
-    for (uint32_t i = 0; i < bs_info->table_size_32; i++)
-    {
-        uint32_t value = fat_table[i] & 0x0FFFFFFF;
-        if (value == FAT32_FAT_ENTRY_RESERVED || value == FAT32_FAT_ENTRY_BAD)
-            break;
-
-        struct fat32_cluster_chain *chain = (struct fat32_cluster_chain *)kmalloc(sizeof(struct fat32_cluster_chain));
-        chain->start = i;
-
-        while (value < FAT32_FAT_ENTRY_EOC && i < bs_info->table_size_32)
-            value = fat_table[++i] & 0x0FFFFFFF;
-
-        chain->end = i;
-        queue64_push(&fat_q, (uintptr_t)chain);
-
-        printk("cluster [%d, %d]\r\n", chain->start, chain->end);
-    }
-
-    // create root node and a set that stores the parent folders
-    struct fs_node *root = fs_create_folder(bs_info->volume_label, strnlen(bs_info->volume_label, 11), 0);
-
-    struct set64 parent_nodes;
-    set64_init(&parent_nodes, 10);
-
-    // read directories
-    for (uint32_t i = bs_info->root_cluster; i < fat_q.length; i++)
-    {
-        struct fat32_cluster_chain *chain = (struct fat32_cluster_chain *)queue64_at(&fat_q, i);
-
-        uint64_t parent_node_ptr;
-        struct fs_node *parent_node;
-        if (set64_get(&parent_nodes, chain->start, &parent_node_ptr) == 0)
-            parent_node = root;
-        else
-            parent_node = (struct fs_node *)parent_node_ptr;
-
-        if ((parent_node->attrs & FS_NODE_ATTRS_TYPE_MASK) == FS_NODE_ATTRS_TYPE_FILE)
-            continue;
-
-        for (uint32_t j = chain->start; j <= chain->end; j++)
-        {
-            uint32_t sector_offset = j - bs_info->root_cluster;
-
-            printk("cluster %d (0x%08x):\r\n", j, (bs_info->first_data_sector + sector_offset) * bs_info->n_bytes_per_sector);
-
-            status = virtio_mmio_read(slot, bs_info->first_data_sector + sector_offset, buff);
-            if (status != VIRTIO_BLK_S_OK)
-            {
-                printk("[init] virtio_mmio_read() returned %i!\r\n", status);
-                kfree(buff);
-                kfree(fat_table);
-                kfree(bs_info);
-                return;
-            }
-
-            if (fat32_read_cluster(bs_info, buff, parent_node, &parent_nodes) != 0)
-                break;
-        }
-    }
-
-    // dump tree
-    fs_dump_node(root);
-
-    // clean ptrs
-    for (uint32_t i = bs_info->root_cluster; i < fat_q.length; i++)
-        kfree((void *)queue64_at(&fat_q, i));
-
-    queue64_destroy(&fat_q);
-    set64_destroy(&parent_nodes);
-    kfree(fat_table);
-    kfree(buff);
-    kfree(bs_info);
 }
 
 void child()

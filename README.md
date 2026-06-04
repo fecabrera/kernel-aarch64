@@ -63,7 +63,8 @@ make run
 
 ### **ARM generic timer**
 
-- 10ms tick via EL1 physical timer (PPI 30); tracks `initial_ticks` at boot and `ticks` per interrupt via `cntpct_el0`.
+- 10ms tick via EL1 physical timer (PPI 30)
+- Tracks `initial_ticks` at boot and `ticks` per interrupt via `cntpct_el0`.
 - `timer_get_uptime()` returns milliseconds since boot and is used by the scheduler for absolute-timestamp sleep wakeups.
 
 ### **PL031 RTC**
@@ -75,13 +76,17 @@ make run
 - Scans all 32 MMIO slots, validates magic, version, and device ID.
 - Negotiates features, sets up per-slot 64-entry virtqueues (`struct virtq` with desc/avail/used rings).
 - `virtio_mmio_read` submits synchronous block reads via 3-descriptor chains.
+- `virtio_mmio_initialize_fat32_device(slot)` parses the FAT32 filesystem on a block device slot and returns the root `fs_node` tree, or NULL on failure.
 - IRQ handler acks `VIRTIO_INTERRUPT_STATUS`.
 
 ### **Filesystem abstraction**
 
-- Generic in-memory tree of `fs_node` structs; each node carries a heap-allocated name, `attrs` (type + flags), and `next`/`child` pointers.
-- Node types: `FS_NODE_ATTRS_TYPE_FILE`, `FS_NODE_ATTRS_TYPE_FOLDER`; flag bits: `FS_NODE_ATTRS_FLAG_LINK`, `FS_NODE_ATTRS_FLAG_HIDDEN`, `FS_NODE_ATTRS_FLAG_READONLY`.
-- `fs_create_file` / `fs_create_folder` allocate nodes; folders are initialised with "." and ".." children (the ".." child's `child` pointer references its parent).
+- Generic in-memory tree of `fs_node` structs.
+- Each node carries a heap-allocated name, `attrs` (type + flags), and `next`/`child` pointers.
+- Node types: `FS_NODE_ATTRS_TYPE_FILE`, `FS_NODE_ATTRS_TYPE_FOLDER`.
+- Flag bits: `FS_NODE_ATTRS_FLAG_LINK`, `FS_NODE_ATTRS_FLAG_HIDDEN`, `FS_NODE_ATTRS_FLAG_READONLY`.
+- `fs_create_file` / `fs_create_folder` allocate nodes.
+- Folders are initialised with "." and ".." children (the ".." child's `child` pointer references its parent).
 - `fs_add_file_to_folder` / `fs_add_subfolder` append to a folder's child list and return the new node.
 - `fs_node_rename` replaces a node's heap-allocated name in place.
 - `fs_destroy_node` frees a single node (non-recursive).
@@ -109,7 +114,8 @@ make run
 
 ### **Exception handling**
 
-- Full save/restore of all 31 registers + ELR/SPSR; IRQ handlers return `struct cpu_context *` for context switching.
+- Full save/restore of all 31 registers + ELR/SPSR.
+- IRQ handlers return `struct cpu_context *` for context switching.
 - IABT/DABT terminate the faulting process via `exit_handler`.
 - Unknown exceptions dump the full register context.
 
@@ -164,7 +170,7 @@ src/
     gic.c/h         — GIC-400 distributor + CPU interface
     timer.c/h       — ARM generic timer
     pl031.c/h       — PL031 RTC
-    virtio_mmio.c/h — virtio MMIO transport: slot scanning, feature negotiation, virtqueue setup (virtq_desc/virtq_avail/virtq_used), IRQ dispatch
+    virtio_mmio.c/h — virtio MMIO transport: slot scanning, feature negotiation, virtqueue setup (virtq_desc/virtq_avail/virtq_used), IRQ dispatch, virtio_mmio_initialize_fat32_device
 
   mm/               — memory subsystem
     mem.c/h         — reads RAM base/size from DTB at boot
