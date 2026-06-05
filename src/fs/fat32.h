@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <uchar.h>
 #include <dsa/set.h>
+#include <dsa/queue.h>
 #include <fs/filesystem.h>
 
 // Partition type byte
@@ -238,6 +239,18 @@ void fat32_parse_boot_sector(uint8_t *buff, struct fat32_bs_info *bs_info);
  * @return number of entries written into fat_table
  */
 uint32_t fat32_read_fat_table(struct fat32_bs_info *bs_info, uint8_t *buff, uint32_t sector_offset, fat_table_entry_t *fat_table);
+
+/**
+ * Scans the FAT table and groups consecutive cluster entries into
+ * fat32_cluster_chain ranges, appending each to fat_q. RESERVED and BAD
+ * entries are skipped; FREE entries are followed by the while loop until an
+ * EOC is reached. Each chain covers [start, end] inclusive.
+ *
+ * @param bs_info:   parsed boot sector info (used for table_size_32)
+ * @param fat_table: flat array of FAT entries, indexed by cluster number
+ * @param fat_q:     queue to append fat32_cluster_chain pointers into
+ */
+void fat32_build_cluster_chains(struct fat32_bs_info *bs_info, fat_table_entry_t *fat_table, struct queue64 *fat_q);
 
 /**
  * Iterates over all 32-byte directory entries in a single cluster sector

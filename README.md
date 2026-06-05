@@ -89,7 +89,7 @@ make run
 - Folders are initialised with "." and ".." children (the ".." child's `child` pointer references its parent).
 - `fs_add_file_to_folder` / `fs_add_subfolder` append to a folder's child list and return the new node.
 - `fs_node_rename` replaces a node's heap-allocated name in place.
-- `fs_destroy_node` frees a single node (non-recursive).
+- `fs_destroy_node` recursively frees a node and its entire child/next subtree.
 - `fs_dump_node` prints the full subtree to the kernel log with path prefixes.
 
 ### **FAT32**

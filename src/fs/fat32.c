@@ -296,6 +296,27 @@ uint32_t fat32_read_fat_table(struct fat32_bs_info *bs_info, uint8_t *buff, uint
     return i;
 }
 
+void fat32_build_cluster_chains(struct fat32_bs_info *bs_info, fat_table_entry_t *fat_table, struct queue64 *fat_q)
+{
+    for (uint32_t i = 0; i < bs_info->table_size_32; i++)
+    {
+        uint32_t value = fat_table[i] & 0x0FFFFFFF;
+        if (value == FAT32_FAT_ENTRY_RESERVED || value == FAT32_FAT_ENTRY_BAD)
+            continue;
+
+        struct fat32_cluster_chain *chain = (struct fat32_cluster_chain *)kmalloc(sizeof(struct fat32_cluster_chain));
+        chain->start = i;
+
+        while (value < FAT32_FAT_ENTRY_EOC && i < bs_info->table_size_32)
+            value = fat_table[++i] & 0x0FFFFFFF;
+
+        chain->end = i;
+        queue64_push(fat_q, (uintptr_t)chain);
+
+        dprintk("cluster [%d, %d]\r\n", chain->start, chain->end);
+    }
+}
+
 int fat32_read_cluster(struct fat32_bs_info *bs_info, uint8_t *buff, struct fs_node *parent_node, struct set64 *parent_nodes)
 {
     uint16_t n_entries_per_sector = bs_info->n_bytes_per_sector / 32;

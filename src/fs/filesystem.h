@@ -97,9 +97,10 @@ struct fs_node *fs_add_subfolder(struct fs_node *node, char *name, size_t name_s
 void fs_node_rename(struct fs_node *node, char *name, size_t name_size);
 
 /**
- * Frees a previously allocated fs_node. Does not recursively free next or child.
+ * Recursively frees an fs_node and its entire subtree (child and next chains).
+ * Frees the name and the node itself at each level.
  *
- * @param node: pointer to the node to free
+ * @param node: root of the subtree to free
  */
 void fs_destroy_node(struct fs_node *node);
 

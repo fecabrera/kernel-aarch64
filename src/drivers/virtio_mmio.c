@@ -209,18 +209,101 @@ struct cpu_context *virtio_mmio_irq_handler(int irq, struct cpu_context *ctx)
     return fnc(slot, ctx);
 }
 
-struct fs_node *virtio_mmio_initialize_fat32_device(int slot)
+static int64_t _virtio_mmio_fat32_parse_table(int slot, struct fat32_bs_info *bs_info, fat_table_entry_t *fat_table)
+{
+    // allocate buffer
+    uint8_t *buff = (uint8_t *)kmalloc(bs_info->n_bytes_per_sector);
+
+    // parse fat table sector by sector, copying entries into fat_table.
+    uint16_t n_clusters_per_sector = bs_info->n_bytes_per_sector / 4;
+
+    int64_t i = 0;
+    while (i < bs_info->table_size_32)
+    {
+        // We need to read the FAT32 table one sector at a time since the virtio_mmio_read()
+        // buffer must be 512-byte aligned, and the FAT32 table entries are 4 bytes each so a
+        // sector contains 128 entries.
+        uint32_t sector_offset = i / n_clusters_per_sector;
+
+        uint32_t status = virtio_mmio_read(slot, bs_info->first_fat_sector + sector_offset, (uint8_t *)buff);
+        if (status != VIRTIO_BLK_S_OK)
+        {
+            dprintk("[virtio_mmio@%x] virtio_mmio_read() returned %i!\r\n", VIRTIO_MMIO_ADDR(slot), status);
+            kfree(buff);
+            return -1;
+        }
+
+        i += fat32_read_fat_table(bs_info, buff, sector_offset, fat_table);
+    }
+
+    dprintk("copied %d entries to fat table\r\n", i);
+    kfree(buff);
+    return i;
+}
+
+static int _virtio_mmio_fat32_build_fs_tree(int slot, struct fat32_bs_info *bs_info, struct queue64 *fat_q, struct fs_node *root_node)
+{
+    // allocate buffer
+    uint8_t *buff = (uint8_t *)kmalloc(bs_info->n_bytes_per_sector);
+
+    // create set of parent nodes
+    struct set64 parent_nodes;
+    set64_init(&parent_nodes, 10);
+
+    // read directories
+    for (uint32_t i = bs_info->root_cluster; i < fat_q->length; i++)
+    {
+        struct fat32_cluster_chain *chain = (struct fat32_cluster_chain *)queue64_at(fat_q, i);
+
+        uint64_t parent_node_ptr;
+        struct fs_node *parent_node;
+        if (set64_get(&parent_nodes, chain->start, &parent_node_ptr) == 0)
+            parent_node = root_node;
+        else
+            parent_node = (struct fs_node *)parent_node_ptr;
+
+        if ((parent_node->attrs & FS_NODE_ATTRS_TYPE_MASK) == FS_NODE_ATTRS_TYPE_FILE)
+            continue;
+
+        for (uint32_t j = chain->start; j <= chain->end; j++)
+        {
+            uint32_t sector_offset = j - bs_info->root_cluster;
+
+            dprintk("cluster %d (0x%08x):\r\n", j, (bs_info->first_data_sector + sector_offset) * bs_info->n_bytes_per_sector);
+
+            int status = virtio_mmio_read(slot, bs_info->first_data_sector + sector_offset, buff);
+            if (status != VIRTIO_BLK_S_OK)
+            {
+                dprintk("[virtio_mmio@%x] virtio_mmio_read() returned %i!\r\n", VIRTIO_MMIO_ADDR(slot), status);
+
+                kfree(buff);
+                set64_destroy(&parent_nodes);
+
+                return -1;
+            }
+
+            if (fat32_read_cluster(bs_info, buff, parent_node, &parent_nodes) != 0)
+                break;
+        }
+    }
+
+    kfree(buff);
+    set64_destroy(&parent_nodes);
+
+    return 0;
+}
+
+static int _virtio_mmio_fat32_parse_boot_sector(int slot, struct fat32_bs_info *bs_info)
 {
     uint8_t *buff = (uint8_t *)kmalloc(512);
-    uint32_t status;
 
     // read boot sector
-    status = virtio_mmio_read(slot, 0, buff);
+    int status = virtio_mmio_read(slot, 0, buff);
     if (status != VIRTIO_BLK_S_OK)
     {
         dprintk("[virtio_mmio@%x] virtio_mmio_read() returned %i!\r\n", VIRTIO_MMIO_ADDR(slot), status);
         kfree(buff);
-        return NULL;
+        return -1;
     }
 
     // check boot sector signature
@@ -228,11 +311,10 @@ struct fs_node *virtio_mmio_initialize_fat32_device(int slot)
     {
         dprintk("[virtio_mmio@%x] not a FAT32 boot sector!\r\n", VIRTIO_MMIO_ADDR(slot));
         kfree(buff);
-        return NULL;
+        return -1;
     }
 
     // parse boot sector
-    struct fat32_bs_info *bs_info = (struct fat32_bs_info *)kmalloc(sizeof(struct fat32_bs_info));
     fat32_parse_boot_sector(buff, bs_info);
 
     dprintk("volume \"%s\":\r\n", bs_info->volume_label);
@@ -246,105 +328,75 @@ struct fs_node *virtio_mmio_initialize_fat32_device(int slot)
     dprintk("  total_clusters    = %d\r\n", bs_info->total_clusters);
     dprintk("\r\n");
 
-    // read fat table
-    printk("[virtio_mmio@%x] allocating %d bytes for the fat table\r\n", VIRTIO_MMIO_ADDR(slot), bs_info->table_size_32 * sizeof(fat_table_entry_t));
-    fat_table_entry_t *fat_table = (fat_table_entry_t *)kmalloc(bs_info->table_size_32 * sizeof(fat_table_entry_t));
-    if (fat_table == NULL)
+    kfree(buff);
+
+    return 0;
+}
+
+struct fs_node *virtio_mmio_initialize_fat32_device(int slot)
+{
+    int status;
+
+    struct fat32_bs_info *bs_info = (struct fat32_bs_info *)kmalloc(sizeof(struct fat32_bs_info));
+    if (bs_info == NULL)
     {
-        dprintk("[virtio_mmio@%x] kmalloc() failed for fat_table!\r\n", VIRTIO_MMIO_ADDR(slot));
-        kfree(buff);
+        dprintk("[virtio_mmio@%x] kmalloc() failed for bs_info!\r\n", VIRTIO_MMIO_ADDR(slot));
+        return NULL;
+    }
+
+    if ((status = _virtio_mmio_fat32_parse_boot_sector(slot, bs_info)) < 0)
+    {
+        dprintk("[virtio_mmio@%x] _virtio_mmio_fat32_parse_boot_sector() returned %i!\r\n", VIRTIO_MMIO_ADDR(slot), status);
         kfree(bs_info);
         return NULL;
     }
 
-    // parse fat table sector by sector, copying entries into fat_table.
-    // We need to read the FAT32 table one sector at a time because the virtio_mmio_read()
-    // buffer must be 512-byte aligned, and the FAT32 table entries are 4 bytes each so a
-    // sector contains 128 entries.
-    uint16_t n_clusters_per_sector = bs_info->n_bytes_per_sector / 4;
+    // read fat table
+    dprintk("[virtio_mmio@%x] allocating %d bytes for the fat table\r\n", VIRTIO_MMIO_ADDR(slot), bs_info->table_size_32 * sizeof(fat_table_entry_t));
 
-    uint32_t i = 0;
-    while (i < bs_info->table_size_32)
+    fat_table_entry_t *fat_table = (fat_table_entry_t *)kmalloc(bs_info->table_size_32 * sizeof(fat_table_entry_t));
+    if (fat_table == NULL)
     {
-        uint32_t sector_offset = i / n_clusters_per_sector;
-
-        status = virtio_mmio_read(slot, bs_info->first_fat_sector + sector_offset, (uint8_t *)buff);
-        if (status != VIRTIO_BLK_S_OK)
-        {
-            dprintk("[virtio_mmio@%x] virtio_mmio_read() returned %i!\r\n", VIRTIO_MMIO_ADDR(slot), status);
-            kfree(buff);
-            kfree(fat_table);
-            kfree(bs_info);
-            return NULL;
-        }
-
-        i += fat32_read_fat_table(bs_info, buff, sector_offset, fat_table);
+        dprintk("[virtio_mmio@%x] kmalloc() failed for fat_table!\r\n", VIRTIO_MMIO_ADDR(slot));
+        kfree(bs_info);
+        return NULL;
     }
 
-    dprintk("copied %d entries to fat table\r\n", i);
+    if (_virtio_mmio_fat32_parse_table(slot, bs_info, fat_table) < 0)
+    {
+        dprintk("[virtio_mmio@%x] _virtio_mmio_fat32_parse_table() failed for fat_table!\r\n", VIRTIO_MMIO_ADDR(slot));
+
+        kfree(bs_info);
+        kfree(fat_table);
+
+        return NULL;
+    }
 
     // build linked list
     struct queue64 fat_q;
     queue64_init(&fat_q, 10);
 
-    for (uint32_t i = 0; i < bs_info->table_size_32; i++)
-    {
-        uint32_t value = fat_table[i] & 0x0FFFFFFF;
-        if (value == FAT32_FAT_ENTRY_RESERVED || value == FAT32_FAT_ENTRY_BAD)
-            break;
-
-        struct fat32_cluster_chain *chain = (struct fat32_cluster_chain *)kmalloc(sizeof(struct fat32_cluster_chain));
-        chain->start = i;
-
-        while (value < FAT32_FAT_ENTRY_EOC && i < bs_info->table_size_32)
-            value = fat_table[++i] & 0x0FFFFFFF;
-
-        chain->end = i;
-        queue64_push(&fat_q, (uintptr_t)chain);
-
-        dprintk("cluster [%d, %d]\r\n", chain->start, chain->end);
-    }
+    fat32_build_cluster_chains(bs_info, fat_table, &fat_q);
 
     // create root node and a set that stores the parent folders
     struct fs_node *root = fs_create_folder(bs_info->volume_label, strnlen(bs_info->volume_label, 11), 0);
 
-    struct set64 parent_nodes;
-    set64_init(&parent_nodes, 10);
-
-    // read directories
-    for (uint32_t i = bs_info->root_cluster; i < fat_q.length; i++)
+    status = _virtio_mmio_fat32_build_fs_tree(slot, bs_info, &fat_q, root);
+    if (status < 0)
     {
-        struct fat32_cluster_chain *chain = (struct fat32_cluster_chain *)queue64_at(&fat_q, i);
+        dprintk("[virtio_mmio@%x] _virtio_mmio_fat32_build_fs_tree() returned %i!\r\n", VIRTIO_MMIO_ADDR(slot), status);
 
-        uint64_t parent_node_ptr;
-        struct fs_node *parent_node;
-        if (set64_get(&parent_nodes, chain->start, &parent_node_ptr) == 0)
-            parent_node = root;
-        else
-            parent_node = (struct fs_node *)parent_node_ptr;
+        for (uint32_t i = bs_info->root_cluster; i < fat_q.length; i++)
+            kfree((void *)queue64_at(&fat_q, i));
 
-        if ((parent_node->attrs & FS_NODE_ATTRS_TYPE_MASK) == FS_NODE_ATTRS_TYPE_FILE)
-            continue;
+        queue64_destroy(&fat_q);
+        fs_destroy_node(root);
 
-        for (uint32_t j = chain->start; j <= chain->end; j++)
-        {
-            uint32_t sector_offset = j - bs_info->root_cluster;
+        kfree(fat_table);
+        kfree(bs_info);
+        kfree(root);
 
-            dprintk("cluster %d (0x%08x):\r\n", j, (bs_info->first_data_sector + sector_offset) * bs_info->n_bytes_per_sector);
-
-            status = virtio_mmio_read(slot, bs_info->first_data_sector + sector_offset, buff);
-            if (status != VIRTIO_BLK_S_OK)
-            {
-                dprintk("[virtio_mmio@%x] virtio_mmio_read() returned %i!\r\n", VIRTIO_MMIO_ADDR(slot), status);
-                kfree(buff);
-                kfree(fat_table);
-                kfree(bs_info);
-                return NULL;
-            }
-
-            if (fat32_read_cluster(bs_info, buff, parent_node, &parent_nodes) != 0)
-                break;
-        }
+        return NULL;
     }
 
     // clean ptrs
@@ -352,9 +404,8 @@ struct fs_node *virtio_mmio_initialize_fat32_device(int slot)
         kfree((void *)queue64_at(&fat_q, i));
 
     queue64_destroy(&fat_q);
-    set64_destroy(&parent_nodes);
+
     kfree(fat_table);
-    kfree(buff);
     kfree(bs_info);
 
     return root;

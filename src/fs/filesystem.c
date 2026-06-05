@@ -17,6 +17,18 @@ struct fs_node *fs_create_node(char *name, size_t name_size, uint16_t attrs, str
     return node;
 }
 
+void fs_destroy_node(struct fs_node *node)
+{
+    if (node->child)
+        fs_destroy_node(node->child);
+
+    if (node->next)
+        fs_destroy_node(node->next);
+
+    kfree(node->name);
+    kfree(node);
+}
+
 struct fs_node *fs_create_file(char *name, size_t name_size, uint16_t attrs)
 {
     size_t _name_size = strnlen(name, name_size);
@@ -84,12 +96,6 @@ void fs_node_rename(struct fs_node *node, char *name, size_t name_size)
     node->name = _name;
 }
 
-void fs_destroy_node(struct fs_node *node)
-{
-    kfree(node->name);
-    kfree(node);
-}
-
 static void _fs_dump_file(struct fs_node *node, char *prefix)
 {
     if (prefix != NULL)
@@ -118,8 +124,11 @@ static void _fs_dump_node(struct fs_node *node, char *prefix)
 
         struct fs_node *current = node->child;
 
+        // .
         _fs_dump_file(current, _prefix);
         current = current->next;
+
+        // ..
         _fs_dump_file(current, _prefix);
         current = current->next;
 
