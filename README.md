@@ -82,7 +82,7 @@ make run
 ### **Filesystem abstraction**
 
 - Generic in-memory tree of `fs_node` structs.
-- Each node carries a heap-allocated name, `size`, `attrs` (type + flags), and `next`/`child` pointers.
+- Each node carries a heap-allocated name, `size`, `attrs` (type + flags), `data` (driver-private `uint32_t`, e.g. FAT32 first cluster), and `next`/`child` pointers.
 - Node types: `FS_NODE_ATTRS_TYPE_FILE`, `FS_NODE_ATTRS_TYPE_FOLDER`.
 - Flag bits: `FS_NODE_ATTRS_FLAG_LINK`, `FS_NODE_ATTRS_FLAG_HIDDEN`, `FS_NODE_ATTRS_FLAG_READONLY`.
 - `fs_create_file` / `fs_create_folder` allocate nodes; folders are initialized with a "." self-reference.

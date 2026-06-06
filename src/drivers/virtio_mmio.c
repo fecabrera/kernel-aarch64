@@ -382,7 +382,7 @@ struct fs_node *virtio_mmio_initialize_fat32_device(virtio_slot_t slot)
 
     // create folder
     struct fs_node *volumes_root = vfs_get_node("/volumes");
-    struct fs_node *root = fs_add_subfolder(volumes_root, bs_info->volume_label, strnlen(bs_info->volume_label, 11), 0);
+    struct fs_node *root = fs_add_subfolder(volumes_root, bs_info->volume_label, strnlen(bs_info->volume_label, 11), 0, 0);
 
     // build volume name
     char mountpoint[50];

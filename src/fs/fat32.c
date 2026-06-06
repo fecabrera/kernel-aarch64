@@ -409,9 +409,9 @@ int fat32_read_cluster(struct fat32_bs_info *bs_info, uint8_t *buff, struct fs_n
             struct fs_node *node;
 
             if (attributes & FAT32_ATTR_DIRECTORY)
-                node = fs_add_subfolder(parent_node, name, strlen(name), 0);
+                node = fs_add_subfolder(parent_node, name, strlen(name), 0, 0);
             else
-                node = fs_add_file_to_folder(parent_node, name, strlen(name), 0);
+                node = fs_add_file_to_folder(parent_node, name, strlen(name), 0, 0);
 
             set64_set(parent_nodes, next_cluster, (uintptr_t)node);
         }

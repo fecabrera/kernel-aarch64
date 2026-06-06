@@ -20,6 +20,7 @@ struct fs_node
     char *name;
     size_t size;
     uint16_t attrs;
+    uint32_t data;
     struct fs_node *next;
     struct fs_node *child;
 };
@@ -52,12 +53,13 @@ int fs_remove_child(struct fs_node *node, char *name);
  * @param name:      null-terminated name string (duplicated into a heap-allocated buffer)
  * @param name_size: maximum number of characters to copy from name (excluding null terminator)
  * @param attrs:     attribute flags (FS_NODE_ATTRS_TYPE_* combined with FS_NODE_ATTRS_FLAG_*)
+ * @param data:      driver-private value stored in the node's data field (e.g. FAT32 first cluster)
  * @param next:      next sibling node in the directory, or NULL
  * @param child:     first child node (for directories), or NULL
  *
  * @return pointer to the new node, or NULL if kmalloc failed
  */
-struct fs_node *fs_create_node(char *name, size_t name_size, uint16_t attrs, struct fs_node *next, struct fs_node *child);
+struct fs_node *fs_create_node(char *name, size_t name_size, uint16_t attrs, uint32_t data, struct fs_node *next, struct fs_node *child);
 
 /**
  * Allocates and initializes a new fs_node with FS_NODE_ATTRS_TYPE_FILE set.
@@ -66,22 +68,25 @@ struct fs_node *fs_create_node(char *name, size_t name_size, uint16_t attrs, str
  * @param name:      null-terminated name string (duplicated into a heap-allocated buffer)
  * @param name_size: maximum number of characters to copy from name (excluding null terminator)
  * @param attrs:     additional attribute flags (FS_NODE_ATTRS_FLAG_*); type bits are ignored
+ * @param data:      driver-private value stored in the node's data field
  *
  * @return pointer to the new file node, or NULL if kmalloc failed
  */
-struct fs_node *fs_create_file(char *name, size_t name_size, uint16_t attrs);
+struct fs_node *fs_create_file(char *name, size_t name_size, uint16_t attrs, uint32_t data);
 
 /**
  * Allocates and initializes a new fs_node with FS_NODE_ATTRS_TYPE_FOLDER set.
  * Convenience wrapper around fs_create_node with next and child set to NULL.
+ * Automatically adds a "." self-reference child.
  *
  * @param name:      null-terminated name string (duplicated into a heap-allocated buffer)
  * @param name_size: maximum number of characters to copy from name (excluding null terminator)
  * @param attrs:     additional attribute flags (FS_NODE_ATTRS_FLAG_*); type bits are ignored
+ * @param data:      driver-private value stored in the node's data field
  *
  * @return pointer to the new folder node, or NULL if kmalloc failed
  */
-struct fs_node *fs_create_folder(char *name, size_t name_size, uint16_t attrs);
+struct fs_node *fs_create_folder(char *name, size_t name_size, uint16_t attrs, uint32_t data);
 
 /**
  * Appends node to the end of parent's child linked list. Does not check
@@ -100,10 +105,11 @@ void fs_add_to_folder(struct fs_node *parent, struct fs_node *node);
  * @param name:      null-terminated name string for the new file (duplicated into a heap-allocated buffer)
  * @param name_size: maximum number of characters to copy from name (excluding null terminator)
  * @param attrs:     attribute flags for the new file (FS_NODE_ATTRS_FLAG_*)
+ * @param data:      driver-private value stored in the node's data field
  *
  * @return pointer to the new file node, or NULL if node is not a folder
  */
-struct fs_node *fs_add_file_to_folder(struct fs_node *node, char *name, size_t name_size, uint16_t attrs);
+struct fs_node *fs_add_file_to_folder(struct fs_node *node, char *name, size_t name_size, uint16_t attrs, uint32_t data);
 
 /**
  * Creates a new folder node and appends it to the child list of a folder node.
@@ -113,10 +119,11 @@ struct fs_node *fs_add_file_to_folder(struct fs_node *node, char *name, size_t n
  * @param name:      null-terminated name string for the new subfolder (duplicated into a heap-allocated buffer)
  * @param name_size: maximum number of characters to copy from name (excluding null terminator)
  * @param attrs:     attribute flags for the new subfolder (FS_NODE_ATTRS_FLAG_*)
+ * @param data:      driver-private value stored in the node's data field
  *
  * @return pointer to the new folder node, or NULL if node is not a folder
  */
-struct fs_node *fs_add_subfolder(struct fs_node *parent, char *name, size_t name_size, uint16_t attrs);
+struct fs_node *fs_add_subfolder(struct fs_node *parent, char *name, size_t name_size, uint16_t attrs, uint32_t data);
 
 /**
  * Replaces the name of an existing fs_node with a new name string.
