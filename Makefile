@@ -19,7 +19,8 @@ SRCS := $(wildcard \
 		  src/arch/*.c \
 		  src/mm/*.c \
 		  src/sched/*.c \
-		  src/fs/*.c)
+		  src/fs/*.c \
+		  src/io/*.c)
 OBJS := $(patsubst src/%, build/%, $(SRCS:.c=.o))
 OBJS := $(OBJS:.S=.o)
 

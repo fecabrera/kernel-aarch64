@@ -32,7 +32,18 @@ struct fs_node
  *
  * @return pointer to the matching child node, or NULL if not found
  */
-struct fs_node *fs_get_children(struct fs_node *node, char *name);
+struct fs_node *fs_get_child(struct fs_node *node, char *name);
+
+/**
+ * Unlinks the first direct child of node whose name matches name.
+ * Does not free the removed node; the caller is responsible for it.
+ *
+ * @param node: parent folder node to search
+ * @param name: null-terminated name of the child to remove
+ *
+ * @return 0 on success, -1 if no matching child is found
+ */
+int fs_remove_child(struct fs_node *node, char *name);
 
 /**
  * Allocates and initializes a new fs_node on the heap.

@@ -91,8 +91,10 @@ make run
 - `fs_node_rename` replaces a node's heap-allocated name in place.
 - `fs_destroy_node` recursively frees a node and its entire child/next subtree.
 - `fs_dump_node(node, prefix)` recursively prints a subtree to the kernel log with path prefixes; skips recursing into "." and ".." to avoid cycles.
-- `fs_get_children(node, name)` searches a node's direct children by name.
-- VFS mount system (`vfs.h`): `vfs_init` creates a global root tree with a "volumes" subfolder; `vfs_mount(path, node)` resolves the path via `vfs_get_node` and appends the node there; `vfs_unmount` is a stub.
+- `fs_get_child(node, name)` searches a node's direct children by name.
+- `fs_remove_child(node, name)` unlinks a named child from a folder's child list without freeing it.
+- VFS mount system (`vfs.h`): `vfs_init` creates a global root tree with a "volumes" subfolder; `vfs_mount(path, module, data)` registers a mount entry in the internal table (caller creates the node separately); `vfs_unmount(path)` removes the entry, unlinks and destroys the root node.
+- `struct vfs_mount` carries the mountpoint path, root node pointer, `io_module *`, and a `void *data` field for driver-private context (e.g. a `virtio_slot_t`).
 - `vfs_get_node(path)` resolves a slash-delimited absolute path against the global root tree.
 - `vfs_dump_fs` prints the entire VFS tree from the global root.
 
@@ -139,6 +141,14 @@ make run
 - `sync_handler` decodes ESR_EL1 and dispatches to the syscall handler (SVC64), abort handler (IABT/DABT), or logs unknown exceptions.
 - `irq_handler` acknowledges the interrupt via the GIC, dispatches to the registered handler, then signals end-of-interrupt.
 - Handlers receive and return `struct cpu_context *`; returning a different pointer triggers a context switch.
+
+### **I/O module registry**
+
+- Named registry of `io_module` structs backed by a `hashmap64`; `io_init()` must be called before any registration.
+- Each module carries `attrs` (IO_CAN_READ / IO_CAN_WRITE) and `read`/`write` function pointers (`io_handler_t`).
+- `io_register_module(name, attrs, read, write)` allocates and inserts a module; returns -1 if already registered.
+- `io_unregister_module(name)` removes and frees the module; returns -1 if not found.
+- `io_read(name, buf, n)` / `io_write(name, buf, n)` look up the module by name and dispatch to its handler.
 
 ### **Syscall interface**
 
@@ -205,9 +215,12 @@ src/
     scheduler.c/h   — FIFO ready queue (dsa/queue64) and wait queue (dsa/deque64), scheduler_enqueue/dequeue/spawn, context switch via timer and yield/exit/waitpid/fork syscalls
 
   fs/               — filesystem drivers
-    filesystem.c/h  — fs_node tree primitives: fs_get_children, fs_create_node/file/folder, fs_add_file_to_folder, fs_add_subfolder, fs_add_to_folder, fs_node_rename, fs_destroy_node, fs_dump_node
+    filesystem.c/h  — fs_node tree primitives: fs_get_child, fs_remove_child, fs_create_node/file/folder, fs_add_file_to_folder, fs_add_subfolder, fs_add_to_folder, fs_node_rename, fs_destroy_node, fs_dump_node
     vfs.c/h         — VFS mount system: vfs_init, vfs_mount, vfs_unmount, vfs_get_node, vfs_dump_fs; owns the global _fs_root tree
     fat32.c/h       — MBR/BPB structs (packed + aligned mirrors), fat32_bs_info, fat32_is_boot_sector, fat32_parse_boot_sector, fat32_read_fat_table, fat32_read_cluster, 8.3 and LFN dir entry structs, partition type/media descriptor/attribute/LFN defines, dump functions
+
+  io/               — I/O module registry
+    module.c/h      — hashmap64-backed named module registry: io_init, io_register_module, io_unregister_module, io_read, io_write; io_module carries attrs + read/write handlers; io_file pairs a pid with a module
 ```
 
 ## Memory map (QEMU virt)

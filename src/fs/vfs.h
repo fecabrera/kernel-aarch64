@@ -1,6 +1,15 @@
 #pragma once
 
+#include <io/module.h>
 #include "filesystem.h"
+
+struct vfs_mount
+{
+    char *mountpoint;
+    struct fs_node *root;
+    struct io_module *module;
+    void *data;
+};
 
 /**
  * Initializes the VFS subsystem. Creates the global root tree node and adds
@@ -10,29 +19,35 @@
 void vfs_init();
 
 /**
- * Mounts a filesystem node at the given path in the VFS tree. Resolves the
- * mountpoint via vfs_get_node and appends node as a child of that folder.
+ * Registers a mount entry for the given path. Resolves mountpoint via
+ * vfs_get_node, validates it is a folder, then allocates a vfs_mount
+ * struct (storing module and data) and pushes it onto the mount table.
+ * Does not insert any node into the VFS tree; the caller is responsible
+ * for creating the node before mounting.
  *
- * @param mountpoint: null-terminated path of an existing VFS folder (e.g. "/volumes")
- * @param node:       root fs_node of the filesystem to mount
+ * @param mountpoint: null-terminated path of an existing VFS folder (e.g. "/volumes/NO NAME")
+ * @param module:     io_module backing this mount, or NULL
+ * @param data:       driver-private context (e.g. virtio slot cast to void *), or NULL
  *
- * @return 0 on success, -1 if the mountpoint is not found or is not a folder
+ * @return 0 on success, -1 if the mountpoint is not found, -2 if it is not a folder
  */
-int vfs_mount(char *mountpoint, struct fs_node *node);
+int vfs_mount(char *mountpoint, struct io_module *module, void *data);
 
 /**
- * Unmounts the filesystem at the given path. Currently a stub; always returns 0.
+ * Removes the mount entry for mountpoint from the mount table, unlinks the
+ * mount's root node from its parent folder via fs_remove_child, and destroys
+ * the root subtree via fs_destroy_node.
  *
  * @param mountpoint: null-terminated mountpoint path to unmount
  *
- * @return 0
+ * @return 0 on success, -1 if no matching mount entry is found
  */
 int vfs_unmount(char *mountpoint);
 
 /**
  * Resolves a slash-delimited absolute path in the VFS tree, starting from
  * the global root. Each path segment is matched against direct children via
- * fs_get_children, advancing one level per segment.
+ * fs_get_child, advancing one level per segment.
  *
  * @param pathname: null-terminated absolute path (e.g. "/volumes")
  *

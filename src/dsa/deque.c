@@ -124,9 +124,16 @@ struct deque64_entry *deque64_find(struct deque64 *dq, struct deque64_entry *sta
     return NULL;
 }
 
-struct deque64_entry *deque64_find_remove(struct deque64 *dq, struct deque64_entry *start, int (*cmp)(struct deque64_entry *, void *), void *ctx)
+int deque64_find_remove(struct deque64 *dq, struct deque64_entry *start, int (*cmp)(struct deque64_entry *, void *), void *ctx, uint64_t *out)
 {
-    return deque64_remove(dq, deque64_find(dq, start, cmp, ctx));
+    struct deque64_entry *entry = deque64_remove(dq, deque64_find(dq, start, cmp, ctx));
+    if (entry == NULL)
+        return -1;
+
+    *out = entry->value;
+
+    kfree(entry);
+    return 0;
 }
 
 struct deque64_entry *deque64_next(struct deque64 *dq, struct deque64_entry *start)

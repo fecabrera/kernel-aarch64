@@ -108,19 +108,18 @@ struct deque64_entry *deque64_remove(struct deque64 *dq, struct deque64_entry *e
 struct deque64_entry *deque64_find(struct deque64 *dq, struct deque64_entry *start, int (*cmp)(struct deque64_entry *, void *), void *ctx);
 
 /**
- * Finds and unlinks the first entry after start for which cmp returns 0, or
- * returns NULL if none match. start is exclusive: search begins at
- * start->next. If start is NULL, search begins at the head. The caller is
- * responsible for freeing the returned entry.
+ * Finds the first entry after start for which cmp returns 0, writes its value
+ * into *out, unlinks it from the deque, and frees it.
  *
  * @param dq:    deque to search and remove from
  * @param start: entry preceding the search range, or NULL to search from head
  * @param cmp:   comparator called on each entry; return 0 on match
  * @param ctx:   caller context forwarded to each cmp call
+ * @param out:   written with the matched entry's value on success
  *
- * @return pointer to the removed entry, or NULL
+ * @return 0 on success, -1 if no matching entry is found
  */
-struct deque64_entry *deque64_find_remove(struct deque64 *dq, struct deque64_entry *start, int (*cmp)(struct deque64_entry *, void *), void *ctx);
+int deque64_find_remove(struct deque64 *dq, struct deque64_entry *start, int (*cmp)(struct deque64_entry *, void *), void *ctx, uint64_t *out);
 
 /**
  * Returns the entry after start, or the head if start is NULL. Returns NULL

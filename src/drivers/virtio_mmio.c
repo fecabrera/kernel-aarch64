@@ -1,6 +1,7 @@
 #include <debug.h>
 #include <dtb.h>
 #include <string.h>
+#include <stdlib.h>
 #include <arch/syscall.h>
 #include <mm/heap.h>
 #include <fs/fat32.h>
@@ -11,7 +12,7 @@
 #include "gic.h"
 #include "virtio_mmio.h"
 
-static int _irq_to_slot[256] = {0};
+static virtio_slot_t _irq_to_slot[256] = {0};
 static virtio_mmio_handler_t _handlers[32];
 static struct virtio_mmio_device _devices[32] = {0};
 
@@ -126,11 +127,11 @@ static int _virtio_mmio_probe_device(int slot)
 
 void virtio_mmio_init()
 {
-    for (int slot = 0; slot < 32; slot++)
+    for (virtio_slot_t slot = 0; slot < 32; slot++)
         _virtio_mmio_probe_device(slot);
 }
 
-int virtio_mmio_find_next_slot(uint32_t device_id, int start)
+virtio_slot_t virtio_mmio_find_next_slot(uint32_t device_id, int start)
 {
     for (int idx = start + 1; idx < 32; idx++)
         if (_devices[idx].device_id == device_id)
@@ -139,7 +140,7 @@ int virtio_mmio_find_next_slot(uint32_t device_id, int start)
     return -1;
 }
 
-int virtio_mmio_read(int slot, uint64_t sector_number, uint8_t *data)
+int virtio_mmio_read(virtio_slot_t slot, uint64_t sector_number, uint8_t *data)
 {
     struct virtio_mmio_device *device = &_devices[slot];
 
@@ -193,7 +194,7 @@ int virtio_mmio_read(int slot, uint64_t sector_number, uint8_t *data)
 
 struct cpu_context *virtio_mmio_irq_handler(int irq, struct cpu_context *ctx)
 {
-    int slot = _irq_to_slot[irq];
+    virtio_slot_t slot = _irq_to_slot[irq];
     virtio_mmio_handler_t fnc = _handlers[slot];
 
     uint32_t status = VIRTIO_INTERRUPT_STATUS(slot);
@@ -210,7 +211,7 @@ struct cpu_context *virtio_mmio_irq_handler(int irq, struct cpu_context *ctx)
     return fnc(slot, ctx);
 }
 
-static int64_t _virtio_mmio_fat32_parse_table(int slot, struct fat32_bs_info *bs_info, fat_table_entry_t *fat_table)
+static int64_t _virtio_mmio_fat32_parse_table(virtio_slot_t slot, struct fat32_bs_info *bs_info, fat_table_entry_t *fat_table)
 {
     // allocate buffer
     uint8_t *buff = (uint8_t *)kmalloc(bs_info->n_bytes_per_sector);
@@ -242,7 +243,7 @@ static int64_t _virtio_mmio_fat32_parse_table(int slot, struct fat32_bs_info *bs
     return i;
 }
 
-static int _virtio_mmio_fat32_build_fs_tree(int slot, struct fat32_bs_info *bs_info, struct queue64 *fat_q, struct fs_node *root_node)
+static int _virtio_mmio_fat32_build_fs_tree(virtio_slot_t slot, struct fat32_bs_info *bs_info, struct queue64 *fat_q, struct fs_node *root_node)
 {
     // allocate buffer
     uint8_t *buff = (uint8_t *)kmalloc(bs_info->n_bytes_per_sector);
@@ -294,7 +295,7 @@ static int _virtio_mmio_fat32_build_fs_tree(int slot, struct fat32_bs_info *bs_i
     return 0;
 }
 
-static int _virtio_mmio_fat32_parse_boot_sector(int slot, struct fat32_bs_info *bs_info)
+static int _virtio_mmio_fat32_parse_boot_sector(virtio_slot_t slot, struct fat32_bs_info *bs_info)
 {
     uint8_t *buff = (uint8_t *)kmalloc(512);
 
@@ -334,7 +335,7 @@ static int _virtio_mmio_fat32_parse_boot_sector(int slot, struct fat32_bs_info *
     return 0;
 }
 
-struct fs_node *virtio_mmio_initialize_fat32_device(int slot)
+struct fs_node *virtio_mmio_initialize_fat32_device(virtio_slot_t slot)
 {
     int status;
 
@@ -379,9 +380,17 @@ struct fs_node *virtio_mmio_initialize_fat32_device(int slot)
 
     fat32_build_cluster_chains(bs_info, fat_table, &fat_q);
 
-    // create root node and a set that stores the parent folders
-    struct fs_node *root = fs_create_folder(bs_info->volume_label, strnlen(bs_info->volume_label, 11), 0);
-    vfs_mount("/volumes", root);
+    // create folder
+    struct fs_node *volumes_root = vfs_get_node("/volumes");
+    struct fs_node *root = fs_add_subfolder(volumes_root, bs_info->volume_label, strnlen(bs_info->volume_label, 11), 0);
+
+    // build volume name
+    char mountpoint[50];
+    sprintf(mountpoint, "/volumes/%s", bs_info->volume_label);
+
+    // mount
+    printk("[virtio_mmio@%x] mounting \"%s\"\r\n", VIRTIO_MMIO_ADDR(slot), mountpoint);
+    vfs_mount(mountpoint, NULL, NULL);
 
     status = _virtio_mmio_fat32_build_fs_tree(slot, bs_info, &fat_q, root);
     if (status < 0)
@@ -400,6 +409,14 @@ struct fs_node *virtio_mmio_initialize_fat32_device(int slot)
 
         return NULL;
     }
+
+    vfs_dump_fs();
+
+    // unmount
+    printk("[virtio_mmio@%x] unmounting \"%s\"\r\n", VIRTIO_MMIO_ADDR(slot), mountpoint);
+    vfs_unmount(mountpoint);
+
+    vfs_dump_fs();
 
     // clean ptrs
     for (uint32_t i = bs_info->root_cluster; i < fat_q.length; i++)

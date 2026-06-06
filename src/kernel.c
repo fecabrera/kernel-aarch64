@@ -15,6 +15,7 @@
 #include <fs/fat32.h>
 #include <fs/filesystem.h>
 #include <fs/vfs.h>
+#include <io/module.h>
 #include "kernel.h"
 
 void kernel_init()
@@ -42,6 +43,7 @@ void kernel_init()
 
     // initialize file system and I/O
     vfs_init();
+    io_init();
 
     // set up root process
     pid_t pid = scheduler_spawn(&init);
@@ -75,7 +77,7 @@ void init()
     printk("[init] child process (pid %i) terminated with status %i\r\n", fork_pid, exit_status);
 
     time_t t0 = syscall_uptime();
-    int slot = -1;
+    virtio_slot_t slot = -1;
     while ((slot = virtio_mmio_find_next_slot(VIRTIO_DEVICE_ID_BLOCK, slot)) != -1)
     {
         printk("[init] reading block device in slot %i\r\n", slot);
@@ -84,8 +86,6 @@ void init()
     time_t t1 = syscall_uptime();
 
     printk("[init] took %dms\r\n", t1 - t0);
-
-    vfs_dump_fs();
 
     syscall_exit(0);
 }

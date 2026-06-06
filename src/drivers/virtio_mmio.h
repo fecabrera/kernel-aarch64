@@ -124,6 +124,8 @@
 #define VIRTIO_MMIO_QUEUE_NUM_ERROR -5
 #define VIRTIO_MMIO_IRQ_NOT_FOUND -6
 
+typedef int8_t virtio_slot_t;
+
 struct virtq_desc
 {
     uint64_t addr;  // physical address of the buffer
@@ -191,7 +193,7 @@ void virtio_mmio_init();
  *
  * @return slot index of the first matching device, or -1 if none found
  */
-int virtio_mmio_find_next_slot(uint32_t device_id, int start);
+virtio_slot_t virtio_mmio_find_next_slot(uint32_t device_id, int start);
 
 /**
  * Submits a synchronous read request to the virtio-blk device at the given
@@ -207,7 +209,7 @@ int virtio_mmio_find_next_slot(uint32_t device_id, int start);
  *         VIRTIO_BLK_S_UNSUPP on device error, VIRTIO_MMIO_INVALID_DEVICE
  *         if the slot has no initialized device.
  */
-int virtio_mmio_read(int slot, uint64_t sector_number, uint8_t *data);
+int virtio_mmio_read(virtio_slot_t slot, uint64_t sector_number, uint8_t *data);
 
 /**
  * IRQ handler for virtio MMIO device interrupts. Maps the IRQ ID to its
@@ -228,13 +230,13 @@ struct cpu_context *virtio_mmio_irq_handler(int irq, struct cpu_context *ctx);
  * Reads the FAT32 filesystem on the virtio-blk device at the given slot.
  * Validates the boot sector signature, parses the BPB, reads the full FAT
  * table sector-by-sector, builds a cluster chain queue, then recursively
- * traverses all directories via fat32_read_cluster, populating an fs_node
- * tree rooted at the volume label. Mounts the root node at "/volumes" via
- * vfs_mount as a side effect.
+ * traverses all directories via fat32_read_cluster. Creates the volume as a
+ * subfolder of "/volumes" and registers a mount entry via vfs_mount at
+ * "/volumes/<label>".
  *
  * @param slot: virtio MMIO slot index of the block device to read
  *
  * @return root fs_node of the parsed filesystem tree, or NULL on any I/O
  *         error, invalid FAT32 signature, or allocation failure.
  */
-struct fs_node *virtio_mmio_initialize_fat32_device(int slot);
+struct fs_node *virtio_mmio_initialize_fat32_device(virtio_slot_t slot);

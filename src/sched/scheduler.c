@@ -146,7 +146,7 @@ struct cpu_context *yield_handler(struct cpu_context *ctx)
     return scheduler_handler(ctx, 0);
 }
 
-static int _pid_eq(struct deque64_entry *entry, void *pid)
+static int _wait_pid_eq(struct deque64_entry *entry, void *pid)
 {
     struct process *proc = (struct process *)entry->value;
     pid_t value = *(pid_t *)pid;
@@ -170,14 +170,11 @@ static void _notify_waiter(struct process *proc, int64_t exit_status)
 
 static void _notify_waiters(pid_t pid, int64_t exit_status)
 {
-    struct deque64_entry *entry = NULL;
     dprintk("[scheduler] _notify_waiters(), exit_status = %i\r\n", exit_status);
 
-    while ((entry = deque64_find_remove(&waitpid_queue, entry, &_pid_eq, &pid)))
-    {
-        _notify_waiter((struct process *)entry->value, exit_status);
-        kfree(entry);
-    }
+    uint64_t value;
+    while (deque64_find_remove(&waitpid_queue, NULL, &_wait_pid_eq, &pid, &value) == 0)
+        _notify_waiter((struct process *)value, exit_status);
 }
 
 struct cpu_context *exit_handler(struct cpu_context *ctx)

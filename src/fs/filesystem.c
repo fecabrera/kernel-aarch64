@@ -5,7 +5,7 @@
 #include <arch/cpu.h>
 #include "filesystem.h"
 
-struct fs_node *fs_get_children(struct fs_node *node, char *name)
+struct fs_node *fs_get_child(struct fs_node *node, char *name)
 {
     struct fs_node *current = node->child;
     while (current)
@@ -16,6 +16,28 @@ struct fs_node *fs_get_children(struct fs_node *node, char *name)
         current = current->next;
     }
     return NULL;
+}
+
+int fs_remove_child(struct fs_node *node, char *name)
+{
+    struct fs_node *prev = NULL;
+    struct fs_node *current = node->child;
+    while (current)
+    {
+        if (strcmp(current->name, name) == 0)
+        {
+            if (prev)
+                prev->next = current->next;
+            else
+                node->child = current->next;
+
+            return 0;
+        }
+
+        prev = current;
+        current = current->next;
+    }
+    return -1;
 }
 
 struct fs_node *fs_create_node(char *name, size_t name_size, uint16_t attrs, struct fs_node *next, struct fs_node *child)
@@ -35,7 +57,10 @@ struct fs_node *fs_create_node(char *name, size_t name_size, uint16_t attrs, str
 
 void fs_destroy_node(struct fs_node *node)
 {
-    if (node->child)
+    if (node == NULL)
+        return;
+
+    if (strcmp(node->name, ".") != 0 && strcmp(node->name, "..") != 0 && node->child)
         fs_destroy_node(node->child);
 
     if (node->next)
