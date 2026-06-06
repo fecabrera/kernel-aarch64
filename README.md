@@ -60,6 +60,7 @@ make run
 ### **PL011 UART**
 
 - Interrupt-driven RX, polled TX, 115200 8N1.
+- `pl011_read_input` handles escape sequences for arrow keys (ESC `[` A/B/C/D) and maps CR/DEL/LF to their terminal equivalents.
 
 ### **ARM generic timer**
 
@@ -82,7 +83,7 @@ make run
 ### **Filesystem abstraction**
 
 - Generic in-memory tree of `fs_node` structs.
-- Each node carries a heap-allocated name, `size`, `attrs` (type + flags), `data` (driver-private `uint32_t`, e.g. FAT32 first cluster), and `next`/`child` pointers.
+- Each node carries a heap-allocated name, `size`, `attrs` (type + flags), `data` (driver-private `uint64_t` — stores a pointer or integer; e.g. `fat32_entry_reference *` for FAT32 nodes), and `next`/`child` pointers.
 - Node types: `FS_NODE_ATTRS_TYPE_FILE`, `FS_NODE_ATTRS_TYPE_FOLDER`.
 - Flag bits: `FS_NODE_ATTRS_FLAG_LINK`, `FS_NODE_ATTRS_FLAG_HIDDEN`, `FS_NODE_ATTRS_FLAG_READONLY`.
 - `fs_create_file` / `fs_create_folder` allocate nodes; folders are initialized with a "." self-reference.
@@ -93,7 +94,7 @@ make run
 - `fs_dump_node(node, prefix)` recursively prints a subtree to the kernel log with path prefixes; skips recursing into "." and ".." to avoid cycles.
 - `fs_get_child(node, name)` searches a node's direct children by name.
 - `fs_remove_child(node, name)` unlinks a named child from a folder's child list without freeing it.
-- VFS mount system (`vfs.h`): `vfs_init` creates a global root tree with a "volumes" subfolder; `vfs_mount(path, module, data)` registers a mount entry in the internal table (caller creates the node separately); `vfs_unmount(path)` removes the entry, unlinks and destroys the root node.
+- VFS mount system (`vfs.h`): `vfs_init` creates a global root tree with a "volumes" subfolder; `vfs_create_mountpoint(path, module, data)` registers a mount entry in the internal table (caller creates the node separately); `vfs_destroy_mountpoint(path)` removes the entry, unlinks and destroys the root node.
 - `struct vfs_mount` carries the mountpoint path, root node pointer, `io_module *`, and a `void *data` field for driver-private context (e.g. a `virtio_slot_t`).
 - `vfs_get_node(path)` resolves a slash-delimited absolute path against the global root tree.
 - `vfs_dump_fs` prints the entire VFS tree from the global root.
@@ -104,7 +105,8 @@ make run
 - `fat32_is_boot_sector` validates the 0xAA55 signature and EBR sanity fields.
 - `fat32_parse_boot_sector` extracts BPB/EBR fields and computes derived values into `fat32_bs_info`.
 - `fat32_read_fat_table` copies one FAT sector into a flat `uint32_t` array (28-bit masked, compare against `FAT32_FAT_ENTRY_*`).
-- `fat32_read_cluster` iterates directory entries in a sector buffer; handles multi-fragment LFN sequences (any number of LFN chunks); populates a caller-supplied `fs_node` with files and subfolders; records subfolder nodes in a `set64` map keyed by first cluster for recursive traversal; skips "." and ".." entries.
+- `fat32_entry_reference` records a directory entry's on-disk location (cluster number + offset within the sector) and is stored in each `fs_node`'s `data` field.
+- Directory cluster parsing is handled inside the virtio MMIO driver (`_virtio_mmio_fat32_read_cluster`); handles multi-fragment LFN sequences, populates an `fs_node` tree, and records subfolder nodes in a `set64` map for recursive traversal.
 - `fat32_cluster_chain` struct pairs a cluster range (`start`/`end`) for FAT chain traversal.
 - `fat32_bs_info` exposes both `total_sectors_16` and `total_sectors_32` (resolved into `total_sectors`) for volumes using the 16-bit sector count field.
 - 8.3 and LFN directory entry structs (`fat32_dir_entry`, `fat32_lfn_entry`) with `FAT32_ATTR_*`, `FAT32_DIRENT_*`, and `FAT32_LFN_*` defines.
@@ -216,8 +218,8 @@ src/
 
   fs/               — filesystem drivers
     filesystem.c/h  — fs_node tree primitives: fs_get_child, fs_remove_child, fs_create_node/file/folder, fs_add_file_to_folder, fs_add_subfolder, fs_add_to_folder, fs_node_rename, fs_destroy_node, fs_dump_node
-    vfs.c/h         — VFS mount system: vfs_init, vfs_mount, vfs_unmount, vfs_get_node, vfs_dump_fs; owns the global _fs_root tree
-    fat32.c/h       — MBR/BPB structs (packed + aligned mirrors), fat32_bs_info, fat32_is_boot_sector, fat32_parse_boot_sector, fat32_read_fat_table, fat32_read_cluster, 8.3 and LFN dir entry structs, partition type/media descriptor/attribute/LFN defines, dump functions
+    vfs.c/h         — VFS mount system: vfs_init, vfs_create_mountpoint, vfs_destroy_mountpoint, vfs_get_node, vfs_dump_fs; owns the global _fs_root tree
+    fat32.c/h       — MBR/BPB structs (packed + aligned mirrors), fat32_bs_info, fat32_entry_reference, fat32_is_boot_sector, fat32_parse_boot_sector, fat32_read_fat_table, fat32_build_cluster_chains, 8.3 and LFN dir entry structs, partition type/media descriptor/attribute/LFN defines, dump functions
 
   io/               — I/O module registry
     module.c/h      — hashmap64-backed named module registry: io_init, io_register_module, io_unregister_module, io_read, io_write; io_module carries attrs + read/write handlers; io_file pairs a pid with a module

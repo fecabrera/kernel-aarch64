@@ -40,12 +40,13 @@ int fs_remove_child(struct fs_node *node, char *name)
     return -1;
 }
 
-struct fs_node *fs_create_node(char *name, size_t name_size, uint16_t attrs, uint32_t data, struct fs_node *next, struct fs_node *child)
+struct fs_node *fs_create_node(char *name, size_t name_size, uint16_t attrs, uint64_t data, struct fs_node *next, struct fs_node *child)
 {
     struct fs_node *node = (struct fs_node *)kmalloc(sizeof(struct fs_node));
 
     node->name = NULL;
     node->attrs = attrs;
+    node->data = data;
     node->next = next;
     node->child = child;
 
@@ -86,7 +87,7 @@ static struct fs_node *_fs_create_parent_ref(struct fs_node *parent, struct fs_n
     return parent_ref;
 }
 
-struct fs_node *fs_create_file(char *name, size_t name_size, uint16_t attrs, uint32_t data)
+struct fs_node *fs_create_file(char *name, size_t name_size, uint16_t attrs, uint64_t data)
 {
     size_t _name_size = strnlen(name, name_size);
     uint16_t _attrs = (attrs & FS_NODE_ATTRS_FLAG_MASK) | FS_NODE_ATTRS_TYPE_FILE;
@@ -94,7 +95,7 @@ struct fs_node *fs_create_file(char *name, size_t name_size, uint16_t attrs, uin
     return fs_create_node(name, _name_size, _attrs, data, NULL, NULL);
 }
 
-struct fs_node *fs_create_folder(char *name, size_t name_size, uint16_t attrs, uint32_t data)
+struct fs_node *fs_create_folder(char *name, size_t name_size, uint16_t attrs, uint64_t data)
 {
     size_t _name_size = 0;
     if (name)
@@ -122,7 +123,7 @@ void fs_add_to_folder(struct fs_node *parent, struct fs_node *node)
         parent->child = node;
 }
 
-struct fs_node *fs_add_file_to_folder(struct fs_node *parent, char *name, size_t name_size, uint16_t attrs, uint32_t data)
+struct fs_node *fs_add_file_to_folder(struct fs_node *parent, char *name, size_t name_size, uint16_t attrs, uint64_t data)
 {
     if ((parent->attrs & FS_NODE_ATTRS_TYPE_MASK) != FS_NODE_ATTRS_TYPE_FOLDER)
     {
@@ -135,7 +136,7 @@ struct fs_node *fs_add_file_to_folder(struct fs_node *parent, char *name, size_t
     return file;
 }
 
-struct fs_node *fs_add_subfolder(struct fs_node *parent, char *name, size_t name_size, uint16_t attrs, uint32_t data)
+struct fs_node *fs_add_subfolder(struct fs_node *parent, char *name, size_t name_size, uint16_t attrs, uint64_t data)
 {
     if ((parent->attrs & FS_NODE_ATTRS_TYPE_MASK) != FS_NODE_ATTRS_TYPE_FOLDER)
     {

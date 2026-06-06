@@ -168,6 +168,14 @@ struct fat32_bs_info
 
 typedef uint32_t fat_table_entry_t; // bitfield: see FAT_TABLE_ENTRY_TYPE_* and FAT_TABLE_ENTRY_MASK_*
 
+// Locates a directory entry on disk: the cluster it lives in and its index
+// within that cluster's sector buffer (0-based, relative to the sector start).
+struct fat32_entry_reference
+{
+    uint32_t cluster;
+    uint32_t offset;
+};
+
 /**
  * Prints all BPB fields of the MBR boot sector to the kernel log via printk.
  * Reads multi-byte fields with memcpy to avoid alignment faults.
@@ -251,21 +259,3 @@ uint32_t fat32_read_fat_table(struct fat32_bs_info *bs_info, uint8_t *buff, uint
  * @param fat_q:     queue to append fat32_cluster_chain pointers into
  */
 void fat32_build_cluster_chains(struct fat32_bs_info *bs_info, fat_table_entry_t *fat_table, struct queue64 *fat_q);
-
-/**
- * Iterates over all 32-byte directory entries in a single cluster sector
- * buffer. Handles multi-fragment LFN entry sequences (any number of LFN
- * chunks per 8.3 entry). Files and subfolders (excluding "." and "..") are
- * appended to parent_node; subfolder nodes are recorded in parent_nodes keyed
- * by their first cluster number for recursive traversal. Stops and returns 1
- * when FAT32_DIRENT_END is encountered; returns 0 after processing all entries
- * in the sector without hitting the end marker.
- *
- * @param bs_info:      parsed boot sector info (used for entries-per-sector count)
- * @param buff:         512-byte buffer containing the directory cluster sector
- * @param parent_node:  fs_node to attach discovered files and subfolders to
- * @param parent_nodes: set64 map of first-cluster → fs_node* for subdirectory lookup
- *
- * @return 1 if the end-of-directory marker was found, 0 otherwise
- */
-int fat32_read_cluster(struct fat32_bs_info *bs_info, uint8_t *buff, struct fs_node *parent_node, struct set64 *parent_nodes);

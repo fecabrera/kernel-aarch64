@@ -85,9 +85,10 @@
 #define PL011_DR_DATA_MASK 0xFF
 
 // ASCII control characters
-#define ASCII_TAB 0x09
-#define ASCII_ENTER 0x0D
-#define ASCII_BACKSPACE 0x7F
+#define ASCII_LF 0x09  // Line Feed
+#define ASCII_CR 0x0D  // Carriage Return
+#define ASCII_ESC 0x1B // Escape
+#define ASCII_DEL 0x7F // Delete
 
 #define RX_BUF_SIZE 1024
 
@@ -128,6 +129,13 @@ void pl011_puts(const char *s);
  * unmasks RX interrupts, and registers the IRQ with the GIC.
  */
 void pl011_init();
+
+/**
+ * Drains the RX FIFO, handling escape sequences for arrow keys (ESC [ A/B/C/D)
+ * and control characters (CR → newline, DEL → backspace, LF → tab).
+ * Printable characters are echoed directly via pl011_putc.
+ */
+void pl011_read_input();
 
 /**
  * IRQ handler for UART RX and receive-timeout interrupts.

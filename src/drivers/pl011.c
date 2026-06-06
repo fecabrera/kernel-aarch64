@@ -1,6 +1,7 @@
 #include <dtb.h>
 #include <debug.h>
 #include <stdlib.h>
+#include <ctype.h>
 #include <arch/irq.h>
 #include "pl011.h"
 #include "gic.h"
@@ -74,29 +75,71 @@ void pl011_init()
     }
 }
 
-struct cpu_context *pl011_irq_handler(__attribute__((unused)) int irq, struct cpu_context *ctx)
+void pl011_read_input()
 {
+    int8_t _escape = 0, _arrow = 0;
+
     // Read all available bytes (RX or timeout interrupt)
     while (!(PL011_FR & PL011_FR_RXFE))
     {
-        uint32_t uat_dr = PL011_DR;
-        uint8_t c = (uint8_t)(uat_dr & PL011_DR_DATA_MASK);
+        uint32_t uart_dr = PL011_DR;                         // read data register
+        uint8_t c = (uint8_t)(uart_dr & PL011_DR_DATA_MASK); // mask value
+
+        if (_escape)
+        {
+            _escape = 0;
+
+            if (c == '[')
+            {
+                _arrow = 1;
+                continue;
+            }
+        }
+
+        if (_arrow)
+        {
+            _arrow = 0;
+
+            switch (c)
+            {
+            case 'A':
+                pl011_puts("[up]");
+                continue;
+            case 'B':
+                pl011_puts("[down]");
+                continue;
+            case 'C':
+                pl011_puts("[right]");
+                continue;
+            case 'D':
+                pl011_puts("[left]");
+                continue;
+            }
+        }
 
         switch (c)
         {
-        case ASCII_ENTER:
+        case ASCII_ESC:
+            _escape = 1; // set escape
+            break;
+        case ASCII_CR:
             pl011_puts("\r\n");
             break;
-        case ASCII_BACKSPACE:
+        case ASCII_DEL:
             pl011_puts("\b \b");
             break;
-        case ASCII_TAB:
+        case ASCII_LF:
             pl011_puts("\t");
             break;
         default:
             pl011_putc(c);
         }
     }
+}
+
+struct cpu_context *pl011_irq_handler(__attribute__((unused)) int irq, struct cpu_context *ctx)
+{
+    pl011_read_input();
 
     // Clear the interrupt flags we handled
     PL011_ICR = PL011_INT_RX | PL011_INT_RT;

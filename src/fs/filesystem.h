@@ -19,8 +19,8 @@ struct fs_node
 {
     char *name;
     size_t size;
+    uint64_t data;
     uint16_t attrs;
-    uint32_t data;
     struct fs_node *next;
     struct fs_node *child;
 };
@@ -59,7 +59,7 @@ int fs_remove_child(struct fs_node *node, char *name);
  *
  * @return pointer to the new node, or NULL if kmalloc failed
  */
-struct fs_node *fs_create_node(char *name, size_t name_size, uint16_t attrs, uint32_t data, struct fs_node *next, struct fs_node *child);
+struct fs_node *fs_create_node(char *name, size_t name_size, uint16_t attrs, uint64_t data, struct fs_node *next, struct fs_node *child);
 
 /**
  * Allocates and initializes a new fs_node with FS_NODE_ATTRS_TYPE_FILE set.
@@ -72,7 +72,7 @@ struct fs_node *fs_create_node(char *name, size_t name_size, uint16_t attrs, uin
  *
  * @return pointer to the new file node, or NULL if kmalloc failed
  */
-struct fs_node *fs_create_file(char *name, size_t name_size, uint16_t attrs, uint32_t data);
+struct fs_node *fs_create_file(char *name, size_t name_size, uint16_t attrs, uint64_t data);
 
 /**
  * Allocates and initializes a new fs_node with FS_NODE_ATTRS_TYPE_FOLDER set.
@@ -86,7 +86,7 @@ struct fs_node *fs_create_file(char *name, size_t name_size, uint16_t attrs, uin
  *
  * @return pointer to the new folder node, or NULL if kmalloc failed
  */
-struct fs_node *fs_create_folder(char *name, size_t name_size, uint16_t attrs, uint32_t data);
+struct fs_node *fs_create_folder(char *name, size_t name_size, uint16_t attrs, uint64_t data);
 
 /**
  * Appends node to the end of parent's child linked list. Does not check
@@ -109,7 +109,7 @@ void fs_add_to_folder(struct fs_node *parent, struct fs_node *node);
  *
  * @return pointer to the new file node, or NULL if node is not a folder
  */
-struct fs_node *fs_add_file_to_folder(struct fs_node *node, char *name, size_t name_size, uint16_t attrs, uint32_t data);
+struct fs_node *fs_add_file_to_folder(struct fs_node *node, char *name, size_t name_size, uint16_t attrs, uint64_t data);
 
 /**
  * Creates a new folder node and appends it to the child list of a folder node.
@@ -123,7 +123,7 @@ struct fs_node *fs_add_file_to_folder(struct fs_node *node, char *name, size_t n
  *
  * @return pointer to the new folder node, or NULL if node is not a folder
  */
-struct fs_node *fs_add_subfolder(struct fs_node *parent, char *name, size_t name_size, uint16_t attrs, uint32_t data);
+struct fs_node *fs_add_subfolder(struct fs_node *parent, char *name, size_t name_size, uint16_t attrs, uint64_t data);
 
 /**
  * Replaces the name of an existing fs_node with a new name string.

@@ -31,7 +31,7 @@ void vfs_init();
  *
  * @return 0 on success, -1 if the mountpoint is not found, -2 if it is not a folder
  */
-int vfs_mount(char *mountpoint, struct io_module *module, void *data);
+int vfs_create_mountpoint(char *mountpoint, struct io_module *module, void *data);
 
 /**
  * Removes the mount entry for mountpoint from the mount table, unlinks the
@@ -42,7 +42,7 @@ int vfs_mount(char *mountpoint, struct io_module *module, void *data);
  *
  * @return 0 on success, -1 if no matching mount entry is found
  */
-int vfs_unmount(char *mountpoint);
+int vfs_destroy_mountpoint(char *mountpoint);
 
 /**
  * Resolves a slash-delimited absolute path in the VFS tree, starting from

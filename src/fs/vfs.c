@@ -12,7 +12,7 @@ void vfs_init()
     fs_add_subfolder(_fs_root, "volumes", 7, 0, 0);
 }
 
-int vfs_mount(char *mountpoint, struct io_module *module, void *data)
+int vfs_create_mountpoint(char *mountpoint, struct io_module *module, void *data)
 {
     struct fs_node *mp_node = vfs_get_node(mountpoint);
     if (mp_node == NULL)
@@ -46,7 +46,7 @@ static int _vfs_mount_mp_eq(struct deque64_entry *entry, void *mountpoint)
     return strcmp(mount->mountpoint, (char *)mountpoint);
 }
 
-int vfs_unmount(char *mountpoint)
+int vfs_destroy_mountpoint(char *mountpoint)
 {
     uint64_t value;
     if (deque64_find_remove(&_vfs_mp_table, NULL, &_vfs_mount_mp_eq, mountpoint, &value) != 0)
