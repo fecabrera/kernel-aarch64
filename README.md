@@ -76,21 +76,25 @@ make run
 - Scans all 32 MMIO slots, validates magic, version, and device ID.
 - Negotiates features, sets up per-slot 64-entry virtqueues (`struct virtq` with desc/avail/used rings).
 - `virtio_mmio_read` submits synchronous block reads via 3-descriptor chains.
-- `virtio_mmio_initialize_fat32_device(slot)` parses the FAT32 filesystem on a block device slot and returns the root `fs_node` tree, or NULL on failure.
+- `virtio_mmio_initialize_fat32_device(slot)` parses the FAT32 filesystem on a block device slot, mounts the root node at `/volumes` via `fs_mount`, and returns the root `fs_node` tree, or NULL on failure.
 - IRQ handler acks `VIRTIO_INTERRUPT_STATUS`.
 
 ### **Filesystem abstraction**
 
 - Generic in-memory tree of `fs_node` structs.
-- Each node carries a heap-allocated name, `attrs` (type + flags), and `next`/`child` pointers.
+- Each node carries a heap-allocated name, `size`, `attrs` (type + flags), and `next`/`child` pointers.
 - Node types: `FS_NODE_ATTRS_TYPE_FILE`, `FS_NODE_ATTRS_TYPE_FOLDER`.
 - Flag bits: `FS_NODE_ATTRS_FLAG_LINK`, `FS_NODE_ATTRS_FLAG_HIDDEN`, `FS_NODE_ATTRS_FLAG_READONLY`.
-- `fs_create_file` / `fs_create_folder` allocate nodes.
-- Folders are initialised with "." and ".." children (the ".." child's `child` pointer references its parent).
-- `fs_add_file_to_folder` / `fs_add_subfolder` append to a folder's child list and return the new node.
+- `fs_create_file` / `fs_create_folder` allocate nodes; folders are initialized with a "." self-reference.
+- `fs_add_file_to_folder` / `fs_add_subfolder` append to a folder's child list and return the new node; `fs_add_subfolder` also adds a ".." parent-reference into the new folder.
+- `fs_add_to_folder` appends a pre-built node to a folder's child list without type checking.
 - `fs_node_rename` replaces a node's heap-allocated name in place.
 - `fs_destroy_node` recursively frees a node and its entire child/next subtree.
-- `fs_dump_node` prints the full subtree to the kernel log with path prefixes.
+- `fs_dump_node` prints the subtree rooted at a given node to the kernel log with path prefixes.
+- VFS mount system: `fs_init` creates a global root tree with a "volumes" subfolder; `fs_mount(path, node)` resolves the path via `fs_get_node` and appends the node there; `fs_unmount` is a stub.
+- `fs_get_node(path)` resolves a slash-delimited absolute path against the global root tree.
+- `fs_get_children(node, name)` searches a node's direct children by name.
+- `fs_dump_fs` prints the entire VFS tree from the global root.
 
 ### **FAT32**
 
@@ -180,7 +184,7 @@ src/
     queue.c/h           — dynamic ring-buffer FIFO queue of uint64_t (queue64_init/push/pop/peek)
     stack.c/h           — dynamic array-backed LIFO stack of uint64_t (stack64_init/push/pop/peek)
     deque.c/h           — doubly-linked deque of uint64_t (deque64_add/remove/peek left/right, find, find_remove, remove, next)
-    hashmap.c/h         — open-addressing hash map: string key → uint64_t value (hashmap64_init/destroy/set/get/remove)
+    hashmap.c/h         — open-addressing hash map: string key → uint64_t value (hashmap64_init/destroy/set/get/has/remove)
     set.c/h             — open-addressing hash map: uint64_t key → uint64_t value (set64_init/destroy/set/get/remove)
     ordered_set.c/h     — BST-based ordered set of uint64_t (ordered_set64_init/destroy/insert/remove/contains/min/max/foreach)
 
@@ -201,7 +205,7 @@ src/
     scheduler.c/h   — FIFO ready queue (dsa/queue64) and wait queue (dsa/deque64), scheduler_enqueue/dequeue/spawn, context switch via timer and yield/exit/waitpid/fork syscalls
 
   fs/               — filesystem drivers
-    filesystem.c/h  — generic fs_node tree: fs_create_node/file/folder, fs_add_file_to_folder, fs_add_subfolder, fs_node_rename, fs_destroy_node, fs_dump_node
+    filesystem.c/h  — VFS tree and mount system: fs_init, fs_mount, fs_unmount, fs_get_node, fs_get_children, fs_create_node/file/folder, fs_add_file_to_folder, fs_add_subfolder, fs_add_to_folder, fs_node_rename, fs_destroy_node, fs_dump_node, fs_dump_fs
     fat32.c/h       — MBR/BPB structs (packed + aligned mirrors), fat32_bs_info, fat32_is_boot_sector, fat32_parse_boot_sector, fat32_read_fat_table, fat32_read_cluster, 8.3 and LFN dir entry structs, partition type/media descriptor/attribute/LFN defines, dump functions
 ```
 

@@ -123,6 +123,12 @@ int hashmap64_get(struct hashmap64 *map, char *key, uint64_t *out)
     return 0;
 }
 
+int hashmap64_has(struct hashmap64 *map, char *key)
+{
+    uint64_t ignored;
+    return hashmap64_get(map, key, &ignored);
+}
+
 void hashmap64_remove(struct hashmap64 *map, char *key)
 {
     size_t slot = _hashmap64_hash(key) % map->capacity;

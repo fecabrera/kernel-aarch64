@@ -39,6 +39,9 @@ void kernel_init()
     scheduler_init();
     irq_enable();
 
+    // initialize file system and I/O
+    fs_init();
+
     // set up root process
     pid_t pid = scheduler_spawn(&init);
     printk("[kernel] spawned init process with pid %i\r\n", pid);
@@ -85,6 +88,8 @@ void init()
     time_t t1 = syscall_uptime();
 
     printk("[init] took %dms\r\n", t1 - t0);
+
+    fs_dump_fs();
 
     syscall_exit(0);
 }

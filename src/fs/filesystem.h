@@ -13,6 +13,8 @@
 
 #define FS_NODE_ATTRS_FLAG_MASK (FS_NODE_ATTRS_FLAG_LINK | FS_NODE_ATTRS_FLAG_HIDDEN | FS_NODE_ATTRS_FLAG_READONLY)
 
+typedef int (*fs_handler_t)(char *, uint8_t *, size_t);
+
 struct fs_node
 {
     char *name;
@@ -21,6 +23,54 @@ struct fs_node
     struct fs_node *next;
     struct fs_node *child;
 };
+
+/**
+ * Initializes the VFS subsystem. Creates the global root tree node and adds
+ * a "volumes" subfolder to it. Must be called before fs_mount, fs_get_node,
+ * or any other VFS operation.
+ */
+void fs_init();
+
+/**
+ * Mounts a filesystem node at the given path in the VFS tree. Resolves the
+ * mountpoint via fs_get_node and appends node as a child of that folder.
+ *
+ * @param mountpoint: null-terminated path of an existing VFS folder (e.g. "/volumes")
+ * @param node:       root fs_node of the filesystem to mount
+ *
+ * @return 0 on success, -1 if the mountpoint is not found or is not a folder
+ */
+int fs_mount(char *mountpoint, struct fs_node *node);
+
+/**
+ * Unmounts the filesystem at the given path. Currently a stub; always returns 0.
+ *
+ * @param mountpoint: null-terminated mountpoint path to unmount
+ *
+ * @return 0
+ */
+int fs_unmount(char *mountpoint);
+
+/**
+ * Searches the direct children of node for a child whose name matches name.
+ *
+ * @param node: parent folder node to search
+ * @param name: null-terminated name to match
+ *
+ * @return pointer to the matching child node, or NULL if not found
+ */
+struct fs_node *fs_get_children(struct fs_node *node, char *name);
+
+/**
+ * Resolves a slash-delimited absolute path in the VFS tree, starting from
+ * the global root. Each path segment is matched against direct children via
+ * fs_get_children, advancing one level per segment.
+ *
+ * @param pathname: null-terminated absolute path (e.g. "/volumes")
+ *
+ * @return pointer to the matching fs_node, or NULL if any segment is not found
+ */
+struct fs_node *fs_get_node(char *pathname);
 
 /**
  * Allocates and initializes a new fs_node on the heap.
@@ -61,6 +111,15 @@ struct fs_node *fs_create_file(char *name, size_t name_size, uint16_t attrs);
 struct fs_node *fs_create_folder(char *name, size_t name_size, uint16_t attrs);
 
 /**
+ * Appends node to the end of parent's child linked list. Does not check
+ * that parent is a folder; callers must enforce that constraint.
+ *
+ * @param parent: folder node to append into
+ * @param node:   node to append
+ */
+void fs_add_to_folder(struct fs_node *parent, struct fs_node *node);
+
+/**
  * Creates a new file node and appends it to the child list of a folder node.
  * The new node is inserted after the last sibling in the folder's child chain.
  *
@@ -77,14 +136,14 @@ struct fs_node *fs_add_file_to_folder(struct fs_node *node, char *name, size_t n
  * Creates a new folder node and appends it to the child list of a folder node.
  * The new node is inserted after the last sibling in the folder's child chain.
  *
- * @param node:      pointer to the parent folder node
+ * @param parent:      pointer to the parent folder node
  * @param name:      null-terminated name string for the new subfolder (duplicated into a heap-allocated buffer)
  * @param name_size: maximum number of characters to copy from name (excluding null terminator)
  * @param attrs:     attribute flags for the new subfolder (FS_NODE_ATTRS_FLAG_*)
  *
  * @return pointer to the new folder node, or NULL if node is not a folder
  */
-struct fs_node *fs_add_subfolder(struct fs_node *node, char *name, size_t name_size, uint16_t attrs);
+struct fs_node *fs_add_subfolder(struct fs_node *parent, char *name, size_t name_size, uint16_t attrs);
 
 /**
  * Replaces the name of an existing fs_node with a new name string.
@@ -112,3 +171,9 @@ void fs_destroy_node(struct fs_node *node);
  * @param node: pointer to the root fs_node to dump
  */
 void fs_dump_node(struct fs_node *node);
+
+/**
+ * Prints the entire VFS tree to the kernel log via printk, starting from the
+ * global root's children. Skips entering "." and ".." nodes to avoid cycles.
+ */
+void fs_dump_fs();

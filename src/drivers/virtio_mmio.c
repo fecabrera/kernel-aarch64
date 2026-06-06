@@ -380,6 +380,7 @@ struct fs_node *virtio_mmio_initialize_fat32_device(int slot)
 
     // create root node and a set that stores the parent folders
     struct fs_node *root = fs_create_folder(bs_info->volume_label, strnlen(bs_info->volume_label, 11), 0);
+    fs_mount("/volumes", root);
 
     status = _virtio_mmio_fat32_build_fs_tree(slot, bs_info, &fat_q, root);
     if (status < 0)

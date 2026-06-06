@@ -61,6 +61,14 @@ void hashmap64_set(struct hashmap64 *map, char *key, uint64_t value);
 int hashmap64_get(struct hashmap64 *map, char *key, uint64_t *out);
 
 /**
+ * Returns 1 if key is present in the map, 0 otherwise.
+ *
+ * @param map: map to search
+ * @param key: null-terminated key string
+ */
+int hashmap64_has(struct hashmap64 *map, char *key);
+
+/**
  * Removes the entry for key, freeing its duplicated key string. Does nothing
  * if key is not present.
  *
