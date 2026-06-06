@@ -76,7 +76,7 @@ make run
 - Scans all 32 MMIO slots, validates magic, version, and device ID.
 - Negotiates features, sets up per-slot 64-entry virtqueues (`struct virtq` with desc/avail/used rings).
 - `virtio_mmio_read` submits synchronous block reads via 3-descriptor chains.
-- `virtio_mmio_initialize_fat32_device(slot)` parses the FAT32 filesystem on a block device slot, mounts the root node at `/volumes` via `fs_mount`, and returns the root `fs_node` tree, or NULL on failure.
+- `virtio_mmio_initialize_fat32_device(slot)` parses the FAT32 filesystem on a block device slot, mounts the root node at `/volumes` via `vfs_mount`, and returns the root `fs_node` tree, or NULL on failure.
 - IRQ handler acks `VIRTIO_INTERRUPT_STATUS`.
 
 ### **Filesystem abstraction**
@@ -90,11 +90,11 @@ make run
 - `fs_add_to_folder` appends a pre-built node to a folder's child list without type checking.
 - `fs_node_rename` replaces a node's heap-allocated name in place.
 - `fs_destroy_node` recursively frees a node and its entire child/next subtree.
-- `fs_dump_node` prints the subtree rooted at a given node to the kernel log with path prefixes.
-- VFS mount system: `fs_init` creates a global root tree with a "volumes" subfolder; `fs_mount(path, node)` resolves the path via `fs_get_node` and appends the node there; `fs_unmount` is a stub.
-- `fs_get_node(path)` resolves a slash-delimited absolute path against the global root tree.
+- `fs_dump_node(node, prefix)` recursively prints a subtree to the kernel log with path prefixes; skips recursing into "." and ".." to avoid cycles.
 - `fs_get_children(node, name)` searches a node's direct children by name.
-- `fs_dump_fs` prints the entire VFS tree from the global root.
+- VFS mount system (`vfs.h`): `vfs_init` creates a global root tree with a "volumes" subfolder; `vfs_mount(path, node)` resolves the path via `vfs_get_node` and appends the node there; `vfs_unmount` is a stub.
+- `vfs_get_node(path)` resolves a slash-delimited absolute path against the global root tree.
+- `vfs_dump_fs` prints the entire VFS tree from the global root.
 
 ### **FAT32**
 
@@ -205,7 +205,8 @@ src/
     scheduler.c/h   — FIFO ready queue (dsa/queue64) and wait queue (dsa/deque64), scheduler_enqueue/dequeue/spawn, context switch via timer and yield/exit/waitpid/fork syscalls
 
   fs/               — filesystem drivers
-    filesystem.c/h  — VFS tree and mount system: fs_init, fs_mount, fs_unmount, fs_get_node, fs_get_children, fs_create_node/file/folder, fs_add_file_to_folder, fs_add_subfolder, fs_add_to_folder, fs_node_rename, fs_destroy_node, fs_dump_node, fs_dump_fs
+    filesystem.c/h  — fs_node tree primitives: fs_get_children, fs_create_node/file/folder, fs_add_file_to_folder, fs_add_subfolder, fs_add_to_folder, fs_node_rename, fs_destroy_node, fs_dump_node
+    vfs.c/h         — VFS mount system: vfs_init, vfs_mount, vfs_unmount, vfs_get_node, vfs_dump_fs; owns the global _fs_root tree
     fat32.c/h       — MBR/BPB structs (packed + aligned mirrors), fat32_bs_info, fat32_is_boot_sector, fat32_parse_boot_sector, fat32_read_fat_table, fat32_read_cluster, 8.3 and LFN dir entry structs, partition type/media descriptor/attribute/LFN defines, dump functions
 ```
 

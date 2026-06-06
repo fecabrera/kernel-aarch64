@@ -14,6 +14,7 @@
 #include <sched/scheduler.h>
 #include <fs/fat32.h>
 #include <fs/filesystem.h>
+#include <fs/vfs.h>
 #include "kernel.h"
 
 void kernel_init()
@@ -40,7 +41,7 @@ void kernel_init()
     irq_enable();
 
     // initialize file system and I/O
-    fs_init();
+    vfs_init();
 
     // set up root process
     pid_t pid = scheduler_spawn(&init);
@@ -78,18 +79,13 @@ void init()
     while ((slot = virtio_mmio_find_next_slot(VIRTIO_DEVICE_ID_BLOCK, slot)) != -1)
     {
         printk("[init] reading block device in slot %i\r\n", slot);
-
-        struct fs_node *root_node = virtio_mmio_initialize_fat32_device(slot);
-
-        // dump tree
-        if (root_node)
-            fs_dump_node(root_node);
+        virtio_mmio_initialize_fat32_device(slot);
     }
     time_t t1 = syscall_uptime();
 
     printk("[init] took %dms\r\n", t1 - t0);
 
-    fs_dump_fs();
+    vfs_dump_fs();
 
     syscall_exit(0);
 }

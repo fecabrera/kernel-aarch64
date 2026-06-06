@@ -25,33 +25,6 @@ struct fs_node
 };
 
 /**
- * Initializes the VFS subsystem. Creates the global root tree node and adds
- * a "volumes" subfolder to it. Must be called before fs_mount, fs_get_node,
- * or any other VFS operation.
- */
-void fs_init();
-
-/**
- * Mounts a filesystem node at the given path in the VFS tree. Resolves the
- * mountpoint via fs_get_node and appends node as a child of that folder.
- *
- * @param mountpoint: null-terminated path of an existing VFS folder (e.g. "/volumes")
- * @param node:       root fs_node of the filesystem to mount
- *
- * @return 0 on success, -1 if the mountpoint is not found or is not a folder
- */
-int fs_mount(char *mountpoint, struct fs_node *node);
-
-/**
- * Unmounts the filesystem at the given path. Currently a stub; always returns 0.
- *
- * @param mountpoint: null-terminated mountpoint path to unmount
- *
- * @return 0
- */
-int fs_unmount(char *mountpoint);
-
-/**
  * Searches the direct children of node for a child whose name matches name.
  *
  * @param node: parent folder node to search
@@ -60,17 +33,6 @@ int fs_unmount(char *mountpoint);
  * @return pointer to the matching child node, or NULL if not found
  */
 struct fs_node *fs_get_children(struct fs_node *node, char *name);
-
-/**
- * Resolves a slash-delimited absolute path in the VFS tree, starting from
- * the global root. Each path segment is matched against direct children via
- * fs_get_children, advancing one level per segment.
- *
- * @param pathname: null-terminated absolute path (e.g. "/volumes")
- *
- * @return pointer to the matching fs_node, or NULL if any segment is not found
- */
-struct fs_node *fs_get_node(char *pathname);
 
 /**
  * Allocates and initializes a new fs_node on the heap.
@@ -164,16 +126,12 @@ void fs_node_rename(struct fs_node *node, char *name, size_t name_size);
 void fs_destroy_node(struct fs_node *node);
 
 /**
- * Prints the full subtree rooted at node to the kernel log via printk.
- * Each entry is printed as "prefix/name", with folders showing their
- * "." and ".." entries followed by their children recursively.
+ * Recursively prints the subtree rooted at node to the kernel log via printk.
+ * Each entry is printed as "prefix/name". Descends into folder children but
+ * skips recursing into "." and ".." to avoid cycles. Advances through siblings
+ * via node->next at each level.
  *
- * @param node: pointer to the root fs_node to dump
+ * @param node:   pointer to the starting fs_node
+ * @param prefix: path prefix to prepend to each entry (may be empty string or NULL)
  */
-void fs_dump_node(struct fs_node *node);
-
-/**
- * Prints the entire VFS tree to the kernel log via printk, starting from the
- * global root's children. Skips entering "." and ".." nodes to avoid cycles.
- */
-void fs_dump_fs();
+void fs_dump_node(struct fs_node *node, char *prefix);

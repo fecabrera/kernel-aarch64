@@ -230,7 +230,7 @@ struct cpu_context *virtio_mmio_irq_handler(int irq, struct cpu_context *ctx);
  * table sector-by-sector, builds a cluster chain queue, then recursively
  * traverses all directories via fat32_read_cluster, populating an fs_node
  * tree rooted at the volume label. Mounts the root node at "/volumes" via
- * fs_mount as a side effect.
+ * vfs_mount as a side effect.
  *
  * @param slot: virtio MMIO slot index of the block device to read
  *
