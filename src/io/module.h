@@ -22,14 +22,15 @@ struct io_file
 };
 
 /**
- * Initializes the I/O module registry. Must be called before any other io_*
- * function.
+ * Initializes the I/O module registry and creates the /dev folder in the VFS
+ * tree. Must be called after vfs_init() and before any other io_* function.
  */
 void io_init();
 
 /**
  * Allocates and registers a named I/O module. The module is stored in an
- * internal hashmap64 keyed by name.
+ * internal hashmap64 keyed by name. Also creates a file node at /dev/<name>
+ * in the VFS tree.
  *
  * @param name:  null-terminated module name (e.g. "tty0")
  * @param attrs: capability flags (IO_CAN_READ, IO_CAN_WRITE)
@@ -41,11 +42,12 @@ void io_init();
 int io_register_module(char *name, uint8_t attrs, io_handler_t read, io_handler_t write);
 
 /**
- * Removes the named module from the registry and frees it.
+ * Removes the named module from the registry, frees it, and unlinks the
+ * corresponding /dev/<name> file node from the VFS tree.
  *
  * @param name: null-terminated module name to unregister
  *
- * @return 0 on success, -1 if the module is not found
+ * @return 0 on success, -1 if the module is not found or the VFS node cannot be removed
  */
 int io_unregister_module(char *name);
 

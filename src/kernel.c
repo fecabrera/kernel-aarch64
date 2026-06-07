@@ -18,6 +18,53 @@
 #include <io/module.h>
 #include "kernel.h"
 
+static void child()
+{
+    pid_t child_pid = syscall_fork();
+
+    if (child_pid < 0)
+    {
+        printk("[child] fork() failed!\r\n");
+        syscall_exit(2);
+    }
+
+    pid_t pid = syscall_getpid();
+    printk("[child] pid = %i, child_pid = %i\r\n", pid, child_pid);
+
+    if (child_pid == 0)
+    {
+        printk("[child] going to sleep\r\n");
+
+        time_t t0 = syscall_uptime();
+        syscall_sleep(2);
+        time_t t1 = syscall_uptime();
+
+        printk("[child] slept for %dms\r\n", t1 - t0);
+        syscall_exit(0);
+    }
+    else
+    {
+        syscall_exit(1);
+    }
+}
+
+static void test_scheduler()
+{
+    pid_t fork_pid = syscall_fork();
+
+    if (fork_pid < 0)
+    {
+        printk("[child] fork() failed!\r\n");
+        halt();
+    }
+
+    if (fork_pid == 0)
+        return child();
+
+    int64_t exit_status = syscall_waitpid(fork_pid);
+    printk("[init] child process (pid %i) terminated with status %i\r\n", fork_pid, exit_status);
+}
+
 void kernel_init()
 {
     // Initialize DTB
@@ -62,19 +109,7 @@ void init()
 
     printk("[init] pid = %i\r\n", pid);
 
-    pid_t fork_pid = syscall_fork();
-
-    if (fork_pid < 0)
-    {
-        printk("[child] fork() failed!\r\n");
-        halt();
-    }
-
-    if (fork_pid == 0)
-        return child();
-
-    int64_t exit_status = syscall_waitpid(fork_pid);
-    printk("[init] child process (pid %i) terminated with status %i\r\n", fork_pid, exit_status);
+    test_scheduler();
 
     time_t t0 = syscall_uptime();
     virtio_slot_t slot = -1;
@@ -88,34 +123,4 @@ void init()
     printk("[init] took %dms\r\n", t1 - t0);
 
     syscall_exit(0);
-}
-
-void child()
-{
-    pid_t child_pid = syscall_fork();
-
-    if (child_pid < 0)
-    {
-        printk("[child] fork() failed!\r\n");
-        syscall_exit(2);
-    }
-
-    pid_t pid = syscall_getpid();
-    printk("[child] pid = %i, child_pid = %i\r\n", pid, child_pid);
-
-    if (child_pid == 0)
-    {
-        printk("[child] going to sleep\r\n");
-
-        time_t t0 = syscall_uptime();
-        syscall_sleep(2);
-        time_t t1 = syscall_uptime();
-
-        printk("[child] slept for %dms\r\n", t1 - t0);
-        syscall_exit(0);
-    }
-    else
-    {
-        syscall_exit(1);
-    }
 }

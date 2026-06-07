@@ -361,9 +361,9 @@ int _virtio_mmio_fat32_read_cluster(virtio_slot_t slot, struct fat32_bs_info *bs
 
             struct fs_node *node;
             if (attributes & FAT32_ATTR_DIRECTORY)
-                node = fs_add_subfolder(parent_node, name, strlen(name), 0, (uintptr_t)entry_ref);
+                node = fs_add_subfolder(parent_node, name, 0, (uintptr_t)entry_ref);
             else
-                node = fs_add_file_to_folder(parent_node, name, strlen(name), 0, (uintptr_t)entry_ref);
+                node = fs_add_file_to_folder(parent_node, name, 0, (uintptr_t)entry_ref);
 
             set64_set(parent_nodes, next_cluster, (uintptr_t)node);
         }
@@ -514,7 +514,12 @@ struct fs_node *virtio_mmio_initialize_fat32_device(virtio_slot_t slot)
 
     // create folder
     struct fs_node *volumes_root = vfs_get_node("/volumes");
-    struct fs_node *root = fs_add_subfolder(volumes_root, bs_info->volume_label, strnlen(bs_info->volume_label, 11), 0, 0);
+    struct fs_node *root = fs_add_subfolder(volumes_root, bs_info->volume_label, 0, 0);
+    if (root == NULL)
+    {
+        printk("[virtio_mmio@%x] cannot creat mountpoint \"%s\"!\r\n");
+        return NULL;
+    }
 
     // build volume name
     char mountpoint[50];

@@ -146,10 +146,10 @@ make run
 
 ### **I/O module registry**
 
-- Named registry of `io_module` structs backed by a `hashmap64`; `io_init()` must be called before any registration.
+- Named registry of `io_module` structs backed by a `hashmap64`; `io_init()` must be called before any registration. Creates the `/dev` folder in the VFS tree at init time.
 - Each module carries `attrs` (IO_CAN_READ / IO_CAN_WRITE) and `read`/`write` function pointers (`io_handler_t`).
-- `io_register_module(name, attrs, read, write)` allocates and inserts a module; returns -1 if already registered.
-- `io_unregister_module(name)` removes and frees the module; returns -1 if not found.
+- `io_register_module(name, attrs, read, write)` allocates and inserts a module and creates a `/dev/<name>` file node in the VFS tree; returns -1 if already registered.
+- `io_unregister_module(name)` removes and frees the module and unlinks the `/dev/<name>` VFS node; returns -1 if not found or the node cannot be removed.
 - `io_read(name, buf, n)` / `io_write(name, buf, n)` look up the module by name and dispatch to its handler.
 
 ### **Syscall interface**

@@ -8,8 +8,8 @@ struct deque64 _vfs_mp_table;
 
 void vfs_init()
 {
-    _fs_root = fs_create_folder(NULL, 0, 0, 0);
-    fs_add_subfolder(_fs_root, "volumes", 7, 0, 0);
+    _fs_root = fs_create_folder(NULL, 0, 0);
+    fs_add_subfolder(_fs_root, "volumes", 0, 0);
 }
 
 int vfs_create_mountpoint(char *mountpoint, struct io_module *module, void *data)
