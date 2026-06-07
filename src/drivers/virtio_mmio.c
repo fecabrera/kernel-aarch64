@@ -513,11 +513,10 @@ struct fs_node *virtio_mmio_initialize_fat32_device(virtio_slot_t slot)
     fat32_build_cluster_chains(bs_info, fat_table, &fat_q);
 
     // create folder
-    struct fs_node *volumes_root = vfs_get_node("/volumes");
-    struct fs_node *root = fs_add_subfolder(volumes_root, bs_info->volume_label, 0, 0);
+    struct fs_node *root = vfs_create_dir("/volumes", bs_info->volume_label, 0);
     if (root == NULL)
     {
-        printk("[virtio_mmio@%x] cannot creat mountpoint \"%s\"!\r\n");
+        printk("[virtio_mmio@%x] cannot create mountpoint \"%s\"!\r\n");
         return NULL;
     }
 
@@ -527,7 +526,7 @@ struct fs_node *virtio_mmio_initialize_fat32_device(virtio_slot_t slot)
 
     // mount
     printk("[virtio_mmio@%x] mounting \"%s\"\r\n", VIRTIO_MMIO_ADDR(slot), mountpoint);
-    vfs_create_mountpoint(mountpoint, NULL, NULL);
+    vfs_create_mountpoint(mountpoint, NULL, NULL, NULL);
 
     status = _virtio_mmio_fat32_build_fs_tree(slot, bs_info, &fat_q, root);
     if (status < 0)
@@ -547,12 +546,20 @@ struct fs_node *virtio_mmio_initialize_fat32_device(virtio_slot_t slot)
         return NULL;
     }
 
+    // dump fs
     vfs_dump_fs();
 
     // unmount
     printk("[virtio_mmio@%x] unmounting \"%s\"\r\n", VIRTIO_MMIO_ADDR(slot), mountpoint);
     vfs_destroy_mountpoint(mountpoint);
 
+    // verify that mountpoint was removed
+    if (vfs_get_mountpoint_for_path(mountpoint))
+        printk("[virtio_mmio@%x] mountpoint \"%s\" still exists :/\r\n", VIRTIO_MMIO_ADDR(slot), mountpoint);
+    else
+        printk("[virtio_mmio@%x] mountpoint \"%s\" was removed :)\r\n", VIRTIO_MMIO_ADDR(slot), mountpoint);
+
+    // dump fs
     vfs_dump_fs();
 
     // clean ptrs

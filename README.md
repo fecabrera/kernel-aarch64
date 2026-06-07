@@ -94,9 +94,11 @@ make run
 - `fs_dump_node(node, prefix)` recursively prints a subtree to the kernel log with path prefixes; skips recursing into "." and ".." to avoid cycles.
 - `fs_get_child(node, name)` searches a node's direct children by name.
 - `fs_remove_child(node, name)` unlinks a named child from a folder's child list without freeing it.
-- VFS mount system (`vfs.h`): `vfs_init` creates a global root tree with a "volumes" subfolder; `vfs_create_mountpoint(path, module, data)` registers a mount entry in the internal table (caller creates the node separately); `vfs_destroy_mountpoint(path)` removes the entry, unlinks and destroys the root node.
-- `struct vfs_mount` carries the mountpoint path, root node pointer, `io_module *`, and a `void *data` field for driver-private context (e.g. a `virtio_slot_t`).
-- `vfs_get_node(path)` resolves a slash-delimited absolute path against the global root tree.
+- VFS mount system (`vfs.h`): `vfs_init` initializes the mount table and creates a global root tree with a "volumes" subfolder; `vfs_create_mountpoint(path, read, write, data)` registers a mount entry in a `hashmap64`-backed table (caller creates the VFS node separately); `vfs_destroy_mountpoint(path)` removes the entry, unlinks and destroys the root node.
+- `struct vfs_mount` carries the mountpoint path, root node pointer, `vfs_handler_t read`/`write` handlers, and a `void *data` field for driver-private context.
+- `vfs_get_mountpoint(path)` looks up a mount entry by its exact path; `vfs_get_mountpoint_for_path(path)` walks path left-to-right and returns the deepest mount whose path is a prefix.
+- `vfs_create_dir(path, name, attrs)` resolves path and appends a new subfolder via `fs_add_subfolder`.
+- `vfs_read` / `vfs_write` resolve the node, find its covering mount via `vfs_get_mountpoint_for_path`, and dispatch to the mount's `read`/`write` handler; return `VFS_IO_ERROR_FILE_NOT_FOUND`, `VFS_IO_ERROR_MOUNTPOINT_NOT_FOUND`, or `VFS_IO_ERROR_HANDLER_NOT_PROVIDED` on failure.
 - `vfs_dump_fs` prints the entire VFS tree from the global root.
 
 ### **FAT32**

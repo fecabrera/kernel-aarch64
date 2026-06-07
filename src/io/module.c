@@ -10,8 +10,7 @@ static struct fs_node *_dev_root = NULL;
 
 void io_init()
 {
-    struct fs_node *volumes_root = vfs_get_node("/");
-    _dev_root = fs_add_subfolder(volumes_root, "dev", 0, 0);
+    _dev_root = vfs_create_dir("/", "dev", 0);
     if (_dev_root == NULL)
     {
         dprintk("[virtio_mmio@%x] cannot creat mountpoint \"%s\"!\r\n");
