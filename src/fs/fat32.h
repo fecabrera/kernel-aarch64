@@ -259,3 +259,16 @@ uint32_t fat32_read_fat_table(struct fat32_bs_info *bs_info, uint8_t *buff, uint
  * @param fat_q:     queue to append fat32_cluster_chain pointers into
  */
 void fat32_build_cluster_chains(struct fat32_bs_info *bs_info, fat_table_entry_t *fat_table, struct queue64 *fat_q);
+
+/**
+ * Mounts a FAT32 volume accessible at the given VFS pathname. Reads the boot
+ * sector and FAT table via vfs_read, validates the FAT32 signature, parses the
+ * BPB, builds the cluster chain queue, then recursively traverses all
+ * directories via _fat32_read_cluster. Creates the volume as a subfolder of
+ * "/volumes" and registers a mountpoint at "/volumes/<label>".
+ *
+ * @param pathname: VFS path to the block device (e.g. "/dev/sd0")
+ *
+ * @return 0 on success, -1 on I/O error, -2 if not a valid FAT32 volume
+ */
+int fat32_mount(char *pathname);

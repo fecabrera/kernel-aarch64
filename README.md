@@ -77,7 +77,6 @@ make run
 - Scans all 32 MMIO slots, validates magic, version, and device ID.
 - Negotiates features, sets up per-slot 64-entry virtqueues (`struct virtq` with desc/avail/used rings).
 - `virtio_mmio_read` submits synchronous block reads via 3-descriptor chains.
-- `virtio_mmio_initialize_fat32_device(slot)` parses the FAT32 filesystem on a block device slot, mounts the root node at `/volumes` via `vfs_mount`, and returns the root `fs_node` tree, or NULL on failure.
 - IRQ handler acks `VIRTIO_INTERRUPT_STATUS`.
 
 ### **Filesystem abstraction**
@@ -109,6 +108,8 @@ make run
 - `fat32_read_fat_table` copies one FAT sector into a flat `uint32_t` array (28-bit masked, compare against `FAT32_FAT_ENTRY_*`).
 - `fat32_entry_reference` records a directory entry's on-disk location (cluster number + offset within the sector) and is stored in each `fs_node`'s `data` field.
 - Directory cluster parsing is handled inside the virtio MMIO driver (`_virtio_mmio_fat32_read_cluster`); handles multi-fragment LFN sequences, populates an `fs_node` tree, and records subfolder nodes in a `set64` map for recursive traversal.
+- `fat32_mount(pathname)` takes a VFS path to a block device (e.g. `/dev/sd0`), reads the boot sector and full FAT table via `vfs_read`, validates the FAT32 signature, builds the cluster chain queue, recursively traverses all directories via `_fat32_read_cluster`, and creates the volume under `/volumes/<label>` with a registered mountpoint; returns 0 on success, -1 on I/O error, -2 if not a valid FAT32 volume.
+- `_fat32_read_cluster` and `_fat32_build_fs_tree` are internal helpers that traverse the directory cluster chain and populate the `fs_node` tree via `vfs_read`.
 - `fat32_cluster_chain` struct pairs a cluster range (`start`/`end`) for FAT chain traversal.
 - `fat32_bs_info` exposes both `total_sectors_16` and `total_sectors_32` (resolved into `total_sectors`) for volumes using the 16-bit sector count field.
 - 8.3 and LFN directory entry structs (`fat32_dir_entry`, `fat32_lfn_entry`) with `FAT32_ATTR_*`, `FAT32_DIRENT_*`, and `FAT32_LFN_*` defines.
@@ -194,7 +195,7 @@ src/
     gic.c/h         — GIC-400 distributor + CPU interface
     timer.c/h       — ARM generic timer
     pl031.c/h       — PL031 RTC
-    virtio_mmio.c/h — virtio MMIO transport: slot scanning, feature negotiation, virtqueue setup (virtq_desc/virtq_avail/virtq_used), IRQ dispatch, virtio_mmio_initialize_fat32_device
+    virtio_mmio.c/h — virtio MMIO transport: slot scanning, feature negotiation, virtqueue setup (virtq_desc/virtq_avail/virtq_used), IRQ dispatch
 
   mm/               — memory subsystem
     mem.c/h         — reads RAM base/size from DTB at boot
@@ -227,7 +228,7 @@ src/
   fs/               — filesystem drivers
     filesystem.c/h  — fs_node tree primitives: fs_get_child, fs_remove_child, fs_create_node/file/folder, fs_add_file_to_folder, fs_add_subfolder, fs_add_to_folder, fs_node_rename, fs_destroy_node, fs_dump_node
     vfs.c/h         — VFS mount system: vfs_init, vfs_create_mountpoint, vfs_destroy_mountpoint, vfs_get_node, vfs_dump_fs; owns the global _fs_root tree
-    fat32.c/h       — MBR/BPB structs (packed + aligned mirrors), fat32_bs_info, fat32_entry_reference, fat32_is_boot_sector, fat32_parse_boot_sector, fat32_read_fat_table, fat32_build_cluster_chains, 8.3 and LFN dir entry structs, partition type/media descriptor/attribute/LFN defines, dump functions
+    fat32.c/h       — MBR/BPB structs (packed + aligned mirrors), fat32_bs_info, fat32_entry_reference, fat32_is_boot_sector, fat32_parse_boot_sector, fat32_read_fat_table, fat32_build_cluster_chains, fat32_mount, _fat32_read_cluster, _fat32_build_fs_tree; 8.3 and LFN dir entry structs, partition type/media descriptor/attribute/LFN defines, dump functions
 
   io/               — I/O module registry
     module.c/h      — hashmap64-backed named module registry: io_init, io_register_module, io_unregister_module, io_read, io_write; io_module carries drv_info + read/write handlers; io_file pairs a pid with a module
