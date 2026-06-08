@@ -21,20 +21,43 @@ int storage_read(uint8_t *buffer, size_t count, size_t offset, uint64_t slot)
 {
     printk("[/dev/sd%d] read(): buff=0x%08x, count=%d, offset=%d\r\n", slot, buffer, count, offset);
 
-    uint8_t *_buffer = (uint8_t *)kmalloc(VIRTIO_MMIO_BLK_SECTOR_SIZE);
+    uint64_t first_sector = offset / VIRTIO_MMIO_BLK_SECTOR_SIZE;
+    uint64_t last_sector = (offset + count - 1) / VIRTIO_MMIO_BLK_SECTOR_SIZE;
+    uint64_t sectors_to_read = last_sector - first_sector + 1;
 
-    // read boot sector
-    uint64_t sector = offset / VIRTIO_MMIO_BLK_SECTOR_SIZE;
-    if (virtio_mmio_read(slot, sector, _buffer) < 0)
+    printk("[/dev/sd%d] first_sector=%d, last_sector=%d, sectors_to_read=%d\r\n", slot, first_sector, last_sector, sectors_to_read);
+
+    // allocate temporary buffer
+    uint8_t *tmp = (uint8_t *)kmalloc(sectors_to_read * VIRTIO_MMIO_BLK_SECTOR_SIZE);
+
+    // read boot sectors
+    for (uint64_t i = 0; i < sectors_to_read; i++)
     {
-        kfree(_buffer);
-        return -1;
+        // calculate sector to read
+        uint64_t sector = first_sector + i;
+
+        // calculate were in the temporary buffer we need to store
+        size_t buf_offset = i * VIRTIO_MMIO_BLK_SECTOR_SIZE;
+
+        // read sector
+        int status = virtio_mmio_read(slot, sector, tmp + buf_offset);
+        if (status < 0)
+        {
+            // free temporary buffer
+            kfree(tmp);
+
+            // pass error status to caller
+            return status;
+        }
     }
 
-    memcpy(buffer, _buffer, VIRTIO_MMIO_BLK_SECTOR_SIZE);
-    kfree(_buffer);
+    // copy data requested to temporary buffer
+    memcpy(buffer, tmp + (offset % VIRTIO_MMIO_BLK_SECTOR_SIZE), count);
 
-    return VIRTIO_MMIO_BLK_SECTOR_SIZE;
+    // free temporary buffer
+    kfree(tmp);
+
+    return count;
 }
 
 int storage_write(uint8_t *buffer, size_t count, size_t offset, uint64_t slot)

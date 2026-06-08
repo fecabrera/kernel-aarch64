@@ -157,7 +157,8 @@ make run
 ### **Storage devices**
 
 - `storage_init()` scans all virtio MMIO slots for block devices and registers each as an I/O module named `sd<slot>` (e.g. `sd0`), creating a `/dev/sd<slot>` VFS node. Must be called after `io_init()`.
-- `storage_read` reads the sector containing `offset` via `virtio_mmio_read` and copies it to the caller's buffer; returns `VIRTIO_MMIO_BLK_SECTOR_SIZE` on success. `storage_write` is a stub. Both receive the virtio slot index as `slot`.
+- `storage_read` reads all 512-byte sectors spanning `[offset, offset+count)` into a temporary buffer via `virtio_mmio_read`, then copies exactly `count` bytes at the correct intra-sector alignment into the caller's buffer; handles non-sector-aligned offsets and multi-sector spans; returns `count` on success or a negative error code from `virtio_mmio_read` on failure.
+- `storage_write` is a stub. Both receive the virtio slot index as `slot`.
 
 ### **Syscall interface**
 

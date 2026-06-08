@@ -11,15 +11,17 @@
 void storage_init();
 
 /**
- * I/O read handler for a virtio block device. Reads the sector containing
- * offset via virtio_mmio_read and copies it into buffer.
+ * I/O read handler for a virtio block device. Reads all sectors spanning
+ * [offset, offset+count) via virtio_mmio_read into a temporary buffer,
+ * then copies exactly count bytes at the correct intra-sector alignment
+ * into buffer.
  *
- * @param buffer:   output buffer (must hold at least VIRTIO_MMIO_BLK_SECTOR_SIZE bytes)
- * @param count:    number of bytes requested
- * @param offset:   byte offset into the device; determines which sector is read
+ * @param buffer:   output buffer (must hold at least count bytes)
+ * @param count:    number of bytes to read
+ * @param offset:   byte offset into the device (does not need to be sector-aligned)
  * @param slot:     virtio slot index (set by storage_init via io_register_module)
  *
- * @return VIRTIO_MMIO_BLK_SECTOR_SIZE on success, -1 on read failure
+ * @return count on success, negative error code from virtio_mmio_read on failure
  */
 int storage_read(uint8_t *buffer, size_t count, size_t offset, uint64_t slot);
 
