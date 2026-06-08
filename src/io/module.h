@@ -4,9 +4,6 @@
 #include <fs/filesystem.h>
 #include <sched/process.h>
 
-#define IO_CAN_READ (1 << 0)
-#define IO_CAN_WRITE (1 << 1)
-
 typedef int (*io_handler_t)(uint8_t *, size_t, uint64_t);
 
 struct io_module
@@ -37,14 +34,13 @@ void io_init();
  * in the VFS tree.
  *
  * @param name:     null-terminated module name (e.g. "tty0")
- * @param attrs:    capability flags (IO_CAN_READ, IO_CAN_WRITE)
  * @param drv_info: driver-private value passed as the third argument to read/write handlers
  * @param read:     read handler, or NULL if not readable
  * @param write:    write handler, or NULL if not writable
  *
  * @return 0 on success, -1 if a module with that name is already registered
  */
-int io_register_module(char *name, uint8_t attrs, uint64_t drv_info, io_handler_t read, io_handler_t write);
+int io_register_module(char *name, uint64_t drv_info, io_handler_t read, io_handler_t write);
 
 /**
  * Removes the named module from the registry, frees it, and unlinks the

@@ -30,7 +30,7 @@ static struct io_module *_io_get_module(char *name)
     return (struct io_module *)module_ptr;
 }
 
-int io_register_module(char *name, uint8_t attrs, uint64_t drv_info, io_handler_t read, io_handler_t write)
+int io_register_module(char *name, uint64_t drv_info, io_handler_t read, io_handler_t write)
 {
     if (_io_get_module(name) != NULL)
     {
@@ -39,7 +39,6 @@ int io_register_module(char *name, uint8_t attrs, uint64_t drv_info, io_handler_
     }
 
     struct io_module *module = (struct io_module *)kmalloc(sizeof(struct io_module));
-    module->attrs = attrs;
     module->drv_info = drv_info;
     module->read = read;
     module->write = write;

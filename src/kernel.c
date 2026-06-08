@@ -150,7 +150,7 @@ static void test_io_modules()
 {
     printk("\r\n=== io test ===\r\n");
 
-    io_register_module("test", 0, 0, &test_io_read, &test_io_write);
+    io_register_module("test", 0, &test_io_read, &test_io_write);
 
     printk("dumping vfs tree...\r\n");
     vfs_dump_fs();
