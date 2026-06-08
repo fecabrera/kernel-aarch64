@@ -149,10 +149,15 @@ make run
 ### **I/O module registry**
 
 - Named registry of `io_module` structs backed by a `hashmap64`; `io_init()` must be called before any registration. Creates the `/dev` VFS folder and registers it as a mountpoint with `io_read`/`io_write` as handlers, so `vfs_read("/dev/<name>", ...)` dispatches through the I/O registry.
-- Each module carries a `uint64_t drv_info` driver-private value and `read`/`write` function pointers (`io_handler_t`: `int (*)(uint8_t *, size_t, uint64_t)`).
+- Each module carries a `uint64_t drv_info` driver-private value and `read`/`write` function pointers (`io_handler_t`: `int (*)(uint8_t *buf, size_t count, size_t offset, uint64_t drv_info)`).
 - `io_register_module(name, drv_info, read, write)` allocates and inserts a module and creates a `/dev/<name>` file node in the VFS tree; returns -1 if already registered. `drv_info` is forwarded to the handler on every call.
 - `io_unregister_module(name)` removes and frees the module and unlinks the `/dev/<name>` VFS node; returns -1 if not found or the node cannot be removed.
 - `io_read(node, buf, n)` / `io_write(node, buf, n)` are `vfs_handler_t` callbacks; they look up the module by `node->name` and dispatch to its handler.
+
+### **Storage devices**
+
+- `storage_init()` scans all virtio MMIO slots for block devices and registers each as an I/O module named `sd<slot>` (e.g. `sd0`), creating a `/dev/sd<slot>` VFS node. Must be called after `io_init()`.
+- `storage_read` / `storage_write` are the `io_handler_t` callbacks; `drv_info` carries the virtio slot index set at registration time.
 
 ### **Syscall interface**
 
@@ -224,7 +229,10 @@ src/
     fat32.c/h       — MBR/BPB structs (packed + aligned mirrors), fat32_bs_info, fat32_entry_reference, fat32_is_boot_sector, fat32_parse_boot_sector, fat32_read_fat_table, fat32_build_cluster_chains, 8.3 and LFN dir entry structs, partition type/media descriptor/attribute/LFN defines, dump functions
 
   io/               — I/O module registry
-    module.c/h      — hashmap64-backed named module registry: io_init, io_register_module, io_unregister_module, io_read, io_write; io_module carries attrs + read/write handlers; io_file pairs a pid with a module
+    module.c/h      — hashmap64-backed named module registry: io_init, io_register_module, io_unregister_module, io_read, io_write; io_module carries drv_info + read/write handlers; io_file pairs a pid with a module
+
+  devices/          — device drivers built on the I/O module registry
+    storage.c/h     — block storage driver: storage_init scans virtio block slots and registers each as /dev/sd<slot>; storage_read/write are the io_handler_t callbacks
 ```
 
 ## Memory map (QEMU virt)

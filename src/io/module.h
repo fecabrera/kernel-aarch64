@@ -4,7 +4,7 @@
 #include <fs/filesystem.h>
 #include <sched/process.h>
 
-typedef int (*io_handler_t)(uint8_t *, size_t, uint64_t);
+typedef int (*io_handler_t)(uint8_t *, size_t, size_t, uint64_t);
 
 struct io_module
 {
@@ -57,21 +57,23 @@ int io_unregister_module(char *name);
  * Used as the vfs_handler_t read callback for the /dev mountpoint.
  *
  * @param node:   fs_node whose name identifies the target module
- * @param buff: output buffer
- * @param n:      number of bytes to read
+ * @param buff:   output buffer
+ * @param count:  number of bytes to read
+ * @param offset: byte offset into the device to read from
  *
  * @return return value of module->read, or -1 if the module is not found
  */
-int io_read(struct fs_node *node, uint8_t *buff, size_t n);
+int io_read(struct fs_node *node, uint8_t *buff, size_t count, size_t offset);
 
 /**
  * Looks up the module keyed by node->name and calls its write handler.
  * Used as the vfs_handler_t write callback for the /dev mountpoint.
  *
  * @param node:   fs_node whose name identifies the target module
- * @param buff: input buffer
- * @param n:      number of bytes to write
+ * @param buff:   input buffer
+ * @param count:  number of bytes to write
+ * @param offset: byte offset into the device to write to
  *
  * @return return value of module->write, or -1 if the module is not found
  */
-int io_write(struct fs_node *node, uint8_t *buff, size_t n);
+int io_write(struct fs_node *node, uint8_t *buff, size_t count, size_t offset);

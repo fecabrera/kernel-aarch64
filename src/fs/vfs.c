@@ -147,9 +147,9 @@ int vfs_destroy_mountpoint(char *mountpoint)
     return 0;
 }
 
-int vfs_read(char *pathname, uint8_t *buffer, size_t n)
+int vfs_read(char *pathname, uint8_t *buffer, size_t count, size_t offset)
 {
-    printk("[vfs] read(): file=\"%s\", buff=0x%08x, n=%d\r\n", pathname, buffer, n);
+    printk("[vfs] read(): file=\"%s\", buff=0x%08x, count=%d, offset=%d\r\n", pathname, buffer, count, offset);
 
     struct fs_node *node = _vfs_get_node(pathname, _fs_root);
     if (node == NULL)
@@ -171,12 +171,12 @@ int vfs_read(char *pathname, uint8_t *buffer, size_t n)
         return VFS_IO_ERROR_HANDLER_NOT_PROVIDED;
     }
 
-    return mp->read(node, buffer, n);
+    return mp->read(node, buffer, count, offset);
 }
 
-int vfs_write(char *pathname, uint8_t *buffer, size_t n)
+int vfs_write(char *pathname, uint8_t *buffer, size_t count, size_t offset)
 {
-    printk("[vfs] write(): file=\"%s\", buff=0x%08x, n=%d\r\n", pathname, buffer, n);
+    printk("[vfs] write(): file=\"%s\", buff=0x%08x, count=%d, offset=%d\r\n", pathname, buffer, count, offset);
 
     struct fs_node *node = _vfs_get_node(pathname, _fs_root);
     if (node == NULL)
@@ -198,7 +198,7 @@ int vfs_write(char *pathname, uint8_t *buffer, size_t n)
         return VFS_IO_ERROR_HANDLER_NOT_PROVIDED;
     }
 
-    return mp->write(node, buffer, n);
+    return mp->write(node, buffer, count, offset);
 }
 
 struct fs_node *vfs_create_dir(char *path, char *name, uint16_t attrs)

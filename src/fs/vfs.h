@@ -6,7 +6,7 @@
 #define VFS_IO_ERROR_MOUNTPOINT_NOT_FOUND -2
 #define VFS_IO_ERROR_HANDLER_NOT_PROVIDED -3
 
-typedef int (*vfs_handler_t)(struct fs_node *, uint8_t *, size_t);
+typedef int (*vfs_handler_t)(struct fs_node *, uint8_t *, size_t, size_t);
 
 struct vfs_mount
 {
@@ -101,13 +101,14 @@ struct fs_node *vfs_create_file(char *path, char *name, uint16_t attrs);
  *
  * @param pathname: null-terminated absolute path of the file to read
  * @param buffer:   output buffer
- * @param n:        number of bytes to read
+ * @param count:    number of bytes to read
+ * @param offset:   byte offset into the file to read from
  *
  * @return return value of mount->read on success;
  *         VFS_IO_ERROR_FILE_NOT_FOUND, VFS_IO_ERROR_MOUNTPOINT_NOT_FOUND, or
  *         VFS_IO_ERROR_HANDLER_NOT_PROVIDED on failure
  */
-int vfs_read(char *pathname, uint8_t *buffer, size_t n);
+int vfs_read(char *pathname, uint8_t *buffer, size_t count, size_t offset);
 
 /**
  * Resolves pathname via _vfs_get_node and finds its covering mount via
@@ -115,13 +116,14 @@ int vfs_read(char *pathname, uint8_t *buffer, size_t n);
  *
  * @param pathname: null-terminated absolute path of the file to write
  * @param buffer:   input buffer
- * @param n:        number of bytes to write
+ * @param count:    number of bytes to write
+ * @param offset:   byte offset into the file to write to
  *
  * @return return value of mount->write on success;
  *         VFS_IO_ERROR_FILE_NOT_FOUND, VFS_IO_ERROR_MOUNTPOINT_NOT_FOUND, or
  *         VFS_IO_ERROR_HANDLER_NOT_PROVIDED on failure
  */
-int vfs_write(char *pathname, uint8_t *buffer, size_t n);
+int vfs_write(char *pathname, uint8_t *buffer, size_t count, size_t offset);
 
 /**
  * Prints the entire VFS tree to the kernel log via printk, starting from the
