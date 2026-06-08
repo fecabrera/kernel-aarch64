@@ -8,7 +8,6 @@
 #include <dsa/set.h>
 #include <mm/heap.h>
 #include <fs/vfs.h>
-#include <drivers/virtio_mmio.h>
 #include "fat32.h"
 
 // ── Aligned copies ───────────────────────────────────────────────────────────
@@ -50,10 +49,6 @@ struct _aligned_mbr_boot_sector
 void fat32_dump_boot_sector(struct mbr_boot_sector *boot_sector)
 {
     dprintk("\r\n=== fat32 dump ===\r\n");
-
-    // for (int i = 0; i < VIRTIO_MMIO_BLK_SECTOR_SIZE; i++)
-    //     dprintk("%02x ", ((uint8_t *)&boot_sector)[i]);
-    // dprintk("\r\n\r\n");
 
     // ARM doesn't like unaligned memory access
     struct _aligned_mbr_boot_sector data;
@@ -330,7 +325,7 @@ int _fat32_read_cluster(char *pathname, struct fat32_bs_info *bs_info, uint32_t 
     // allocate buffer
     uint8_t *buff = (uint8_t *)kmalloc(bs_info->n_bytes_per_sector);
 
-    int status = vfs_read(pathname, buff, VIRTIO_MMIO_BLK_SECTOR_SIZE, sector * VIRTIO_MMIO_BLK_SECTOR_SIZE);
+    int status = vfs_read(pathname, buff, bs_info->n_bytes_per_sector, sector * bs_info->n_bytes_per_sector);
     if (status < 0)
     {
         dprintk("[fat32] vfs_read() returned %i!\r\n", status);
