@@ -2,6 +2,7 @@
 #include <debug.h>
 #include <io/module.h>
 #include <drivers/virtio_mmio.h>
+#include <mm/heap.h>
 
 void storage_init()
 {
@@ -16,16 +17,29 @@ void storage_init()
     }
 }
 
-int storage_read(uint8_t *buffer, size_t count, size_t offset, uint64_t drv_info)
+int storage_read(uint8_t *buffer, size_t count, size_t offset, uint64_t slot)
 {
-    printk("[/dev/virtio] read(): buff=0x%08x, count=%d, offset=%d, drv_info=%d\r\n", buffer, count, offset, drv_info);
+    printk("[/dev/sd%d] read(): buff=0x%08x, count=%d, offset=%d\r\n", slot, buffer, count, offset);
 
-    return 0;
+    uint8_t *_buffer = (uint8_t *)kmalloc(VIRTIO_MMIO_BLK_SECTOR_SIZE);
+
+    // read boot sector
+    uint64_t sector = offset / VIRTIO_MMIO_BLK_SECTOR_SIZE;
+    if (virtio_mmio_read(slot, sector, _buffer) < 0)
+    {
+        kfree(_buffer);
+        return -1;
+    }
+
+    memcpy(buffer, _buffer, VIRTIO_MMIO_BLK_SECTOR_SIZE);
+    kfree(_buffer);
+
+    return VIRTIO_MMIO_BLK_SECTOR_SIZE;
 }
 
-int storage_write(uint8_t *buffer, size_t count, size_t offset, uint64_t drv_info)
+int storage_write(uint8_t *buffer, size_t count, size_t offset, uint64_t slot)
 {
-    printk("[/dev/virtio] write(): buff=0x%08x, count=%d, offset=%d, drv_info=%d\r\n", buffer, count, offset, drv_info);
+    printk("[/dev/sd%d] write(): buff=0x%08x, count=%d, offset=%d\r\n", slot, buffer, count, offset);
 
     return 0;
 }

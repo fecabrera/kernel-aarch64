@@ -546,9 +546,6 @@ struct fs_node *virtio_mmio_initialize_fat32_device(virtio_slot_t slot)
         return NULL;
     }
 
-    // dump fs
-    vfs_dump_fs();
-
     // clean ptrs
     for (uint32_t i = bs_info->root_cluster; i < fat_q.length; i++)
         kfree((void *)queue64_at(&fat_q, i));
