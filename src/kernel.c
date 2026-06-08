@@ -31,7 +31,7 @@ static void child()
     pid_t pid = syscall_getpid();
     printk("[child] pid = %i, child_pid = %i\r\n", pid, child_pid);
 
-    if (child_pid == 0)
+    if (child_pid == 0) // children
     {
         printk("[child] going to sleep\r\n");
 
@@ -42,7 +42,7 @@ static void child()
         printk("[child] slept for %dms\r\n", t1 - t0);
         syscall_exit(0);
     }
-    else
+    else // parent
     {
         syscall_exit(1);
     }
@@ -63,6 +63,109 @@ static void test_scheduler()
 
     int64_t exit_status = syscall_waitpid(fork_pid);
     printk("[init] child process (pid %i) terminated with status %i\r\n", fork_pid, exit_status);
+}
+
+static int test_vfs_read(struct fs_node *node, uint8_t *buff, size_t n)
+{
+    printk("test_vfs_read(): node=0x%08x, buff=0x%08x, n=%d\r\n", node->name, buff, n);
+
+    char *msg = "im pibble";
+    strncpy((char *)buff, msg, strlen(msg));
+
+    printk("test_vfs_read(): sent \"%s\"\r\n", msg);
+
+    return 0;
+}
+
+static int test_vfs_write(struct fs_node *node, uint8_t *buff, size_t n)
+{
+    printk("test_vfs_write(): node=0x%08x, buff=0x%08x, n=%d\r\n", node->name, buff, n);
+
+    char msg[50] = {0};
+    strncpy(msg, (char *)buff, n);
+
+    printk("test_vfs_write(): received \"%s\"\r\n", msg);
+
+    return 0;
+}
+
+static void test_vfs()
+{
+    printk("\r\n=== vfs test ===\r\n");
+
+    printk("mounting \"/test\"...\r\n");
+    vfs_create_dir("/", "test", 0);
+    vfs_create_mountpoint("/test", &test_vfs_read, &test_vfs_write, NULL);
+
+    printk("creating \"/test/file\"...\r\n");
+    vfs_create_file("/test", "file", 0);
+
+    printk("reading \"/test/file\"...\r\n");
+    char buffer[50] = {0};
+    vfs_read("/test/file", (uint8_t *)&buffer, 50);
+
+    printk("writing \"/test/file\"...\r\n");
+    char *msg = "wash my belly";
+    vfs_write("/test/file", (uint8_t *)msg, strlen(msg));
+
+    printk("dumping vfs tree...\r\n");
+    vfs_dump_fs();
+
+    printk("unmounting \"/test\"...\r\n");
+    vfs_destroy_mountpoint("/test");
+
+    if (vfs_get_mountpoint_for_path("/test"))
+        printk("mountpoint \"/test\" still exists :/\r\n");
+    else
+        printk("mountpoint \"/test\" was removed :)\r\n");
+
+    printk("================\r\n\r\n");
+}
+
+static int test_io_read(uint8_t *buff, size_t n, uint64_t drv_info)
+{
+    printk("test_io_read(): buff=0x%08x, n=%d, drv_info=0x%08x\r\n", buff, n, drv_info);
+
+    char *msg = "im pibble";
+    strncpy((char *)buff, msg, strlen(msg));
+
+    printk("test_io_read(): received \"%s\"\r\n", msg);
+
+    return 0;
+}
+
+static int test_io_write(uint8_t *buff, size_t n, uint64_t drv_info)
+{
+    printk("test_io_write(): buff=0x%08x, n=%d, drv_info=0x%08x\r\n", buff, n, drv_info);
+
+    char msg[50] = {0};
+    strncpy(msg, (char *)buff, n);
+
+    printk("test_io_write(): received \"%s\"\r\n", msg);
+
+    return 0;
+}
+
+static void test_io_modules()
+{
+    printk("\r\n=== io test ===\r\n");
+
+    io_register_module("test", 0, 0, &test_io_read, &test_io_write);
+
+    printk("dumping vfs tree...\r\n");
+    vfs_dump_fs();
+
+    printk("reading \"/dev/test\"...\r\n");
+    char buffer[50] = {0};
+    vfs_read("/dev/test", (uint8_t *)&buffer, 50);
+
+    printk("writing \"/dev/test\"...\r\n");
+    char *msg = "wash my belly";
+    vfs_write("/dev/test", (uint8_t *)msg, strlen(msg));
+
+    io_unregister_module("test");
+
+    printk("===============\r\n\r\n");
 }
 
 void kernel_init()
@@ -110,6 +213,8 @@ void init()
     printk("[init] pid = %i\r\n", pid);
 
     test_scheduler();
+    test_vfs();
+    test_io_modules();
 
     time_t t0 = syscall_uptime();
     virtio_slot_t slot = -1;

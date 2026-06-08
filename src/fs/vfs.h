@@ -84,6 +84,18 @@ int vfs_destroy_mountpoint(char *mountpoint);
 struct fs_node *vfs_create_dir(char *path, char *name, uint16_t attrs);
 
 /**
+ * Resolves path via _vfs_get_node and creates a new file named name
+ * inside it via fs_add_file_to_folder.
+ *
+ * @param path:  null-terminated absolute path of the parent folder (e.g. "/volumes/NO NAME")
+ * @param name:  null-terminated name for the new file
+ * @param attrs: attribute flags (FS_NODE_ATTRS_FLAG_*)
+ *
+ * @return pointer to the new file node, or NULL if the parent is not found or creation fails
+ */
+struct fs_node *vfs_create_file(char *path, char *name, uint16_t attrs);
+
+/**
  * Resolves pathname via _vfs_get_node and finds its covering mount via
  * vfs_get_mountpoint_for_path, then dispatches to mount->read.
  *

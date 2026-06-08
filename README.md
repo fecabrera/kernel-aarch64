@@ -97,7 +97,7 @@ make run
 - VFS mount system (`vfs.h`): `vfs_init` initializes the mount table and creates a global root tree with a "volumes" subfolder; `vfs_create_mountpoint(path, read, write, data)` registers a mount entry in a `hashmap64`-backed table (caller creates the VFS node separately); `vfs_destroy_mountpoint(path)` removes the entry, unlinks and destroys the root node.
 - `struct vfs_mount` carries the mountpoint path, root node pointer, `vfs_handler_t read`/`write` handlers, and a `void *data` field for driver-private context.
 - `vfs_get_mountpoint(path)` looks up a mount entry by its exact path; `vfs_get_mountpoint_for_path(path)` walks path left-to-right and returns the deepest mount whose path is a prefix.
-- `vfs_create_dir(path, name, attrs)` resolves path and appends a new subfolder via `fs_add_subfolder`.
+- `vfs_create_dir(path, name, attrs)` / `vfs_create_file(path, name, attrs)` resolve path and append a new subfolder or file node.
 - `vfs_read` / `vfs_write` resolve the node, find its covering mount via `vfs_get_mountpoint_for_path`, and dispatch to the mount's `read`/`write` handler; return `VFS_IO_ERROR_FILE_NOT_FOUND`, `VFS_IO_ERROR_MOUNTPOINT_NOT_FOUND`, or `VFS_IO_ERROR_HANDLER_NOT_PROVIDED` on failure.
 - `vfs_dump_fs` prints the entire VFS tree from the global root.
 
@@ -148,11 +148,11 @@ make run
 
 ### **I/O module registry**
 
-- Named registry of `io_module` structs backed by a `hashmap64`; `io_init()` must be called before any registration. Creates the `/dev` folder in the VFS tree at init time.
-- Each module carries `attrs` (IO_CAN_READ / IO_CAN_WRITE) and `read`/`write` function pointers (`io_handler_t`).
-- `io_register_module(name, attrs, read, write)` allocates and inserts a module and creates a `/dev/<name>` file node in the VFS tree; returns -1 if already registered.
+- Named registry of `io_module` structs backed by a `hashmap64`; `io_init()` must be called before any registration. Creates the `/dev` VFS folder and registers it as a mountpoint with `io_read`/`io_write` as handlers, so `vfs_read("/dev/<name>", ...)` dispatches through the I/O registry.
+- Each module carries `attrs` (IO_CAN_READ / IO_CAN_WRITE), a `uint64_t drv_info` driver-private value, and `read`/`write` function pointers (`io_handler_t`: `int (*)(uint8_t *, size_t, uint64_t)`).
+- `io_register_module(name, attrs, drv_info, read, write)` allocates and inserts a module and creates a `/dev/<name>` file node in the VFS tree; returns -1 if already registered. `drv_info` is forwarded to the handler on every call.
 - `io_unregister_module(name)` removes and frees the module and unlinks the `/dev/<name>` VFS node; returns -1 if not found or the node cannot be removed.
-- `io_read(name, buf, n)` / `io_write(name, buf, n)` look up the module by name and dispatch to its handler.
+- `io_read(node, buf, n)` / `io_write(node, buf, n)` are `vfs_handler_t` callbacks; they look up the module by `node->name` and dispatch to its handler.
 
 ### **Syscall interface**
 

@@ -549,19 +549,6 @@ struct fs_node *virtio_mmio_initialize_fat32_device(virtio_slot_t slot)
     // dump fs
     vfs_dump_fs();
 
-    // unmount
-    printk("[virtio_mmio@%x] unmounting \"%s\"\r\n", VIRTIO_MMIO_ADDR(slot), mountpoint);
-    vfs_destroy_mountpoint(mountpoint);
-
-    // verify that mountpoint was removed
-    if (vfs_get_mountpoint_for_path(mountpoint))
-        printk("[virtio_mmio@%x] mountpoint \"%s\" still exists :/\r\n", VIRTIO_MMIO_ADDR(slot), mountpoint);
-    else
-        printk("[virtio_mmio@%x] mountpoint \"%s\" was removed :)\r\n", VIRTIO_MMIO_ADDR(slot), mountpoint);
-
-    // dump fs
-    vfs_dump_fs();
-
     // clean ptrs
     for (uint32_t i = bs_info->root_cluster; i < fat_q.length; i++)
         kfree((void *)queue64_at(&fat_q, i));

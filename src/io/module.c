@@ -16,6 +16,7 @@ void io_init()
         dprintk("[virtio_mmio@%x] cannot creat mountpoint \"%s\"!\r\n");
         hang();
     }
+    vfs_create_mountpoint("/dev", &io_read, &io_write, NULL);
 
     hashmap64_init(&_devices, 10);
 }
@@ -29,7 +30,7 @@ static struct io_module *_io_get_module(char *name)
     return (struct io_module *)module_ptr;
 }
 
-int io_register_module(char *name, uint8_t attrs, io_handler_t read, io_handler_t write)
+int io_register_module(char *name, uint8_t attrs, uint64_t drv_info, io_handler_t read, io_handler_t write)
 {
     if (_io_get_module(name) != NULL)
     {
@@ -39,6 +40,7 @@ int io_register_module(char *name, uint8_t attrs, io_handler_t read, io_handler_
 
     struct io_module *module = (struct io_module *)kmalloc(sizeof(struct io_module));
     module->attrs = attrs;
+    module->drv_info = drv_info;
     module->read = read;
     module->write = write;
 
@@ -73,26 +75,30 @@ int io_unregister_module(char *name)
     return 0;
 }
 
-int io_read(char *name, uint8_t *buffer, size_t n)
+int io_read(struct fs_node *node, uint8_t *buff, size_t n)
 {
-    struct io_module *module = _io_get_module(name);
+    printk("[io] read(): mod=\"%s\", buff=0x%08x, n=%d\r\n", node->name, buff, n);
+
+    struct io_module *module = _io_get_module(node->name);
     if (module == NULL)
     {
-        dprintk("[io] module \"%s\" not found!\r\n", name);
+        dprintk("[io] module \"%s\" not found!\r\n", node->name);
         return -1;
     }
 
-    return module->read(buffer, n);
+    return module->read(buff, n, module->drv_info);
 }
 
-int io_write(char *name, uint8_t *buffer, size_t n)
+int io_write(struct fs_node *node, uint8_t *buff, size_t n)
 {
-    struct io_module *module = _io_get_module(name);
+    printk("[io] write(): mod=\"%s\", buff=0x%08x, n=%d\r\n", node->name, buff, n);
+
+    struct io_module *module = _io_get_module(node->name);
     if (module == NULL)
     {
-        dprintk("[io] module \"%s\" not found!\r\n", name);
+        dprintk("[io] module \"%s\" not found!\r\n", node->name);
         return -1;
     }
 
-    return module->write(buffer, n);
+    return module->write(buff, n, module->drv_info);
 }
