@@ -314,7 +314,7 @@ void fat32_build_cluster_chains(struct fat32_bs_info *bs_info, fat_table_entry_t
     }
 }
 
-int _fat32_read_cluster(char *pathname, struct fat32_bs_info *bs_info, uint32_t cluster, struct fs_node *parent_node, struct set64 *parent_nodes)
+static int _fat32_read_cluster(char *pathname, struct fat32_bs_info *bs_info, uint32_t cluster, struct fs_node *parent_node, struct set64 *parent_nodes, struct vfs_mount *mount)
 {
     uint32_t sector_offset = cluster - bs_info->root_cluster;
     uint32_t sector = bs_info->first_data_sector + sector_offset;
@@ -430,9 +430,9 @@ int _fat32_read_cluster(char *pathname, struct fat32_bs_info *bs_info, uint32_t 
 
             struct fs_node *node;
             if (attributes & FAT32_ATTR_DIRECTORY)
-                node = fs_add_subfolder(parent_node, name, 0, (void *)entry_ref);
+                node = fs_add_subfolder(parent_node, name, 0, (void *)entry_ref, (void *)mount);
             else
-                node = fs_add_file_to_folder(parent_node, name, 0, (void *)entry_ref);
+                node = fs_add_file_to_folder(parent_node, name, 0, (void *)entry_ref, (void *)mount);
 
             set64_set(parent_nodes, next_cluster, (uintptr_t)node);
         }
@@ -454,7 +454,7 @@ int _fat32_read_cluster(char *pathname, struct fat32_bs_info *bs_info, uint32_t 
     return 0;
 }
 
-static int _fat32_build_fs_tree(char *pathname, struct fat32_bs_info *bs_info, struct queue64 *fat_q, struct fs_node *root_node)
+static int _fat32_build_fs_tree(char *pathname, struct fat32_bs_info *bs_info, struct queue64 *fat_q, struct fs_node *root_node, struct vfs_mount *mount)
 {
     // create set of parent nodes
     struct set64 parent_nodes;
@@ -481,7 +481,7 @@ static int _fat32_build_fs_tree(char *pathname, struct fat32_bs_info *bs_info, s
         // go through all clusters on the cluster chain
         for (uint32_t cluster = chain->start; cluster <= chain->end; cluster++)
         {
-            int status = _fat32_read_cluster(pathname, bs_info, cluster, parent_node, &parent_nodes);
+            int status = _fat32_read_cluster(pathname, bs_info, cluster, parent_node, &parent_nodes, mount);
             if (status < 0)
             {
                 set64_destroy(&parent_nodes);
@@ -508,12 +508,6 @@ int fat32_mount(char *pathname)
         printk("[fat32] cannot read boot sector from \"%s\"!\r\n", pathname);
         return -1;
     }
-
-    // test non-aligned offset
-    uint16_t mbr_signature_word;
-    vfs_read(pathname, (uint8_t *)&mbr_signature_word, 2, 510);
-
-    printk("[fat32] signature=0x%04x\r\n", mbr_signature_word);
 
     // check if it's a fat32 volume
     if (!fat32_is_boot_sector(bs))
@@ -548,7 +542,7 @@ int fat32_mount(char *pathname)
     fat32_build_cluster_chains(&bs_info, fat_table, &fat_q);
 
     // create folder
-    struct fs_node *root = vfs_create_dir("/volumes", bs_info.volume_label, 0);
+    struct fs_node *root = vfs_create_dir("/volumes", bs_info.volume_label, 0, NULL);
     if (root == NULL)
     {
         printk("[fat32] cannot create mountpoint \"%s\"!\r\n", pathname);
@@ -561,10 +555,10 @@ int fat32_mount(char *pathname)
 
     // mount volume
     printk("[fat32] mounting \"%s\"\r\n", mountpoint);
-    vfs_create_mountpoint(mountpoint, pathname, &fat32_read, &fat32_write);
+    struct vfs_mount *vfs_mp = vfs_create_mountpoint(mountpoint, pathname, &fat32_read, &fat32_write);
 
     // build fs tree
-    int status = _fat32_build_fs_tree(pathname, &bs_info, &fat_q, root);
+    int status = _fat32_build_fs_tree(pathname, &bs_info, &fat_q, root, vfs_mp);
     if (status < 0)
     {
         dprintk("[fat32] _fat32_build_fs_tree() returned %i!\r\n", status);
@@ -594,8 +588,18 @@ int fat32_mount(char *pathname)
 
 int fat32_read(struct fs_node *node, uint8_t *buffer, size_t count, size_t offset)
 {
+    struct vfs_mount *vfs_mp = node->mount;
+
+    printk("[fat32] mp=\"%s\", device=\"%s\"\r\n", vfs_mp->mountpoint, vfs_mp->device);
+
+    return -1;
 }
 
 int fat32_write(struct fs_node *node, uint8_t *buffer, size_t count, size_t offset)
 {
+    struct vfs_mount *vfs_mp = node->mount;
+
+    printk("[fat32] mp=\"%s\", device=\"%s\"\r\n", vfs_mp->mountpoint, vfs_mp->device);
+
+    return -1;
 }

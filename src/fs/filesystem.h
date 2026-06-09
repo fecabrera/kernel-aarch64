@@ -20,7 +20,8 @@ struct fs_node
     char *name;
     size_t size;
     uint16_t attrs;
-    void *info;            // driver-private pointer (e.g. fat32_entry_reference *)
+    void *info;  // driver-private pointer (e.g. fat32_entry_reference *)
+    void *mount; // vfs_mount * for this node's covering mountpoint, or NULL
     struct fs_node *next;
     struct fs_node *child;
 };
@@ -52,13 +53,14 @@ int fs_remove_child(struct fs_node *node, char *name);
  *
  * @param name:  null-terminated name string (length determined via strlen; duplicated into heap)
  * @param attrs: attribute flags (FS_NODE_ATTRS_TYPE_* combined with FS_NODE_ATTRS_FLAG_*)
- * @param data:  driver-private value stored in the node's data field (e.g. FAT32 entry reference)
+ * @param info:  driver-private pointer stored in node->info (e.g. fat32_entry_reference *)
+ * @param mount: vfs_mount pointer stored in node->mount (void * to avoid circular include), or NULL
  * @param next:  next sibling node in the directory, or NULL
  * @param child: first child node (for directories), or NULL
  *
  * @return pointer to the new node, or NULL if kmalloc failed
  */
-struct fs_node *fs_create_node(char *name, uint16_t attrs, void *info, struct fs_node *next, struct fs_node *child);
+struct fs_node *fs_create_node(char *name, uint16_t attrs, void *info, void *mount, struct fs_node *next, struct fs_node *child);
 
 /**
  * Allocates and initializes a new fs_node with FS_NODE_ATTRS_TYPE_FILE set.
@@ -66,11 +68,12 @@ struct fs_node *fs_create_node(char *name, uint16_t attrs, void *info, struct fs
  *
  * @param name:  null-terminated name string (length determined via strlen; duplicated into heap)
  * @param attrs: additional attribute flags (FS_NODE_ATTRS_FLAG_*); type bits are ignored
- * @param data:  driver-private value stored in the node's data field
+ * @param data:  driver-private pointer stored in node->info
+ * @param mount: vfs_mount pointer stored in node->mount, or NULL
  *
  * @return pointer to the new file node, or NULL if kmalloc failed
  */
-struct fs_node *fs_create_file(char *name, uint16_t attrs, void *data);
+struct fs_node *fs_create_file(char *name, uint16_t attrs, void *data, void *mount);
 
 /**
  * Allocates and initializes a new fs_node with FS_NODE_ATTRS_TYPE_FOLDER set.
@@ -79,11 +82,12 @@ struct fs_node *fs_create_file(char *name, uint16_t attrs, void *data);
  *
  * @param name:  null-terminated name string (length determined via strlen; duplicated into heap)
  * @param attrs: additional attribute flags (FS_NODE_ATTRS_FLAG_*); type bits are ignored
- * @param data:  driver-private value stored in the node's data field
+ * @param data:  driver-private pointer stored in node->info
+ * @param mount: vfs_mount pointer stored in node->mount, or NULL
  *
  * @return pointer to the new folder node, or NULL if kmalloc failed
  */
-struct fs_node *fs_create_folder(char *name, uint16_t attrs, void *data);
+struct fs_node *fs_create_folder(char *name, uint16_t attrs, void *data, void *mount);
 
 /**
  * Appends node to the end of parent's child linked list. Does not check
@@ -98,27 +102,29 @@ void fs_add_to_folder(struct fs_node *parent, struct fs_node *node);
  * Creates a new file node and appends it to the child list of a folder node.
  * The new node is inserted after the last sibling in the folder's child chain.
  *
- * @param node:      pointer to the parent folder node
- * @param name:      null-terminated name string for the new file (duplicated into a heap-allocated buffer)
- * @param attrs:     attribute flags for the new file (FS_NODE_ATTRS_FLAG_*)
- * @param data:      driver-private value stored in the node's data field
+ * @param node:  pointer to the parent folder node
+ * @param name:  null-terminated name string for the new file (duplicated into a heap-allocated buffer)
+ * @param attrs: attribute flags for the new file (FS_NODE_ATTRS_FLAG_*)
+ * @param data:  driver-private pointer stored in node->info
+ * @param mount: vfs_mount pointer stored in node->mount, or NULL
  *
  * @return pointer to the new file node, or NULL if node is not a folder
  */
-struct fs_node *fs_add_file_to_folder(struct fs_node *node, char *name, uint16_t attrs, void *data);
+struct fs_node *fs_add_file_to_folder(struct fs_node *node, char *name, uint16_t attrs, void *data, void *mount);
 
 /**
  * Creates a new folder node and appends it to the child list of a folder node.
  * The new node is inserted after the last sibling in the folder's child chain.
  *
- * @param parent:      pointer to the parent folder node
- * @param name:      null-terminated name string for the new subfolder (duplicated into a heap-allocated buffer)
- * @param attrs:     attribute flags for the new subfolder (FS_NODE_ATTRS_FLAG_*)
- * @param data:      driver-private value stored in the node's data field
+ * @param parent: pointer to the parent folder node
+ * @param name:   null-terminated name string for the new subfolder (duplicated into a heap-allocated buffer)
+ * @param attrs:  attribute flags for the new subfolder (FS_NODE_ATTRS_FLAG_*)
+ * @param data:   driver-private pointer stored in node->info
+ * @param mount:  vfs_mount pointer stored in node->mount, or NULL
  *
  * @return pointer to the new folder node, or NULL if node is not a folder
  */
-struct fs_node *fs_add_subfolder(struct fs_node *parent, char *name, uint16_t attrs, void *data);
+struct fs_node *fs_add_subfolder(struct fs_node *parent, char *name, uint16_t attrs, void *data, void *mount);
 
 /**
  * Replaces the name of an existing fs_node with a new name string.

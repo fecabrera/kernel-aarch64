@@ -7,16 +7,17 @@
 
 static struct hashmap64 _devices;
 static struct fs_node *_dev_root = NULL;
+static struct vfs_mount *dev_mp;
 
 void io_init()
 {
-    _dev_root = vfs_create_dir("/", "dev", 0);
+    _dev_root = vfs_create_dir("/", "dev", 0, NULL);
     if (_dev_root == NULL)
     {
         dprintk("[virtio_mmio@%x] cannot creat mountpoint \"%s\"!\r\n");
         hang();
     }
-    vfs_create_mountpoint("/dev", NULL, &io_read, &io_write);
+    dev_mp = vfs_create_mountpoint("/dev", NULL, &io_read, &io_write);
 
     hashmap64_init(&_devices, 10);
 }
@@ -43,7 +44,7 @@ int io_register_module(char *name, uint64_t drv_info, io_handler_t read, io_hand
     module->read = read;
     module->write = write;
 
-    if (fs_add_file_to_folder(_dev_root, name, 0, NULL) == NULL)
+    if (fs_add_file_to_folder(_dev_root, name, 0, NULL, dev_mp) == NULL)
     {
         dprintk("[io] cannot add \"%s\" to /dev!\r\n", name);
         return -1;

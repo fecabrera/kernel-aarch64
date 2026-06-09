@@ -36,9 +36,9 @@ void vfs_init();
  * @param read:       read handler for this mount, or NULL
  * @param write:      write handler for this mount, or NULL
  *
- * @return 0 on success, -1 if the mountpoint is not found, -2 if it is not a folder
+ * @return pointer to the new vfs_mount on success, NULL if the mountpoint is not found or not a folder
  */
-int vfs_create_mountpoint(char *mountpoint, char *device, vfs_handler_t read, vfs_handler_t write);
+struct vfs_mount *vfs_create_mountpoint(char *mountpoint, char *device, vfs_handler_t read, vfs_handler_t write);
 
 /**
  * Looks up a mount entry by its exact mountpoint path.
@@ -50,15 +50,13 @@ int vfs_create_mountpoint(char *mountpoint, char *device, vfs_handler_t read, vf
 struct vfs_mount *vfs_get_mountpoint(char *mountpoint);
 
 /**
- * Walks pathname left-to-right, accumulating each segment and checking it
- * against the mount table at every '/' boundary. Returns the last mount whose
- * path is a prefix of pathname, or NULL if no mount covers any prefix.
+ * Resolves pathname via _vfs_get_node and returns the matching fs_node.
  *
- * @param pathname: null-terminated absolute path to resolve (e.g. "/volumes/NO NAME/foo")
+ * @param pathname: null-terminated absolute path to resolve
  *
- * @return pointer to the deepest matching vfs_mount, or NULL if none found
+ * @return pointer to the fs_node, or NULL if not found
  */
-struct vfs_mount *vfs_get_mountpoint_for_path(char *pathname);
+struct fs_node *vfs_get_node_for_path(char *pathname);
 
 /**
  * Removes the mount entry for mountpoint from the mount table, unlinks the
@@ -79,10 +77,11 @@ int vfs_destroy_mountpoint(char *mountpoint);
  * @param path:  null-terminated absolute path of the parent folder (e.g. "/volumes")
  * @param name:  null-terminated name for the new directory
  * @param attrs: attribute flags (FS_NODE_ATTRS_FLAG_*)
+ * @param mount: vfs_mount pointer stored in node->mount (void * to avoid circular include), or NULL
  *
  * @return pointer to the new folder node, or NULL if the parent is not found or creation fails
  */
-struct fs_node *vfs_create_dir(char *path, char *name, uint16_t attrs);
+struct fs_node *vfs_create_dir(char *path, char *name, uint16_t attrs, void *mount);
 
 /**
  * Resolves path via _vfs_get_node and creates a new file named name
@@ -91,14 +90,15 @@ struct fs_node *vfs_create_dir(char *path, char *name, uint16_t attrs);
  * @param path:  null-terminated absolute path of the parent folder (e.g. "/volumes/NO NAME")
  * @param name:  null-terminated name for the new file
  * @param attrs: attribute flags (FS_NODE_ATTRS_FLAG_*)
+ * @param mount: vfs_mount pointer stored in node->mount (void * to avoid circular include), or NULL
  *
  * @return pointer to the new file node, or NULL if the parent is not found or creation fails
  */
-struct fs_node *vfs_create_file(char *path, char *name, uint16_t attrs);
+struct fs_node *vfs_create_file(char *path, char *name, uint16_t attrs, void *mount);
 
 /**
- * Resolves pathname via _vfs_get_node and finds its covering mount via
- * vfs_get_mountpoint_for_path, then dispatches to mount->read.
+ * Resolves pathname via _vfs_get_node, reads node->mount for the covering
+ * mount, then dispatches to mount->read.
  *
  * @param pathname: null-terminated absolute path of the file to read
  * @param buffer:   output buffer
@@ -112,8 +112,8 @@ struct fs_node *vfs_create_file(char *path, char *name, uint16_t attrs);
 int vfs_read(char *pathname, uint8_t *buffer, size_t count, size_t offset);
 
 /**
- * Resolves pathname via _vfs_get_node and finds its covering mount via
- * vfs_get_mountpoint_for_path, then dispatches to mount->write.
+ * Resolves pathname via _vfs_get_node, reads node->mount for the covering
+ * mount, then dispatches to mount->write.
  *
  * @param pathname: null-terminated absolute path of the file to write
  * @param buffer:   input buffer

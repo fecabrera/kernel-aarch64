@@ -58,23 +58,23 @@ void vfs_init()
     hashmap64_init(&_vfs_mp_table, 10);
 
     // create root and volumes
-    _fs_root = fs_create_folder(NULL, 0, NULL);
-    fs_add_subfolder(_fs_root, "volumes", 0, NULL);
+    _fs_root = fs_create_folder(NULL, 0, NULL, NULL);
+    fs_add_subfolder(_fs_root, "volumes", 0, NULL, NULL);
 }
 
-int vfs_create_mountpoint(char *mountpoint, char *device, vfs_handler_t read, vfs_handler_t write)
+struct vfs_mount *vfs_create_mountpoint(char *mountpoint, char *device, vfs_handler_t read, vfs_handler_t write)
 {
     struct fs_node *mp_node = _vfs_get_node(mountpoint, _fs_root);
     if (mp_node == NULL)
     {
         printk("[vfs] mountpoint \"%s\" not found!\r\n", mountpoint);
-        return -1;
+        return NULL;
     }
 
     if ((mp_node->attrs & FS_NODE_ATTRS_TYPE_MASK) != FS_NODE_ATTRS_TYPE_FOLDER)
     {
         printk("[vfs] \"%s\" is not a folder!\r\n", mountpoint);
-        return -2;
+        return NULL;
     }
 
     struct vfs_mount *vfs_mp = (struct vfs_mount *)kmalloc(sizeof(struct vfs_mount));
@@ -100,7 +100,7 @@ int vfs_create_mountpoint(char *mountpoint, char *device, vfs_handler_t read, vf
 
     printk("[vfs] \"%s\" mounted successfully\r\n", mountpoint);
 
-    return 0;
+    return vfs_mp;
 }
 
 struct vfs_mount *vfs_get_mountpoint(char *mountpoint)
@@ -112,26 +112,9 @@ struct vfs_mount *vfs_get_mountpoint(char *mountpoint)
     return (struct vfs_mount *)value;
 }
 
-struct vfs_mount *vfs_get_mountpoint_for_path(char *pathname)
+struct fs_node *vfs_get_node_for_path(char *pathname)
 {
-    struct vfs_mount *mp = NULL;
-    char str[256] = {0};
-    char *_str = str;
-    char *_pathname = pathname;
-
-    while (*_pathname)
-    {
-        if (*_pathname == '/')
-        {
-            uint64_t value;
-            if (hashmap64_get(&_vfs_mp_table, str, &value) == 1)
-                mp = (struct vfs_mount *)value;
-        }
-
-        *_str++ = *_pathname++;
-    }
-
-    return mp;
+    return _vfs_get_node(pathname, _fs_root);
 }
 
 int vfs_destroy_mountpoint(char *mountpoint)
@@ -170,7 +153,7 @@ int vfs_read(char *pathname, uint8_t *buffer, size_t count, size_t offset)
         return VFS_IO_ERROR_FILE_NOT_FOUND;
     }
 
-    struct vfs_mount *mp = vfs_get_mountpoint_for_path(pathname);
+    struct vfs_mount *mp = node->mount;
     if (mp == NULL)
     {
         printk("[vfs] mountpoint for \"%s\" not found!\r\n", pathname);
@@ -197,7 +180,7 @@ int vfs_write(char *pathname, uint8_t *buffer, size_t count, size_t offset)
         return VFS_IO_ERROR_FILE_NOT_FOUND;
     }
 
-    struct vfs_mount *mp = vfs_get_mountpoint_for_path(pathname);
+    struct vfs_mount *mp = node->mount;
     if (mp == NULL)
     {
         printk("[vfs] mountpoint for file \"%s\" not found!\r\n", pathname);
@@ -213,10 +196,10 @@ int vfs_write(char *pathname, uint8_t *buffer, size_t count, size_t offset)
     return mp->write(node, buffer, count, offset);
 }
 
-struct fs_node *vfs_create_dir(char *path, char *name, uint16_t attrs)
+struct fs_node *vfs_create_dir(char *path, char *name, uint16_t attrs, void *mount)
 {
     struct fs_node *parent = _vfs_get_node(path, _fs_root);
-    struct fs_node *node = fs_add_subfolder(parent, name, attrs, NULL);
+    struct fs_node *node = fs_add_subfolder(parent, name, attrs, NULL, mount);
     if (node == NULL)
     {
         printk("[vfs] cannot create \"%s/%s\"!\r\n", path, name);
@@ -226,10 +209,10 @@ struct fs_node *vfs_create_dir(char *path, char *name, uint16_t attrs)
     return node;
 }
 
-struct fs_node *vfs_create_file(char *path, char *name, uint16_t attrs)
+struct fs_node *vfs_create_file(char *path, char *name, uint16_t attrs, void *mount)
 {
     struct fs_node *parent = _vfs_get_node(path, _fs_root);
-    struct fs_node *node = fs_add_file_to_folder(parent, name, attrs, NULL);
+    struct fs_node *node = fs_add_file_to_folder(parent, name, attrs, NULL, mount);
     if (node == NULL)
     {
         printk("[vfs] cannot create \"%s/%s\"!\r\n", path, name);
