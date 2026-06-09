@@ -19,8 +19,6 @@ void storage_init()
 
 int storage_read(uint8_t *buffer, size_t count, size_t offset, uint64_t slot)
 {
-    printk("[/dev/sd%d] read(): buff=0x%08x, count=%d, offset=%d\r\n", slot, buffer, count, offset);
-
     uint64_t first_sector = offset / VIRTIO_MMIO_BLK_SECTOR_SIZE;
     uint64_t last_sector = (offset + count - 1) / VIRTIO_MMIO_BLK_SECTOR_SIZE;
     uint64_t sectors_to_read = last_sector - first_sector + 1;
@@ -62,7 +60,11 @@ int storage_read(uint8_t *buffer, size_t count, size_t offset, uint64_t slot)
 
 int storage_write(uint8_t *buffer, size_t count, size_t offset, uint64_t slot)
 {
-    printk("[/dev/sd%d] write(): buff=0x%08x, count=%d, offset=%d\r\n", slot, buffer, count, offset);
+    uint64_t first_sector = offset / VIRTIO_MMIO_BLK_SECTOR_SIZE;
+    uint64_t last_sector = (offset + count - 1) / VIRTIO_MMIO_BLK_SECTOR_SIZE;
+    uint64_t sectors_to_read = last_sector - first_sector + 1;
+
+    printk("[/dev/sd%d] first_sector=%d, last_sector=%d, sectors_to_read=%d\r\n", slot, first_sector, last_sector, sectors_to_read);
 
     return 0;
 }
