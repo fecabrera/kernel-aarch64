@@ -1,4 +1,5 @@
 #include "stdlib.h"
+#include <ctype.h>
 
 static const char _itoa_digits[] = "0123456789abcdef";
 
@@ -59,16 +60,16 @@ int vsprintf(char *str, const char *format, __builtin_va_list args)
 
         format++;
 
-        // parse optional zero-pad: %0<width><conv> e.g. %08x
+        // parse optional pad: %[0]<width><conv> e.g. %8x or %08x
         char pad_char = ' ';
         int pad_width = 0;
         if (*format == '0')
         {
             pad_char = '0';
             format++;
-            while (*format >= '0' && *format <= '9')
-                pad_width = pad_width * 10 + (*format++ - '0');
         }
+        while (*format >= '0' && *format <= '9')
+            pad_width = pad_width * 10 + (*format++ - '0');
 
         switch (*format++)
         {
@@ -99,6 +100,7 @@ int vsprintf(char *str, const char *format, __builtin_va_list args)
                 *out++ = *p;
             break;
         }
+        case 'X':
         case 'x':
         {
             unsigned int val = __builtin_va_arg(args, unsigned int);
@@ -109,7 +111,7 @@ int vsprintf(char *str, const char *format, __builtin_va_list args)
             for (int i = len; i < pad_width; i++)
                 *out++ = pad_char;
             for (char *p = tmp; *p; p++)
-                *out++ = *p;
+                *out++ = (*(format - 1) == 'X') ? toupper(*p) : *p;
             break;
         }
         case 's':

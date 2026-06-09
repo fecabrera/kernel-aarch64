@@ -16,9 +16,10 @@ char *itoa(int64_t value, char *str, int base);
 
 /**
  * Formats a string into str using a printf-style format and a pre-initialized
- * va_list. Supports: %d/%i (signed int), %u (unsigned int), %x (hex),
- * %s (string), %c (char), %%. Zero-padding is supported for integer
- * conversions via %0<width><conv> (e.g. %08x, %04d).
+ * va_list. Supports: %d/%i (signed int), %u (unsigned int), %x (lowercase hex),
+ * %X (uppercase hex), %s (string), %c (char), %%. Width padding is supported
+ * for integer conversions: %<width><conv> space-pads (e.g. %8x), %0<width><conv>
+ * zero-pads (e.g. %08x, %04d).
  *
  * @param str: output buffer
  * @param format: printf-style format string
@@ -30,9 +31,10 @@ int vsprintf(char *str, const char *format, __builtin_va_list args);
 
 /**
  * Formats a string into str using a printf-style format.
- * Supports: %d/%i (signed int), %u (unsigned int), %x (hex),
- * %s (string), %c (char), %%. Zero-padding is supported for integer
- * conversions via %0<width><conv> (e.g. %08x, %04d).
+ * Supports: %d/%i (signed int), %u (unsigned int), %x (lowercase hex),
+ * %X (uppercase hex), %s (string), %c (char), %%. Width padding is supported
+ * for integer conversions: %<width><conv> space-pads (e.g. %8x), %0<width><conv>
+ * zero-pads (e.g. %08x, %04d).
  *
  * @param str: output buffer
  * @param format: printf-style format string
