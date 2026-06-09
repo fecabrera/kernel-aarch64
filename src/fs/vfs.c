@@ -58,11 +58,11 @@ void vfs_init()
     hashmap64_init(&_vfs_mp_table, 10);
 
     // create root and volumes
-    _fs_root = fs_create_folder(NULL, 0, 0);
-    fs_add_subfolder(_fs_root, "volumes", 0, 0);
+    _fs_root = fs_create_folder(NULL, 0, NULL);
+    fs_add_subfolder(_fs_root, "volumes", 0, NULL);
 }
 
-int vfs_create_mountpoint(char *mountpoint, vfs_handler_t read, vfs_handler_t write, void *data)
+int vfs_create_mountpoint(char *mountpoint, char *device, vfs_handler_t read, vfs_handler_t write)
 {
     struct fs_node *mp_node = _vfs_get_node(mountpoint, _fs_root);
     if (mp_node == NULL)
@@ -78,13 +78,23 @@ int vfs_create_mountpoint(char *mountpoint, vfs_handler_t read, vfs_handler_t wr
     }
 
     struct vfs_mount *vfs_mp = (struct vfs_mount *)kmalloc(sizeof(struct vfs_mount));
+
     vfs_mp->mountpoint = (char *)kmalloc(strlen(mountpoint) + 1);
+    strcpy(vfs_mp->mountpoint, mountpoint);
+
     vfs_mp->root = mp_node;
     vfs_mp->read = read;
     vfs_mp->write = write;
-    vfs_mp->data = data;
 
-    strcpy(vfs_mp->mountpoint, mountpoint);
+    if (device)
+    {
+        vfs_mp->device = (char *)kmalloc(strlen(device) + 1);
+        strcpy(vfs_mp->device, device);
+    }
+    else
+    {
+        vfs_mp->device = NULL;
+    }
 
     hashmap64_set(&_vfs_mp_table, mountpoint, (uintptr_t)vfs_mp);
 
@@ -140,6 +150,8 @@ int vfs_destroy_mountpoint(char *mountpoint)
 
     fs_destroy_node(mp->root);
     kfree(mp->mountpoint);
+    if (mp->device)
+        kfree(mp->device);
     kfree(mp);
 
     printk("[vfs] \"%s\" unmounted successfully\r\n", mountpoint);
@@ -204,7 +216,7 @@ int vfs_write(char *pathname, uint8_t *buffer, size_t count, size_t offset)
 struct fs_node *vfs_create_dir(char *path, char *name, uint16_t attrs)
 {
     struct fs_node *parent = _vfs_get_node(path, _fs_root);
-    struct fs_node *node = fs_add_subfolder(parent, name, attrs, 0);
+    struct fs_node *node = fs_add_subfolder(parent, name, attrs, NULL);
     if (node == NULL)
     {
         printk("[vfs] cannot create \"%s/%s\"!\r\n", path, name);
@@ -217,7 +229,7 @@ struct fs_node *vfs_create_dir(char *path, char *name, uint16_t attrs)
 struct fs_node *vfs_create_file(char *path, char *name, uint16_t attrs)
 {
     struct fs_node *parent = _vfs_get_node(path, _fs_root);
-    struct fs_node *node = fs_add_file_to_folder(parent, name, attrs, 0);
+    struct fs_node *node = fs_add_file_to_folder(parent, name, attrs, NULL);
     if (node == NULL)
     {
         printk("[vfs] cannot create \"%s/%s\"!\r\n", path, name);

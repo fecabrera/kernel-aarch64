@@ -272,3 +272,29 @@ void fat32_build_cluster_chains(struct fat32_bs_info *bs_info, fat_table_entry_t
  * @return 0 on success, -1 on I/O error, -2 if not a valid FAT32 volume
  */
 int fat32_mount(char *pathname);
+
+/**
+ * vfs_handler_t read handler for FAT32 mountpoints. Reads count bytes from
+ * the file described by node->info (fat32_entry_reference) into buffer,
+ * starting at offset.
+ *
+ * @param node:   fs_node whose info points to a fat32_entry_reference
+ * @param buffer: output buffer
+ * @param count:  number of bytes to read
+ * @param offset: byte offset into the file
+ *
+ * @return number of bytes read on success, negative on error
+ */
+int fat32_read(struct fs_node *node, uint8_t *buffer, size_t count, size_t offset);
+
+/**
+ * vfs_handler_t write handler for FAT32 mountpoints. Not yet implemented.
+ *
+ * @param node:   fs_node whose info points to a fat32_entry_reference
+ * @param buffer: input buffer
+ * @param count:  number of bytes to write
+ * @param offset: byte offset into the file
+ *
+ * @return number of bytes written on success, negative on error
+ */
+int fat32_write(struct fs_node *node, uint8_t *buffer, size_t count, size_t offset);

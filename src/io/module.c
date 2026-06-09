@@ -16,7 +16,7 @@ void io_init()
         dprintk("[virtio_mmio@%x] cannot creat mountpoint \"%s\"!\r\n");
         hang();
     }
-    vfs_create_mountpoint("/dev", &io_read, &io_write, NULL);
+    vfs_create_mountpoint("/dev", NULL, &io_read, &io_write);
 
     hashmap64_init(&_devices, 10);
 }
@@ -43,7 +43,7 @@ int io_register_module(char *name, uint64_t drv_info, io_handler_t read, io_hand
     module->read = read;
     module->write = write;
 
-    if (fs_add_file_to_folder(_dev_root, name, 0, 0) == NULL)
+    if (fs_add_file_to_folder(_dev_root, name, 0, NULL) == NULL)
     {
         dprintk("[io] cannot add \"%s\" to /dev!\r\n", name);
         return -1;

@@ -10,11 +10,11 @@ typedef int (*vfs_handler_t)(struct fs_node *, uint8_t *, size_t, size_t);
 
 struct vfs_mount
 {
-    char *mountpoint;
+    char *mountpoint; // VFS path this mount is registered under
+    char *device;     // VFS path of the underlying block device, or NULL
     struct fs_node *root;
     vfs_handler_t read;
     vfs_handler_t write;
-    void *data;
 };
 
 /**
@@ -27,18 +27,18 @@ void vfs_init();
 /**
  * Registers a mount entry for the given path. Resolves mountpoint via
  * _vfs_get_node, validates it is a folder, then allocates a vfs_mount
- * struct (storing read/write handlers and data) and inserts it into the
+ * struct (storing device path and read/write handlers) and inserts it into the
  * mount table keyed by mountpoint. Does not insert any node into the VFS
  * tree; the caller is responsible for creating the node before mounting.
  *
  * @param mountpoint: null-terminated path of an existing VFS folder (e.g. "/volumes/NO NAME")
+ * @param device:     VFS path of the underlying block device (e.g. "/dev/sd0"), or NULL
  * @param read:       read handler for this mount, or NULL
  * @param write:      write handler for this mount, or NULL
- * @param data:       driver-private context (e.g. virtio slot cast to void *), or NULL
  *
  * @return 0 on success, -1 if the mountpoint is not found, -2 if it is not a folder
  */
-int vfs_create_mountpoint(char *mountpoint, vfs_handler_t read, vfs_handler_t write, void *data);
+int vfs_create_mountpoint(char *mountpoint, char *device, vfs_handler_t read, vfs_handler_t write);
 
 /**
  * Looks up a mount entry by its exact mountpoint path.
@@ -62,8 +62,9 @@ struct vfs_mount *vfs_get_mountpoint_for_path(char *pathname);
 
 /**
  * Removes the mount entry for mountpoint from the mount table, unlinks the
- * mount's root node from its parent folder via fs_remove_child, and destroys
- * the root subtree via fs_destroy_node.
+ * mount's root node from its parent folder via fs_remove_child, destroys
+ * the root subtree via fs_destroy_node, and frees the mountpoint and device
+ * strings.
  *
  * @param mountpoint: null-terminated mountpoint path to unmount
  *

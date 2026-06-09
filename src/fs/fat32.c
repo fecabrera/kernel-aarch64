@@ -430,9 +430,9 @@ int _fat32_read_cluster(char *pathname, struct fat32_bs_info *bs_info, uint32_t 
 
             struct fs_node *node;
             if (attributes & FAT32_ATTR_DIRECTORY)
-                node = fs_add_subfolder(parent_node, name, 0, (uintptr_t)entry_ref);
+                node = fs_add_subfolder(parent_node, name, 0, (void *)entry_ref);
             else
-                node = fs_add_file_to_folder(parent_node, name, 0, (uintptr_t)entry_ref);
+                node = fs_add_file_to_folder(parent_node, name, 0, (void *)entry_ref);
 
             set64_set(parent_nodes, next_cluster, (uintptr_t)node);
         }
@@ -561,7 +561,7 @@ int fat32_mount(char *pathname)
 
     // mount volume
     printk("[fat32] mounting \"%s\"\r\n", mountpoint);
-    vfs_create_mountpoint(mountpoint, NULL, NULL, NULL);
+    vfs_create_mountpoint(mountpoint, pathname, &fat32_read, &fat32_write);
 
     // build fs tree
     int status = _fat32_build_fs_tree(pathname, &bs_info, &fat_q, root);
@@ -590,4 +590,12 @@ int fat32_mount(char *pathname)
     kfree(root);
 
     return 0;
+}
+
+int fat32_read(struct fs_node *node, uint8_t *buffer, size_t count, size_t offset)
+{
+}
+
+int fat32_write(struct fs_node *node, uint8_t *buffer, size_t count, size_t offset)
+{
 }
