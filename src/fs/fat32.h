@@ -172,8 +172,9 @@ typedef uint32_t fat_table_entry_t; // bitfield: see FAT_TABLE_ENTRY_TYPE_* and 
 // within that cluster's sector buffer (0-based, relative to the sector start).
 struct fat32_entry_reference
 {
-    uint32_t cluster;
-    uint32_t offset;
+    uint32_t cluster;       // cluster number of the directory containing this entry
+    uint32_t offset;        // index of the 8.3 dir entry within the cluster's sector buffer (0-based)
+    uint32_t n_lfn_entries; // number of LFN entries preceding the 8.3 entry (0 if short name only)
 };
 
 /**

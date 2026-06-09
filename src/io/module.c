@@ -17,7 +17,7 @@ void io_init()
         dprintk("[virtio_mmio@%x] cannot creat mountpoint \"%s\"!\r\n");
         hang();
     }
-    dev_mp = vfs_create_mountpoint("/dev", NULL, &io_read, &io_write);
+    dev_mp = vfs_create_mountpoint("/dev", NULL, NULL, &io_read, &io_write);
 
     hashmap64_init(&_devices, 10);
 }

@@ -427,6 +427,7 @@ static int _fat32_read_cluster(char *pathname, struct fat32_bs_info *bs_info, ui
             struct fat32_entry_reference *entry_ref = (struct fat32_entry_reference *)kmalloc(sizeof(struct fat32_entry_reference));
             entry_ref->cluster = cluster;
             entry_ref->offset = _offset;
+            entry_ref->n_lfn_entries = n_lfn_entries;
 
             struct fs_node *node;
             if (attributes & FAT32_ATTR_DIRECTORY)
@@ -517,15 +518,15 @@ int fat32_mount(char *pathname)
     }
 
     // parse boot sector
-    struct fat32_bs_info bs_info;
-    fat32_parse_boot_sector(bs, &bs_info);
+    struct fat32_bs_info *bs_info = (struct fat32_bs_info *)kmalloc(sizeof(struct fat32_bs_info));
+    fat32_parse_boot_sector(bs, bs_info);
 
-    printk("[fat32] found FAT 32 volume named \"%s\"!\r\n", bs_info.volume_label);
-    printk("[fat32] total_sectors=%d, table_size_32=%d\r\n", bs_info.total_sectors, bs_info.table_size_32);
+    printk("[fat32] found FAT 32 volume named \"%s\"!\r\n", bs_info->volume_label);
+    printk("[fat32] total_sectors=%d, table_size_32=%d\r\n", bs_info->total_sectors, bs_info->table_size_32);
 
     // read fat table
-    size_t fat_table_size = bs_info.table_size_32 * sizeof(fat_table_entry_t);
-    size_t fat_table_offset = bs_info.first_fat_sector * bs_info.n_bytes_per_sector;
+    size_t fat_table_size = bs_info->table_size_32 * sizeof(fat_table_entry_t);
+    size_t fat_table_offset = bs_info->first_fat_sector * bs_info->n_bytes_per_sector;
     fat_table_entry_t *fat_table = (fat_table_entry_t *)kmalloc(fat_table_size);
 
     if (vfs_read(pathname, (uint8_t *)fat_table, fat_table_size, fat_table_offset) < 0)
@@ -539,10 +540,10 @@ int fat32_mount(char *pathname)
     struct queue64 fat_q;
     queue64_init(&fat_q, 10);
 
-    fat32_build_cluster_chains(&bs_info, fat_table, &fat_q);
+    fat32_build_cluster_chains(bs_info, fat_table, &fat_q);
 
     // create folder
-    struct fs_node *root = vfs_create_dir("/volumes", bs_info.volume_label, 0, NULL);
+    struct fs_node *root = vfs_create_dir("/volumes", bs_info->volume_label, 0, NULL);
     if (root == NULL)
     {
         printk("[fat32] cannot create mountpoint \"%s\"!\r\n", pathname);
@@ -551,26 +552,40 @@ int fat32_mount(char *pathname)
 
     // build volume name
     char mountpoint[50];
-    sprintf(mountpoint, "/volumes/%s", bs_info.volume_label);
+    sprintf(mountpoint, "/volumes/%s", bs_info->volume_label);
 
     // mount volume
     printk("[fat32] mounting \"%s\"\r\n", mountpoint);
-    struct vfs_mount *vfs_mp = vfs_create_mountpoint(mountpoint, pathname, &fat32_read, &fat32_write);
+    struct vfs_mount *vfs_mp = vfs_create_mountpoint(mountpoint, pathname, bs_info, &fat32_read, &fat32_write);
+    if (vfs_mp == NULL)
+    {
+        dprintk("[fat32] vfs_create_mountpoint() returned NULL!\r\n");
+
+        for (uint32_t i = bs_info->root_cluster; i < fat_q.length; i++)
+            kfree((void *)queue64_at(&fat_q, i));
+
+        queue64_destroy(&fat_q);
+        kfree(fat_table);
+
+        fs_destroy_node(root);
+        kfree(bs_info);
+
+        return NULL;
+    }
 
     // build fs tree
-    int status = _fat32_build_fs_tree(pathname, &bs_info, &fat_q, root, vfs_mp);
+    int status = _fat32_build_fs_tree(pathname, bs_info, &fat_q, root, vfs_mp);
     if (status < 0)
     {
         dprintk("[fat32] _fat32_build_fs_tree() returned %i!\r\n", status);
 
-        for (uint32_t i = bs_info.root_cluster; i < fat_q.length; i++)
+        for (uint32_t i = bs_info->root_cluster; i < fat_q.length; i++)
             kfree((void *)queue64_at(&fat_q, i));
 
         queue64_destroy(&fat_q);
-        fs_destroy_node(root);
-
         kfree(fat_table);
-        kfree(root);
+
+        vfs_destroy_mountpoint(mountpoint);
 
         return NULL;
     }
@@ -581,25 +596,32 @@ int fat32_mount(char *pathname)
 
     queue64_destroy(&fat_q);
     kfree(fat_table);
-    kfree(root);
 
     return 0;
 }
 
 int fat32_read(struct fs_node *node, uint8_t *buffer, size_t count, size_t offset)
 {
+    struct fat32_entry_reference *entry_ref = node->info;
     struct vfs_mount *vfs_mp = node->mount;
+    struct fat32_bs_info *bs_info = vfs_mp->info;
 
+    printk("[fat32] entry_ref=0x%08X, vfs_mp=0x%08X, bs_info=0x%08X\r\n", entry_ref, vfs_mp, bs_info);
     printk("[fat32] mp=\"%s\", device=\"%s\"\r\n", vfs_mp->mountpoint, vfs_mp->device);
+    printk("[fat32] cluster=%d, offset=%d, n_lfn_entries=%d\r\n", entry_ref->cluster, entry_ref->offset, entry_ref->n_lfn_entries);
 
     return -1;
 }
 
 int fat32_write(struct fs_node *node, uint8_t *buffer, size_t count, size_t offset)
 {
+    struct fat32_entry_reference *entry_ref = node->info;
     struct vfs_mount *vfs_mp = node->mount;
+    struct fat32_bs_info *bs_info = vfs_mp->info;
 
+    printk("[fat32] entry_ref=0x%08X, vfs_mp=0x%08X, bs_info=0x%08X\r\n", entry_ref, vfs_mp, bs_info);
     printk("[fat32] mp=\"%s\", device=\"%s\"\r\n", vfs_mp->mountpoint, vfs_mp->device);
+    printk("[fat32] cluster=%d, offset=%d, n_lfn_entries=%d\r\n", entry_ref->cluster, entry_ref->offset, entry_ref->n_lfn_entries);
 
     return -1;
 }

@@ -87,5 +87,9 @@ void init()
     vfs_read("/volumes/NO NAME/INIT.SH", NULL, 0, 0);
     vfs_write("/volumes/NO NAME/INIT.SH", NULL, 0, 0);
 
+    // test fat32 read/write
+    vfs_read("/volumes/NO NAME/fseventsd-uuid", NULL, 0, 0);
+    vfs_write("/volumes/NO NAME/fseventsd-uuid", NULL, 0, 0);
+
     syscall_exit(0);
 }

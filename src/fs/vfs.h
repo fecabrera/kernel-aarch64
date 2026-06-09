@@ -12,6 +12,7 @@ struct vfs_mount
 {
     char *mountpoint; // VFS path this mount is registered under
     char *device;     // VFS path of the underlying block device, or NULL
+    void *info;       // filesystem-private superblock data (heap-allocated; freed by vfs_destroy_mountpoint)
     struct fs_node *root;
     vfs_handler_t read;
     vfs_handler_t write;
@@ -33,12 +34,13 @@ void vfs_init();
  *
  * @param mountpoint: null-terminated path of an existing VFS folder (e.g. "/volumes/NO NAME")
  * @param device:     VFS path of the underlying block device (e.g. "/dev/sd0"), or NULL
+ * @param info:       filesystem-private superblock data (heap-allocated; ownership transferred to mount), or NULL
  * @param read:       read handler for this mount, or NULL
  * @param write:      write handler for this mount, or NULL
  *
  * @return pointer to the new vfs_mount on success, NULL if the mountpoint is not found or not a folder
  */
-struct vfs_mount *vfs_create_mountpoint(char *mountpoint, char *device, vfs_handler_t read, vfs_handler_t write);
+struct vfs_mount *vfs_create_mountpoint(char *mountpoint, char *device, void *info, vfs_handler_t read, vfs_handler_t write);
 
 /**
  * Looks up a mount entry by its exact mountpoint path.
@@ -61,8 +63,8 @@ struct fs_node *vfs_get_node_for_path(char *pathname);
 /**
  * Removes the mount entry for mountpoint from the mount table, unlinks the
  * mount's root node from its parent folder via fs_remove_child, destroys
- * the root subtree via fs_destroy_node, and frees the mountpoint and device
- * strings.
+ * the root subtree via fs_destroy_node, and frees the mountpoint, device,
+ * and info (if non-NULL) fields.
  *
  * @param mountpoint: null-terminated mountpoint path to unmount
  *

@@ -62,7 +62,7 @@ void vfs_init()
     fs_add_subfolder(_fs_root, "volumes", 0, NULL, NULL);
 }
 
-struct vfs_mount *vfs_create_mountpoint(char *mountpoint, char *device, vfs_handler_t read, vfs_handler_t write)
+struct vfs_mount *vfs_create_mountpoint(char *mountpoint, char *device, void *info, vfs_handler_t read, vfs_handler_t write)
 {
     struct fs_node *mp_node = _vfs_get_node(mountpoint, _fs_root);
     if (mp_node == NULL)
@@ -82,6 +82,7 @@ struct vfs_mount *vfs_create_mountpoint(char *mountpoint, char *device, vfs_hand
     vfs_mp->mountpoint = (char *)kmalloc(strlen(mountpoint) + 1);
     strcpy(vfs_mp->mountpoint, mountpoint);
 
+    vfs_mp->info = info;
     vfs_mp->root = mp_node;
     vfs_mp->read = read;
     vfs_mp->write = write;
@@ -135,6 +136,8 @@ int vfs_destroy_mountpoint(char *mountpoint)
     kfree(mp->mountpoint);
     if (mp->device)
         kfree(mp->device);
+    if (mp->info)
+        kfree(mp->info);
     kfree(mp);
 
     printk("[vfs] \"%s\" unmounted successfully\r\n", mountpoint);

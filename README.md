@@ -93,8 +93,8 @@ make run
 - `fs_dump_node(node, prefix)` recursively prints a subtree to the kernel log with path prefixes; skips recursing into "." and ".." to avoid cycles.
 - `fs_get_child(node, name)` searches a node's direct children by name.
 - `fs_remove_child(node, name)` unlinks a named child from a folder's child list without freeing it.
-- VFS mount system (`vfs.h`): `vfs_init` initializes the mount table and creates a global root tree with a "volumes" subfolder; `vfs_create_mountpoint(path, device, read, write)` registers a mount entry in a `hashmap64`-backed table and returns a pointer to the new `vfs_mount` (caller creates the VFS node separately); `vfs_destroy_mountpoint(path)` removes the entry, unlinks and destroys the root node.
-- `struct vfs_mount` carries the mountpoint path, `device` (VFS path of the underlying block device, or NULL), root node pointer, and `vfs_handler_t read`/`write` handlers.
+- VFS mount system (`vfs.h`): `vfs_init` initializes the mount table and creates a global root tree with a "volumes" subfolder; `vfs_create_mountpoint(path, device, info, read, write)` registers a mount entry in a `hashmap64`-backed table, storing `info` as filesystem-private superblock data, and returns a pointer to the new `vfs_mount` (caller creates the VFS node separately; ownership of `info` transferred to the mount); `vfs_destroy_mountpoint(path)` removes the entry, unlinks and destroys the root node.
+- `struct vfs_mount` carries the mountpoint path, `device` (VFS path of the underlying block device, or NULL), `info` (filesystem-private superblock data, heap-allocated, freed by `vfs_destroy_mountpoint`), root node pointer, and `vfs_handler_t read`/`write` handlers.
 - `vfs_get_mountpoint(path)` looks up a mount entry by its exact path; `vfs_get_node_for_path(path)` resolves a path and returns the `fs_node` directly.
 - `vfs_create_dir(path, name, attrs, mount)` / `vfs_create_file(path, name, attrs, mount)` resolve path and append a new subfolder or file node, storing `mount` in `node->mount`.
 - `vfs_read` / `vfs_write` resolve the node and dispatch to `node->mount->read`/`write`; return `VFS_IO_ERROR_FILE_NOT_FOUND`, `VFS_IO_ERROR_MOUNTPOINT_NOT_FOUND`, or `VFS_IO_ERROR_HANDLER_NOT_PROVIDED` on failure.
@@ -106,7 +106,7 @@ make run
 - `fat32_is_boot_sector` validates the 0xAA55 signature and EBR sanity fields.
 - `fat32_parse_boot_sector` extracts BPB/EBR fields and computes derived values into `fat32_bs_info`.
 - `fat32_read_fat_table` copies one FAT sector into a flat `uint32_t` array (28-bit masked, compare against `FAT32_FAT_ENTRY_*`).
-- `fat32_entry_reference` records a directory entry's on-disk location (cluster number + offset within the sector) and is stored in each `fs_node`'s `info` field.
+- `fat32_entry_reference` records a directory entry's on-disk location (cluster number, 8.3 entry index within the sector, and LFN entry count) and is stored in each `fs_node`'s `info` field.
 - Directory cluster parsing is handled by `_fat32_read_cluster` in `fat32.c`; handles multi-fragment LFN sequences, populates an `fs_node` tree, and records subfolder nodes in a `set64` map for recursive traversal.
 - `fat32_mount(pathname)` takes a VFS path to a block device (e.g. `/dev/sd0`), reads the boot sector and full FAT table via `vfs_read`, validates the FAT32 signature, builds the cluster chain queue, recursively traverses all directories via `_fat32_read_cluster`, and creates the volume under `/volumes/<label>` registering `fat32_read`/`fat32_write` as `vfs_handler_t` callbacks; returns 0 on success, -1 on I/O error, -2 if not a valid FAT32 volume.
 - `fat32_read` / `fat32_write` are the `vfs_handler_t` callbacks for FAT32 mountpoints; they receive the `fs_node` (whose `mount` carries the device path) and dispatch file I/O via the cluster chain.
