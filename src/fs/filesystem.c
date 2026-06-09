@@ -40,11 +40,12 @@ int fs_remove_child(struct fs_node *node, char *name)
     return -1;
 }
 
-struct fs_node *fs_create_node(char *name, uint16_t attrs, void *info, void *mount, struct fs_node *next, struct fs_node *child)
+struct fs_node *fs_create_node(char *name, size_t file_size, uint16_t attrs, void *info, void *mount, struct fs_node *next, struct fs_node *child)
 {
     struct fs_node *node = (struct fs_node *)kmalloc(sizeof(struct fs_node));
 
     node->name = NULL;
+    node->file_size = file_size;
     node->attrs = attrs;
     node->info = info;
     node->mount = mount;
@@ -74,7 +75,7 @@ void fs_destroy_node(struct fs_node *node)
 
 static struct fs_node *_fs_create_self_ref(struct fs_node *folder)
 {
-    struct fs_node *self_ref = fs_create_node(".", FS_NODE_ATTRS_TYPE_FOLDER, NULL, folder->mount, NULL, NULL);
+    struct fs_node *self_ref = fs_create_node(".", 0, FS_NODE_ATTRS_TYPE_FOLDER, NULL, folder->mount, NULL, NULL);
     self_ref->child = folder;
     fs_add_to_folder(folder, self_ref);
     return self_ref;
@@ -82,23 +83,23 @@ static struct fs_node *_fs_create_self_ref(struct fs_node *folder)
 
 static struct fs_node *_fs_create_parent_ref(struct fs_node *parent, struct fs_node *folder)
 {
-    struct fs_node *parent_ref = fs_create_node("..", FS_NODE_ATTRS_TYPE_FOLDER, NULL, folder->mount, NULL, NULL);
+    struct fs_node *parent_ref = fs_create_node("..", 0, FS_NODE_ATTRS_TYPE_FOLDER, NULL, folder->mount, NULL, NULL);
     parent_ref->child = parent;
     fs_add_to_folder(folder, parent_ref);
     return parent_ref;
 }
 
-struct fs_node *fs_create_file(char *name, uint16_t attrs, void *data, void *mount)
+struct fs_node *fs_create_file(char *name, size_t file_size, uint16_t attrs, void *data, void *mount)
 {
     uint16_t _attrs = (attrs & FS_NODE_ATTRS_FLAG_MASK) | FS_NODE_ATTRS_TYPE_FILE;
-    return fs_create_node(name, _attrs, data, mount, NULL, NULL);
+    return fs_create_node(name, file_size, _attrs, data, mount, NULL, NULL);
 }
 
 struct fs_node *fs_create_folder(char *name, uint16_t attrs, void *data, void *mount)
 {
     uint16_t _attrs = (attrs & FS_NODE_ATTRS_FLAG_MASK) | FS_NODE_ATTRS_TYPE_FOLDER;
 
-    struct fs_node *folder = fs_create_node(name, _attrs, data, mount, NULL, NULL);
+    struct fs_node *folder = fs_create_node(name, 0, _attrs, data, mount, NULL, NULL);
     _fs_create_self_ref(folder);
 
     return folder;
@@ -118,7 +119,7 @@ void fs_add_to_folder(struct fs_node *parent, struct fs_node *node)
         parent->child = node;
 }
 
-struct fs_node *fs_add_file_to_folder(struct fs_node *parent, char *name, uint16_t attrs, void *data, void *mount)
+struct fs_node *fs_add_file_to_folder(struct fs_node *parent, char *name, size_t file_size, uint16_t attrs, void *data, void *mount)
 {
     if ((parent->attrs & FS_NODE_ATTRS_TYPE_MASK) != FS_NODE_ATTRS_TYPE_FOLDER)
     {
@@ -126,7 +127,8 @@ struct fs_node *fs_add_file_to_folder(struct fs_node *parent, char *name, uint16
         return NULL;
     }
 
-    struct fs_node *file = fs_create_file(name, attrs, data, mount);
+    struct fs_node *file = fs_create_file(name, file_size, attrs, data, mount);
+    file->file_size = file_size;
     fs_add_to_folder(parent, file);
     return file;
 }
@@ -143,6 +145,11 @@ struct fs_node *fs_add_subfolder(struct fs_node *parent, char *name, uint16_t at
     _fs_create_parent_ref(parent, folder);
     fs_add_to_folder(parent, folder);
     return folder;
+}
+
+size_t fs_get_node_file_size(struct fs_node *node)
+{
+    return node->file_size;
 }
 
 void fs_node_rename(struct fs_node *node, char *name)

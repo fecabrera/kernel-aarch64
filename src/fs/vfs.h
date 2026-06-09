@@ -89,14 +89,24 @@ struct fs_node *vfs_create_dir(char *path, char *name, uint16_t attrs, void *mou
  * Resolves path via _vfs_get_node and creates a new file named name
  * inside it via fs_add_file_to_folder.
  *
- * @param path:  null-terminated absolute path of the parent folder (e.g. "/volumes/NO NAME")
- * @param name:  null-terminated name for the new file
- * @param attrs: attribute flags (FS_NODE_ATTRS_FLAG_*)
- * @param mount: vfs_mount pointer stored in node->mount (void * to avoid circular include), or NULL
+ * @param path:      null-terminated absolute path of the parent folder (e.g. "/volumes/NO NAME")
+ * @param name:      null-terminated name for the new file
+ * @param file_size: file size in bytes, stored in node->file_size
+ * @param attrs:     attribute flags (FS_NODE_ATTRS_FLAG_*)
+ * @param mount:     vfs_mount pointer stored in node->mount (void * to avoid circular include), or NULL
  *
  * @return pointer to the new file node, or NULL if the parent is not found or creation fails
  */
-struct fs_node *vfs_create_file(char *path, char *name, uint16_t attrs, void *mount);
+struct fs_node *vfs_create_file(char *path, char *name, size_t file_size, uint16_t attrs, void *mount);
+
+/**
+ * Resolves pathname via _vfs_get_node and returns node->file_size.
+ *
+ * @param pathname: null-terminated absolute path of the file
+ *
+ * @return file size in bytes, or 0 if the node is not found
+ */
+size_t vfs_get_file_size(char *pathname);
 
 /**
  * Resolves pathname via _vfs_get_node, reads node->mount for the covering

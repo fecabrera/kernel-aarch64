@@ -108,10 +108,11 @@ struct cpu_context *scheduler_handler(struct cpu_context *ctx, time_t ms_elapsed
     if (ms_elapsed > 0 && !deque64_is_empty(&sleep_queue))
         _notify_sleepers();
 
-    if (current != NULL)
+    struct process *previous = current;
+    if (previous != NULL)
     {
-        current->ctx = ctx;
-        queue64_push(&ready_queue, (uintptr_t)current);
+        previous->ctx = ctx;
+        queue64_push(&ready_queue, (uintptr_t)previous);
     }
 
     if (ready_queue.length == 0)
@@ -123,15 +124,20 @@ struct cpu_context *scheduler_handler(struct cpu_context *ctx, time_t ms_elapsed
 
     current = (struct process *)queue64_pop(&ready_queue);
 
-    if (current->ctx != ctx)
+    if (previous == NULL || previous->pid != current->pid)
     {
-        dprintk("[scheduler] context_switch(), q = { ");
+        printk("[scheduler] context_switch(), q = { ");
 
         struct process **procs = (struct process **)ready_queue.data;
         for (uint64_t i = 0; i < ready_queue.length; i++)
-            dprintk("%i ", procs[i]->pid);
+            printk("%i ", procs[i]->pid);
 
-        dprintk("}, current = %i\r\n", current->pid);
+        printk("}, ");
+        if (previous)
+            printk("previous = %i, ", previous->pid);
+        else
+            printk("previous = <null>, ");
+        printk("current = %i, ms_elapsed = %d ms\r\n", current->pid, ms_elapsed);
     }
 
     return current->ctx;

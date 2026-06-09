@@ -144,6 +144,8 @@ struct fat32_cluster_chain
     uint32_t end;
 };
 
+typedef uint32_t fat_table_entry_t; // bitfield: see FAT_TABLE_ENTRY_TYPE_* and FAT_TABLE_ENTRY_MASK_*
+
 struct fat32_bs_info
 {
     // fields from MBR boot sector
@@ -164,9 +166,8 @@ struct fat32_bs_info
     uint32_t total_sectors;
     uint32_t data_sectors;
     uint32_t total_clusters;
+    fat_table_entry_t *fat_table; // full FAT table loaded at mount time; kept alive for cluster chain traversal at read time
 };
-
-typedef uint32_t fat_table_entry_t; // bitfield: see FAT_TABLE_ENTRY_TYPE_* and FAT_TABLE_ENTRY_MASK_*
 
 // Locates a directory entry on disk: the cluster it lives in and its index
 // within that cluster's sector buffer (0-based, relative to the sector start).
@@ -273,6 +274,17 @@ void fat32_build_cluster_chains(struct fat32_bs_info *bs_info, fat_table_entry_t
  * @return 0 on success, -1 on I/O error, -2 if not a valid FAT32 volume
  */
 int fat32_mount(char *pathname);
+
+/**
+ * Unmounts the FAT32 volume mounted at the VFS path derived from pathname.
+ * Frees bs_info->fat_table, then destroys the mountpoint via vfs_destroy_mountpoint.
+ * Not yet implemented.
+ *
+ * @param pathname: VFS path to the block device used when mounting (e.g. "/dev/sd0")
+ *
+ * @return 0 on success, -1 on error
+ */
+int fat32_unmount(char *pathname);
 
 /**
  * vfs_handler_t read handler for FAT32 mountpoints. Reads count bytes from

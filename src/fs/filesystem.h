@@ -18,7 +18,7 @@ typedef int (*fs_handler_t)(char *, uint8_t *, size_t);
 struct fs_node
 {
     char *name;
-    size_t size;
+    size_t file_size;
     uint16_t attrs;
     void *info;  // driver-private pointer (e.g. fat32_entry_reference *)
     void *mount; // vfs_mount * for this node's covering mountpoint, or NULL
@@ -51,29 +51,31 @@ int fs_remove_child(struct fs_node *node, char *name);
  * Allocates and initializes a new fs_node on the heap.
  * The name is duplicated into a heap-allocated buffer via fs_node_rename.
  *
- * @param name:  null-terminated name string (length determined via strlen; duplicated into heap)
- * @param attrs: attribute flags (FS_NODE_ATTRS_TYPE_* combined with FS_NODE_ATTRS_FLAG_*)
- * @param info:  driver-private pointer stored in node->info (e.g. fat32_entry_reference *)
- * @param mount: vfs_mount pointer stored in node->mount (void * to avoid circular include), or NULL
- * @param next:  next sibling node in the directory, or NULL
- * @param child: first child node (for directories), or NULL
+ * @param name:      null-terminated name string (length determined via strlen; duplicated into heap)
+ * @param file_size: file size in bytes stored in node->file_size (0 for folders)
+ * @param attrs:     attribute flags (FS_NODE_ATTRS_TYPE_* combined with FS_NODE_ATTRS_FLAG_*)
+ * @param info:      driver-private pointer stored in node->info (e.g. fat32_entry_reference *)
+ * @param mount:     vfs_mount pointer stored in node->mount (void * to avoid circular include), or NULL
+ * @param next:      next sibling node in the directory, or NULL
+ * @param child:     first child node (for directories), or NULL
  *
  * @return pointer to the new node, or NULL if kmalloc failed
  */
-struct fs_node *fs_create_node(char *name, uint16_t attrs, void *info, void *mount, struct fs_node *next, struct fs_node *child);
+struct fs_node *fs_create_node(char *name, size_t file_size, uint16_t attrs, void *info, void *mount, struct fs_node *next, struct fs_node *child);
 
 /**
  * Allocates and initializes a new fs_node with FS_NODE_ATTRS_TYPE_FILE set.
  * Convenience wrapper around fs_create_node with next and child set to NULL.
  *
- * @param name:  null-terminated name string (length determined via strlen; duplicated into heap)
- * @param attrs: additional attribute flags (FS_NODE_ATTRS_FLAG_*); type bits are ignored
- * @param data:  driver-private pointer stored in node->info
- * @param mount: vfs_mount pointer stored in node->mount, or NULL
+ * @param name:      null-terminated name string (length determined via strlen; duplicated into heap)
+ * @param file_size: file size in bytes stored in node->file_size
+ * @param attrs:     additional attribute flags (FS_NODE_ATTRS_FLAG_*); type bits are ignored
+ * @param data:      driver-private pointer stored in node->info
+ * @param mount:     vfs_mount pointer stored in node->mount, or NULL
  *
  * @return pointer to the new file node, or NULL if kmalloc failed
  */
-struct fs_node *fs_create_file(char *name, uint16_t attrs, void *data, void *mount);
+struct fs_node *fs_create_file(char *name, size_t file_size, uint16_t attrs, void *data, void *mount);
 
 /**
  * Allocates and initializes a new fs_node with FS_NODE_ATTRS_TYPE_FOLDER set.
@@ -102,15 +104,16 @@ void fs_add_to_folder(struct fs_node *parent, struct fs_node *node);
  * Creates a new file node and appends it to the child list of a folder node.
  * The new node is inserted after the last sibling in the folder's child chain.
  *
- * @param node:  pointer to the parent folder node
- * @param name:  null-terminated name string for the new file (duplicated into a heap-allocated buffer)
- * @param attrs: attribute flags for the new file (FS_NODE_ATTRS_FLAG_*)
- * @param data:  driver-private pointer stored in node->info
- * @param mount: vfs_mount pointer stored in node->mount, or NULL
+ * @param node:      pointer to the parent folder node
+ * @param name:      null-terminated name string for the new file (duplicated into a heap-allocated buffer)
+ * @param file_size: file size in bytes, stored in node->file_size
+ * @param attrs:     attribute flags for the new file (FS_NODE_ATTRS_FLAG_*)
+ * @param data:      driver-private pointer stored in node->info
+ * @param mount:     vfs_mount pointer stored in node->mount, or NULL
  *
  * @return pointer to the new file node, or NULL if node is not a folder
  */
-struct fs_node *fs_add_file_to_folder(struct fs_node *node, char *name, uint16_t attrs, void *data, void *mount);
+struct fs_node *fs_add_file_to_folder(struct fs_node *node, char *name, size_t file_size, uint16_t attrs, void *data, void *mount);
 
 /**
  * Creates a new folder node and appends it to the child list of a folder node.
@@ -125,6 +128,15 @@ struct fs_node *fs_add_file_to_folder(struct fs_node *node, char *name, uint16_t
  * @return pointer to the new folder node, or NULL if node is not a folder
  */
 struct fs_node *fs_add_subfolder(struct fs_node *parent, char *name, uint16_t attrs, void *data, void *mount);
+
+/**
+ * Returns node->file_size.
+ *
+ * @param node: file node to query
+ *
+ * @return file size in bytes
+ */
+size_t fs_get_node_file_size(struct fs_node *node);
 
 /**
  * Replaces the name of an existing fs_node with a new name string.

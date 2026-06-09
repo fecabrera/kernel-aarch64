@@ -145,6 +145,12 @@ int vfs_destroy_mountpoint(char *mountpoint)
     return 0;
 }
 
+size_t vfs_get_file_size(char *pathname)
+{
+    struct fs_node *node = _vfs_get_node(pathname, _fs_root);
+    return fs_get_node_file_size(node);
+}
+
 int vfs_read(char *pathname, uint8_t *buffer, size_t count, size_t offset)
 {
     printk("[vfs] read(): file=\"%s\", buff=0x%08x, count=%d, offset=%d\r\n", pathname, buffer, count, offset);
@@ -212,10 +218,10 @@ struct fs_node *vfs_create_dir(char *path, char *name, uint16_t attrs, void *mou
     return node;
 }
 
-struct fs_node *vfs_create_file(char *path, char *name, uint16_t attrs, void *mount)
+struct fs_node *vfs_create_file(char *path, char *name, size_t file_size, uint16_t attrs, void *mount)
 {
     struct fs_node *parent = _vfs_get_node(path, _fs_root);
-    struct fs_node *node = fs_add_file_to_folder(parent, name, attrs, NULL, mount);
+    struct fs_node *node = fs_add_file_to_folder(parent, name, file_size, attrs, NULL, mount);
     if (node == NULL)
     {
         printk("[vfs] cannot create \"%s/%s\"!\r\n", path, name);

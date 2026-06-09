@@ -44,7 +44,7 @@ int io_register_module(char *name, uint64_t drv_info, io_handler_t read, io_hand
     module->read = read;
     module->write = write;
 
-    if (fs_add_file_to_folder(_dev_root, name, 0, NULL, dev_mp) == NULL)
+    if (fs_add_file_to_folder(_dev_root, name, 0, 0, NULL, dev_mp) == NULL)
     {
         dprintk("[io] cannot add \"%s\" to /dev!\r\n", name);
         return -1;

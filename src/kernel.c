@@ -83,12 +83,27 @@ void init()
     // dump fs
     vfs_dump_fs();
 
-    // test fat32 read/write
-    vfs_read("/volumes/NO NAME/INIT.SH", NULL, 0, 0);
-    vfs_write("/volumes/NO NAME/INIT.SH", NULL, 0, 0);
+    // test fat32 read
+    char buffer1[513];
+    vfs_read("/volumes/NO NAME/INIT.SH", (uint8_t *)buffer1, 512, 0);
+    buffer1[512] = '\0';
+    printk("%s\r\n", buffer1);
 
-    // test fat32 read/write
-    vfs_read("/volumes/NO NAME/fseventsd-uuid", NULL, 0, 0);
+    char buffer2[513];
+    vfs_read("/volumes/NO NAME/fseventsd-uuid", (uint8_t *)buffer2, 512, 0);
+    buffer2[512] = '\0';
+    printk("%s\r\n", buffer2);
+
+    size_t file_size = vfs_get_file_size("/volumes/NO NAME/DTB/OUT.DTS");
+    char *buffer3 = (char *)kmalloc(file_size + 1);
+    vfs_read("/volumes/NO NAME/DTB/OUT.DTS", (uint8_t *)buffer3, file_size, 0);
+    buffer3[file_size] = '\0';
+    printk("%s\r\n", buffer3);
+
+    kfree(buffer3);
+
+    // test fat32 write
+    vfs_write("/volumes/NO NAME/INIT.SH", NULL, 0, 0);
     vfs_write("/volumes/NO NAME/fseventsd-uuid", NULL, 0, 0);
 
     syscall_exit(0);
