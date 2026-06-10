@@ -1,5 +1,5 @@
 #include <mm/heap.h>
-#include "set.h"
+#include "set64.h"
 
 // splitmix64 finalizer — good avalanche for integer keys
 static uint64_t _set64_hash(uint64_t key)

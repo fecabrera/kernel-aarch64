@@ -1,6 +1,6 @@
 #include <mm/heap.h>
 #include <string.h>
-#include "stack.h"
+#include "stack64.h"
 
 void _stack64_grow(struct stack64 *s)
 {

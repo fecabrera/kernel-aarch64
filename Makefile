@@ -15,6 +15,12 @@ SRCS := $(wildcard \
  		  src/*.S \
   		  src/lib/*.c \
 		  src/dsa/*.c \
+		  src/dsa/deque/*.c \
+		  src/dsa/hashmap/*.c \
+		  src/dsa/ordered_set/*.c \
+		  src/dsa/queue/*.c \
+		  src/dsa/set/*.c \
+		  src/dsa/stack/*.c \
 		  src/drivers/*.c \
 		  src/arch/*.c \
 		  src/mm/*.c \

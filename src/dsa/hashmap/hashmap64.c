@@ -1,6 +1,6 @@
 #include <mm/heap.h>
 #include <string.h>
-#include "hashmap.h"
+#include "hashmap64.h"
 
 static uint64_t _hashmap64_hash(char *key)
 {

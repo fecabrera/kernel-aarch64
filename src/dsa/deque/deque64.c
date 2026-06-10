@@ -1,5 +1,5 @@
 #include <mm/heap.h>
-#include "deque.h"
+#include "deque64.h"
 
 static void _deque64_insert_entry(struct deque64_entry *entry, struct deque64_entry *prev, struct deque64_entry *next)
 {

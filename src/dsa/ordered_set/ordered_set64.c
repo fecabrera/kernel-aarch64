@@ -1,5 +1,5 @@
 #include <mm/heap.h>
-#include "ordered_set.h"
+#include "ordered_set64.h"
 
 void ordered_set64_init(struct ordered_set64 *set)
 {

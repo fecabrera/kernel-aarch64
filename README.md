@@ -204,13 +204,13 @@ src/
     mem.c/h         — reads RAM base/size from DTB at boot
     heap.c/h        — kmalloc/kfree/krealloc/kmalloc_aligned
 
-  dsa/              — generic data structures
-    queue.c/h           — dynamic ring-buffer FIFO queue of uint64_t (queue64_init/push/pop/peek)
-    stack.c/h           — dynamic array-backed LIFO stack of uint64_t (stack64_init/push/pop/peek)
-    deque.c/h           — doubly-linked deque of uint64_t (deque64_add/remove/peek left/right, find, find_remove, remove, next)
-    hashmap.c/h         — open-addressing hash map: string key → uint64_t value (hashmap64_init/destroy/set/get/has/remove)
-    set.c/h             — open-addressing hash map: uint64_t key → uint64_t value (set64_init/destroy/set/get/remove)
-    ordered_set.c/h     — BST-based ordered set of uint64_t (ordered_set64_init/destroy/insert/remove/contains/min/max/foreach)
+  dsa/              — generic data structures (top-level .h files are forwarding includes)
+    queue/queue64       — dynamic ring-buffer FIFO queue of uint64_t (queue64_init/push/pop/peek)
+    stack/stack64       — dynamic array-backed LIFO stack of uint64_t (stack64_init/push/pop/peek)
+    deque/deque64       — doubly-linked deque of uint64_t (deque64_add/remove/peek left/right, find, find_remove, remove, next)
+    hashmap/hashmap64   — open-addressing hash map: string key → uint64_t value (hashmap64_init/destroy/set/get/has/remove)
+    set/set64           — open-addressing hash map: uint64_t key → uint64_t value (set64_init/destroy/set/get/remove)
+    ordered_set/ordered_set64 — BST-based ordered set of uint64_t (ordered_set64_init/destroy/insert/remove/contains/min/max/foreach)
 
   lib/              — architecture-independent libraries
     debug.c/h       — printk (always on) and dprintk (DEBUG=1 only), both backed by pl011_vprintf

@@ -1,6 +1,6 @@
 #include <mm/heap.h>
 #include <string.h>
-#include "queue.h"
+#include "queue64.h"
 
 void _queue64_grow(struct queue64 *q)
 {
