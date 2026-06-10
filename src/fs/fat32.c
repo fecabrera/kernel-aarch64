@@ -271,14 +271,14 @@ void fat32_parse_boot_sector(uint8_t *buff, struct fat32_bs_info *bs_info)
     bs_info->total_clusters = total_clusters;
 }
 
-uint32_t fat32_read_fat_table(struct fat32_bs_info *bs_info, uint8_t *buff, uint32_t sector_offset, fat_table_entry_t *fat_table)
+uint32_t fat32_read_fat_table(struct fat32_bs_info *bs_info, uint8_t *buff, uint32_t sector_offset)
 {
     uint16_t n_entries_per_sector = bs_info->n_bytes_per_sector / 4;
     uint32_t offset = sector_offset * n_entries_per_sector;
 
     dprintk("fat sector %d (0x%08x):\r\n", sector_offset, (bs_info->first_fat_sector + sector_offset) * n_entries_per_sector);
 
-    fat_table_entry_t *_fat_table = fat_table + offset;
+    fat_table_entry_t *_fat_table = bs_info->fat_table + offset;
     uint32_t *_entry = (uint32_t *)buff;
 
     uint32_t i;
@@ -291,27 +291,6 @@ uint32_t fat32_read_fat_table(struct fat32_bs_info *bs_info, uint8_t *buff, uint
     }
 
     return i;
-}
-
-void fat32_build_cluster_chains(struct fat32_bs_info *bs_info, fat_table_entry_t *fat_table, struct queue64 *fat_q)
-{
-    for (uint32_t i = 0; i < bs_info->table_size_32; i++)
-    {
-        uint32_t value = fat_table[i] & 0x0FFFFFFF;
-        if (value == FAT32_FAT_ENTRY_RESERVED || value == FAT32_FAT_ENTRY_BAD)
-            continue;
-
-        struct fat32_cluster_chain *chain = (struct fat32_cluster_chain *)kmalloc(sizeof(struct fat32_cluster_chain));
-        chain->start = i;
-
-        while (value < FAT32_FAT_ENTRY_EOC && i < bs_info->table_size_32)
-            value = fat_table[++i] & 0x0FFFFFFF;
-
-        chain->end = i;
-        queue64_push(fat_q, (uintptr_t)chain);
-
-        dprintk("cluster [%d, %d]\r\n", chain->start, chain->end);
-    }
 }
 
 static int _fat32_read_cluster(char *pathname, struct fat32_bs_info *bs_info, uint32_t cluster, struct fs_node *parent_node, struct set64 *parent_nodes, struct vfs_mount *mount)
@@ -453,28 +432,73 @@ static int _fat32_read_cluster(char *pathname, struct fat32_bs_info *bs_info, ui
 
         kfree(lfn_dir_name);
         kfree(name);
+        stack64_destroy(&lfn_entries);
     }
 
     kfree(buff);
     return 0;
 }
 
-static int _fat32_build_fs_tree(char *pathname, struct fat32_bs_info *bs_info, struct queue64 *fat_q, struct fs_node *root_node, struct vfs_mount *mount)
+void fat32_build_cluster_chains(struct fat32_bs_info *bs_info, struct queue64 *cluster_chains)
 {
+    uint8_t *visited_clusters = (uint8_t *)kmalloc(bs_info->n_fat_entries);
+    memset(visited_clusters, 0, bs_info->n_fat_entries);
+
+    for (uint32_t i = bs_info->root_cluster; i < bs_info->n_fat_entries; i++)
+    {
+        uint32_t cluster_value = bs_info->fat_table[i] & 0x0FFFFFFF;
+
+        // skip if cluster has been visited
+        if (visited_clusters[i])
+            continue;
+
+        visited_clusters[i] = 1;
+
+        // skip if cluster is reserved, free or bad
+        if (cluster_value == FAT32_FAT_ENTRY_RESERVED ||
+            cluster_value == FAT32_FAT_ENTRY_FREE ||
+            cluster_value == FAT32_FAT_ENTRY_BAD)
+            continue;
+
+        queue64_push(cluster_chains, i);
+
+        uint32_t cluster = i;
+        do
+        {
+            // mark cluster as visited
+            visited_clusters[cluster] = 1;
+
+            // next cluster
+            cluster = bs_info->fat_table[cluster] & 0x0FFFFFFF;
+        } while (cluster < FAT32_FAT_ENTRY_EOC && cluster < bs_info->n_fat_entries);
+    }
+
+    kfree(visited_clusters);
+}
+
+static int _fat32_build_fs_tree(char *pathname, struct fat32_bs_info *bs_info, struct fs_node *root_node, struct vfs_mount *mount)
+{
+    // build queue with all the clusters that start a chain
+    struct queue64 cluster_chains;
+    queue64_init(&cluster_chains, 10);
+
+    fat32_build_cluster_chains(bs_info, &cluster_chains);
+
     // create set of parent nodes
     struct set64 parent_nodes;
     set64_init(&parent_nodes, 10);
 
-    // read directories
-    for (uint32_t i = bs_info->root_cluster; i < fat_q->length; i++)
+    // read clusters
+    uint32_t n_chains = cluster_chains.length;
+    for (uint32_t i = 0; i < n_chains; i++)
     {
-        // next cluster chain
-        struct fat32_cluster_chain *chain = (struct fat32_cluster_chain *)queue64_at(fat_q, i);
+        // printk("[fat32] reading chain for cluster %d/%d\r\n", i, bs_info->n_fat_entries);
+        uint32_t cluster = queue64_pop(&cluster_chains);
 
         // retrieve parent node
         uint64_t parent_node_ptr;
         struct fs_node *parent_node;
-        if (set64_get(&parent_nodes, chain->start, &parent_node_ptr) == 0)
+        if (set64_get(&parent_nodes, cluster, &parent_node_ptr) == 0)
             parent_node = root_node;
         else
             parent_node = (struct fs_node *)parent_node_ptr;
@@ -484,19 +508,25 @@ static int _fat32_build_fs_tree(char *pathname, struct fat32_bs_info *bs_info, s
             continue;
 
         // go through all clusters on the cluster chain
-        for (uint32_t cluster = chain->start; cluster <= chain->end; cluster++)
+        do
         {
+            // printk("[fat32] reading cluster %d\r\n", cluster);
+
             int status = _fat32_read_cluster(pathname, bs_info, cluster, parent_node, &parent_nodes, mount);
             if (status < 0)
             {
+                queue64_destroy(&cluster_chains);
                 set64_destroy(&parent_nodes);
                 return -1;
             }
             if (status > 0)
                 break;
-        }
+
+            cluster = bs_info->fat_table[cluster] & 0x0FFFFFFF;
+        } while (cluster < FAT32_FAT_ENTRY_EOC && cluster < bs_info->n_fat_entries);
     }
 
+    queue64_destroy(&cluster_chains);
     set64_destroy(&parent_nodes);
     return 0;
 }
@@ -525,28 +555,26 @@ int fat32_mount(char *pathname)
     struct fat32_bs_info *bs_info = (struct fat32_bs_info *)kmalloc(sizeof(struct fat32_bs_info));
     fat32_parse_boot_sector(bs, bs_info);
 
-    printk("[fat32] found FAT 32 volume named \"%s\"!\r\n", bs_info->volume_label);
-    printk("[fat32] total_sectors=%d, table_size_32=%d\r\n", bs_info->total_sectors, bs_info->table_size_32);
+    printk("[fat32] found FAT 32 volume \"%s\"!\r\n", bs_info->volume_label);
+    printk("[fat32] first_fat_sector=%d, total_sectors=%d, table_size_32=%d, bs_info->total_clusters=%d\r\n", bs_info->first_fat_sector, bs_info->total_sectors, bs_info->table_size_32, bs_info->total_clusters);
 
     // read fat table
-    size_t fat_table_size = bs_info->table_size_32 * sizeof(fat_table_entry_t);
+    size_t fat_table_size = bs_info->table_size_32 * bs_info->n_bytes_per_sector;
     size_t fat_table_offset = bs_info->first_fat_sector * bs_info->n_bytes_per_sector;
     fat_table_entry_t *fat_table = (fat_table_entry_t *)kmalloc(fat_table_size);
 
     if (vfs_read(pathname, (uint8_t *)fat_table, fat_table_size, fat_table_offset) < 0)
     {
-        printk("[fat32] cannot read boot sector from \"%s\"!\r\n", pathname);
+        printk("[fat32] cannot read fat table from \"%s\"!\r\n", pathname);
         kfree(fat_table);
         return -1;
     }
 
     bs_info->fat_table = fat_table;
+    bs_info->n_fat_entries = fat_table_size / sizeof(fat_table_entry_t);
 
-    // build linked list
-    struct queue64 fat_q;
-    queue64_init(&fat_q, 10);
-
-    fat32_build_cluster_chains(bs_info, fat_table, &fat_q);
+    // for (size_t i = 0; i < fat_table_size / sizeof(fat_table_entry_t); i++)
+    //     printk("cluster %4d: value=0x%08X, address=0x%08X\r\n", i, fat_table[i], fat_table_offset + (i * sizeof(fat_table_entry_t)));
 
     // create folder
     struct fs_node *root = vfs_create_dir("/volumes", bs_info->volume_label, 0, NULL);
@@ -567,10 +595,6 @@ int fat32_mount(char *pathname)
     {
         dprintk("[fat32] vfs_create_mountpoint() returned NULL!\r\n");
 
-        for (uint32_t i = bs_info->root_cluster; i < fat_q.length; i++)
-            kfree((void *)queue64_at(&fat_q, i));
-
-        queue64_destroy(&fat_q);
         kfree(fat_table);
 
         fs_destroy_node(root);
@@ -580,27 +604,17 @@ int fat32_mount(char *pathname)
     }
 
     // build fs tree
-    int status = _fat32_build_fs_tree(pathname, bs_info, &fat_q, root, vfs_mp);
+    int status = _fat32_build_fs_tree(pathname, bs_info, root, vfs_mp);
     if (status < 0)
     {
         dprintk("[fat32] _fat32_build_fs_tree() returned %i!\r\n", status);
 
-        for (uint32_t i = bs_info->root_cluster; i < fat_q.length; i++)
-            kfree((void *)queue64_at(&fat_q, i));
-
-        queue64_destroy(&fat_q);
         kfree(fat_table);
 
         vfs_destroy_mountpoint(mountpoint);
 
         return NULL;
     }
-
-    // clean ptrs
-    for (uint32_t i = 0; i < fat_q.length; i++)
-        kfree((void *)queue64_at(&fat_q, i));
-
-    queue64_destroy(&fat_q);
 
     return 0;
 }

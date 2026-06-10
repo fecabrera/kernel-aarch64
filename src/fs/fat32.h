@@ -138,12 +138,6 @@ struct __attribute__((packed)) fat32_lfn_entry
     char16_t name3[2];  // UTF-16LE name characters 12–13
 };
 
-struct fat32_cluster_chain
-{
-    uint32_t start;
-    uint32_t end;
-};
-
 typedef uint32_t fat_table_entry_t; // bitfield: see FAT_TABLE_ENTRY_TYPE_* and FAT_TABLE_ENTRY_MASK_*
 
 struct fat32_bs_info
@@ -167,6 +161,7 @@ struct fat32_bs_info
     uint32_t data_sectors;
     uint32_t total_clusters;
     fat_table_entry_t *fat_table; // full FAT table loaded at mount time; kept alive for cluster chain traversal at read time
+    uint32_t n_fat_entries;
 };
 
 // Locates a directory entry on disk: the cluster it lives in and its index
@@ -234,33 +229,32 @@ int fat32_is_boot_sector(uint8_t *buff);
 void fat32_parse_boot_sector(uint8_t *buff, struct fat32_bs_info *bs_info);
 
 /**
- * Copies raw FAT cluster chain values from a single pre-read sector buffer
- * into fat_table, applying _le32 and masking to 28 bits per the spec.
- * Appends entries starting at fat_table[sector_offset * n_entries_per_sector].
+ * Parses one pre-read FAT sector into bs_info->fat_table, applying _le32 and
+ * masking to 28 bits per the spec. Writes entries starting at
+ * bs_info->fat_table[sector_offset * n_entries_per_sector].
  * Each entry holds the raw next-cluster value; compare against FAT32_FAT_ENTRY_*
  * to interpret (free, bad, EOC, or next cluster number).
- * Call once per FAT sector, in order, to build the full table.
+ * bs_info->fat_table must be allocated before calling. Call once per FAT sector,
+ * in order, to populate the full table.
  *
- * @param bs_info:       parsed boot sector info (used for sector/entry sizes)
+ * @param bs_info:       parsed boot sector info (fat_table must be allocated; provides sector/entry sizes)
  * @param buff:          512-byte buffer containing the FAT sector already read from disk
  * @param sector_offset: index of this sector within the FAT (0-based)
- * @param fat_table:     output array; must hold at least bs_info->table_size_32 entries
  *
- * @return number of entries written into fat_table
+ * @return number of entries written into bs_info->fat_table
  */
-uint32_t fat32_read_fat_table(struct fat32_bs_info *bs_info, uint8_t *buff, uint32_t sector_offset, fat_table_entry_t *fat_table);
+uint32_t fat32_read_fat_table(struct fat32_bs_info *bs_info, uint8_t *buff, uint32_t sector_offset);
 
 /**
- * Scans the FAT table and groups consecutive cluster entries into
- * fat32_cluster_chain ranges, appending each to fat_q. RESERVED and BAD
- * entries are skipped; FREE entries are followed by the while loop until an
- * EOC is reached. Each chain covers [start, end] inclusive.
+ * Scans bs_info->fat_table and pushes the starting cluster number of each
+ * distinct chain into cluster_chains. Iterates from root_cluster to
+ * n_fat_entries, marking visited clusters so each chain is enqueued exactly
+ * once. FREE, RESERVED, and BAD entries are skipped.
  *
- * @param bs_info:   parsed boot sector info (used for table_size_32)
- * @param fat_table: flat array of FAT entries, indexed by cluster number
- * @param fat_q:     queue to append fat32_cluster_chain pointers into
+ * @param bs_info:        parsed boot sector info (fat_table and n_fat_entries must be set)
+ * @param cluster_chains: output queue; receives one uint32_t per chain (the start cluster)
  */
-void fat32_build_cluster_chains(struct fat32_bs_info *bs_info, fat_table_entry_t *fat_table, struct queue64 *fat_q);
+void fat32_build_cluster_chains(struct fat32_bs_info *bs_info, struct queue64 *cluster_chains);
 
 /**
  * Mounts a FAT32 volume accessible at the given VFS pathname. Reads the boot

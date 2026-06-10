@@ -124,7 +124,7 @@ struct cpu_context *scheduler_handler(struct cpu_context *ctx, time_t ms_elapsed
 
     current = (struct process *)queue64_pop(&ready_queue);
 
-    if (previous == NULL || previous->pid != current->pid)
+    if (previous && (previous->pid != current->pid))
     {
         printk("[scheduler] context_switch(), q = { ");
 

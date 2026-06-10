@@ -106,14 +106,14 @@ make run
 - MBR/BPB parsing (`mbr_boot_sector`, `fat32_ext_bs`).
 - `fat32_is_boot_sector` validates the 0xAA55 signature and EBR sanity fields.
 - `fat32_parse_boot_sector` extracts BPB/EBR fields and computes derived values into `fat32_bs_info`.
-- `fat32_read_fat_table` copies one FAT sector into a flat `uint32_t` array (28-bit masked, compare against `FAT32_FAT_ENTRY_*`).
+- `fat32_read_fat_table` parses one pre-read FAT sector directly into `bs_info->fat_table` (28-bit masked, LE-converted); call once per FAT sector in order to populate the full table.
 - `fat32_entry_reference` records a directory entry's on-disk location (cluster number, 8.3 entry index within the sector, and LFN entry count) and is stored in each `fs_node`'s `info` field.
 - Directory cluster parsing is handled by `_fat32_read_cluster` in `fat32.c`; handles multi-fragment LFN sequences, populates an `fs_node` tree, and records subfolder nodes in a `set64` map for recursive traversal.
 - `fat32_mount(pathname)` takes a VFS path to a block device (e.g. `/dev/sd0`), reads the boot sector and full FAT table via `vfs_read`, validates the FAT32 signature, builds the cluster chain queue, recursively traverses all directories via `_fat32_read_cluster`, and creates the volume under `/volumes/<label>` registering `fat32_read`/`fat32_write` as `vfs_handler_t` callbacks; the full FAT table is kept alive in `bs_info->fat_table` for cluster chain traversal at read time; returns 0 on success, -1 on I/O error, -2 if not a valid FAT32 volume.
 - `fat32_unmount(pathname)` frees `bs_info->fat_table` and destroys the mountpoint; not yet implemented.
 - `fat32_read` re-reads the dir entry from disk to get the file's first cluster and size, walks `bs_info->fat_table` to the cluster containing `offset`, reads the required sectors into a temporary buffer, and copies `count` bytes into `buffer`. `fat32_write` is not yet implemented.
 - `_fat32_read_cluster` and `_fat32_build_fs_tree` are internal helpers that traverse the directory cluster chain and populate the `fs_node` tree via `vfs_read`; each node is stamped with the `vfs_mount *` so dispatch is O(1) at read time.
-- `fat32_cluster_chain` struct pairs a cluster range (`start`/`end`) for FAT chain traversal.
+- `fat32_build_cluster_chains` scans `bs_info->fat_table` from `root_cluster` to `n_fat_entries`, marks visited clusters to avoid duplicates, and pushes the start cluster of each distinct chain into an output `queue64`.
 - `fat32_bs_info` exposes both `total_sectors_16` and `total_sectors_32` (resolved into `total_sectors`) for volumes using the 16-bit sector count field; also carries `fat_table` (heap-allocated, owned by `bs_info`, freed by `fat32_unmount` before calling `vfs_destroy_mountpoint`).
 - 8.3 and LFN directory entry structs (`fat32_dir_entry`, `fat32_lfn_entry`) with `FAT32_ATTR_*`, `FAT32_DIRENT_*`, and `FAT32_LFN_*` defines.
 - Packed structs with aligned mirrors for safe field access on AArch64.
