@@ -254,7 +254,7 @@ uint32_t fat32_read_fat_table(struct fat32_bs_info *bs_info, uint8_t *buff, uint
  * @param bs_info:        parsed boot sector info (fat_table and n_fat_entries must be set)
  * @param cluster_chains: output queue; receives one uint32_t per chain (the start cluster)
  */
-void fat32_build_cluster_chains(struct fat32_bs_info *bs_info, struct queue64 *cluster_chains);
+void fat32_build_cluster_chains(struct fat32_bs_info *bs_info, struct queue32 *cluster_chains);
 
 /**
  * Mounts a FAT32 volume accessible at the given VFS pathname. Reads the boot

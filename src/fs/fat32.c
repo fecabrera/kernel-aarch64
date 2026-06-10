@@ -439,7 +439,7 @@ static int _fat32_read_cluster(char *pathname, struct fat32_bs_info *bs_info, ui
     return 0;
 }
 
-void fat32_build_cluster_chains(struct fat32_bs_info *bs_info, struct queue64 *cluster_chains)
+void fat32_build_cluster_chains(struct fat32_bs_info *bs_info, struct queue32 *cluster_chains)
 {
     uint8_t *visited_clusters = (uint8_t *)kmalloc(bs_info->n_fat_entries);
     memset(visited_clusters, 0, bs_info->n_fat_entries);
@@ -460,7 +460,7 @@ void fat32_build_cluster_chains(struct fat32_bs_info *bs_info, struct queue64 *c
             cluster_value == FAT32_FAT_ENTRY_BAD)
             continue;
 
-        queue64_push(cluster_chains, i);
+        queue32_push(cluster_chains, i);
 
         uint32_t cluster = i;
         do
@@ -479,8 +479,8 @@ void fat32_build_cluster_chains(struct fat32_bs_info *bs_info, struct queue64 *c
 static int _fat32_build_fs_tree(char *pathname, struct fat32_bs_info *bs_info, struct fs_node *root_node, struct vfs_mount *mount)
 {
     // build queue with all the clusters that start a chain
-    struct queue64 cluster_chains;
-    queue64_init(&cluster_chains, 10);
+    struct queue32 cluster_chains;
+    queue32_init(&cluster_chains, 10);
 
     fat32_build_cluster_chains(bs_info, &cluster_chains);
 
@@ -493,7 +493,7 @@ static int _fat32_build_fs_tree(char *pathname, struct fat32_bs_info *bs_info, s
     for (uint32_t i = 0; i < n_chains; i++)
     {
         // dprintk("[fat32] reading chain for cluster %d/%d\r\n", i, bs_info->n_fat_entries);
-        uint32_t cluster = queue64_pop(&cluster_chains);
+        uint32_t cluster = queue32_pop(&cluster_chains);
 
         // retrieve parent node
         uint64_t parent_node_ptr;
@@ -515,7 +515,7 @@ static int _fat32_build_fs_tree(char *pathname, struct fat32_bs_info *bs_info, s
             int status = _fat32_read_cluster(pathname, bs_info, cluster, parent_node, &parent_nodes, mount);
             if (status < 0)
             {
-                queue64_destroy(&cluster_chains);
+                queue32_destroy(&cluster_chains);
                 set64_destroy(&parent_nodes);
                 return -1;
             }
@@ -526,7 +526,7 @@ static int _fat32_build_fs_tree(char *pathname, struct fat32_bs_info *bs_info, s
         } while (cluster < FAT32_FAT_ENTRY_EOC && cluster < bs_info->n_fat_entries);
     }
 
-    queue64_destroy(&cluster_chains);
+    queue32_destroy(&cluster_chains);
     set64_destroy(&parent_nodes);
     return 0;
 }
