@@ -531,9 +531,25 @@ static int _fat32_build_fs_tree(char *pathname, struct fat32_bs_info *bs_info, s
     return 0;
 }
 
+static int _read_fat_table(char *pathname, struct fat32_bs_info *bs_info, uint8_t *fat_table)
+{
+    size_t fat_table_addr = bs_info->first_fat_sector * bs_info->n_bytes_per_sector;
+
+    for (size_t i = 0; i < bs_info->table_size_32; i++)
+    {
+        size_t offset = i * bs_info->n_bytes_per_sector;
+        printk("[fat32] reading sector %d/%d, addr=0x%08X\r\n", i + 1, bs_info->table_size_32, fat_table_addr + offset);
+
+        if (vfs_read(pathname, fat_table + offset, bs_info->n_bytes_per_sector, fat_table_addr + offset) < 0)
+            return -1;
+    }
+    return bs_info->table_size_32;
+}
+
 int fat32_mount(char *pathname)
 {
     uint8_t bs[512];
+    int status;
 
     // read mbr
     if (vfs_read(pathname, bs, 512, 0) < 0)
@@ -561,21 +577,17 @@ int fat32_mount(char *pathname)
     printk("[fat32] reading FAT table...\r\n");
 
     size_t fat_table_size = bs_info->table_size_32 * bs_info->n_bytes_per_sector;
-    size_t fat_table_offset = bs_info->first_fat_sector * bs_info->n_bytes_per_sector;
     fat_table_entry_t *fat_table = (fat_table_entry_t *)kmalloc(fat_table_size);
-
-    if (vfs_read(pathname, (uint8_t *)fat_table, fat_table_size, fat_table_offset) < 0)
+    status = _read_fat_table(pathname, bs_info, (uint8_t *)fat_table);
+    if (status < 0)
     {
-        printk("[fat32] cannot read fat table from \"%s\"!\r\n", pathname);
+        printk("[fat32] _read_fat_table() returned %d!\r\n", status);
         kfree(fat_table);
         return -1;
     }
 
-    bs_info->fat_table = fat_table;
+    bs_info->fat_table = (fat_table_entry_t *)fat_table;
     bs_info->n_fat_entries = fat_table_size / sizeof(fat_table_entry_t);
-
-    // for (size_t i = 0; i < fat_table_size / sizeof(fat_table_entry_t); i++)
-    //     dprintk("cluster %4d: value=0x%08X, address=0x%08X\r\n", i, fat_table[i], fat_table_offset + (i * sizeof(fat_table_entry_t)));
 
     // create folder
     struct fs_node *root = vfs_create_dir("/volumes", bs_info->volume_label, 0, NULL);
@@ -606,7 +618,7 @@ int fat32_mount(char *pathname)
 
     // build fs tree
     printk("[fat32] building fs tree\r\n");
-    int status = _fat32_build_fs_tree(pathname, bs_info, root, vfs_mp);
+    status = _fat32_build_fs_tree(pathname, bs_info, root, vfs_mp);
     if (status < 0)
     {
         printk("[fat32] _fat32_build_fs_tree() returned %i!\r\n", status);
