@@ -12,7 +12,7 @@ void storage_init()
         char mod_name[50] = {0};
         sprintf(mod_name, "sd%d", slot);
 
-        printk("[storage] adding \"/dev/%s\"\r\n", mod_name);
+        dprintk("[storage] adding \"/dev/%s\"\r\n", mod_name);
         io_register_module(mod_name, slot, &storage_read, &storage_write);
     }
 }
@@ -23,7 +23,7 @@ int storage_read(uint8_t *buffer, size_t count, size_t offset, uint64_t slot)
     uint64_t last_sector = (offset + count - 1) / VIRTIO_MMIO_BLK_SECTOR_SIZE;
     uint64_t sectors_to_read = last_sector - first_sector + 1;
 
-    printk("[/dev/sd%d] first_sector=%d, last_sector=%d, sectors_to_read=%d\r\n", slot, first_sector, last_sector, sectors_to_read);
+    dprintk("[/dev/sd%d] first_sector=%d, last_sector=%d, sectors_to_read=%d\r\n", slot, first_sector, last_sector, sectors_to_read);
 
     // allocate temporary buffer
     uint8_t *tmp = (uint8_t *)kmalloc(sectors_to_read * VIRTIO_MMIO_BLK_SECTOR_SIZE);
@@ -64,7 +64,7 @@ int storage_write(uint8_t *buffer, size_t count, size_t offset, uint64_t slot)
     uint64_t last_sector = (offset + count - 1) / VIRTIO_MMIO_BLK_SECTOR_SIZE;
     uint64_t sectors_to_read = last_sector - first_sector + 1;
 
-    printk("[/dev/sd%d] first_sector=%d, last_sector=%d, sectors_to_read=%d\r\n", slot, first_sector, last_sector, sectors_to_read);
+    dprintk("[/dev/sd%d] first_sector=%d, last_sector=%d, sectors_to_read=%d\r\n", slot, first_sector, last_sector, sectors_to_read);
 
     return 0;
 }

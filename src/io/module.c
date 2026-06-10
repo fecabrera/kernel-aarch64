@@ -77,7 +77,7 @@ int io_unregister_module(char *name)
 
 int io_read(struct fs_node *node, uint8_t *buff, size_t count, size_t offset)
 {
-    printk("[io] read(): mod=\"%s\", buff=0x%08x, count=%d, offset=%d\r\n", node->name, buff, count, offset);
+    dprintk("[io] read(): mod=\"%s\", buff=0x%08x, count=%d, offset=%d\r\n", node->name, buff, count, offset);
 
     struct io_module *module = _io_get_module(node->name);
     if (module == NULL)
@@ -91,7 +91,7 @@ int io_read(struct fs_node *node, uint8_t *buff, size_t count, size_t offset)
 
 int io_write(struct fs_node *node, uint8_t *buff, size_t count, size_t offset)
 {
-    printk("[io] write(): mod=\"%s\", buff=0x%08x, count=%d, offset=%d\r\n", node->name, buff, count, offset);
+    dprintk("[io] write(): mod=\"%s\", buff=0x%08x, count=%d, offset=%d\r\n", node->name, buff, count, offset);
 
     struct io_module *module = _io_get_module(node->name);
     if (module == NULL)
