@@ -62,7 +62,7 @@ init.img:
 	mkfs.fat -F 32 $@; \
 	dev=$$(hdiutil attach $@ | grep -o '/Volumes/.*'); \
 	dot_clean -n init; \
-	cp -R init/* "$$dev"; \
+	cp -R README.md init/* "$$dev"; \
 	dot_clean -n "$$dev"; \
 	hdiutil detach "$$dev"
 

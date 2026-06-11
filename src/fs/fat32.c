@@ -534,10 +534,12 @@ static int _fat32_build_fs_tree(char *pathname, struct fat32_bs_info *bs_info, s
 static int _read_fat_table(char *pathname, struct fat32_bs_info *bs_info, uint8_t *fat_table)
 {
     size_t fat_table_addr = bs_info->first_fat_sector * bs_info->n_bytes_per_sector;
+    printk("[fat32] will read %d sectors\r\n", bs_info->table_size_32);
 
     for (size_t i = 0; i < bs_info->table_size_32; i++)
     {
         size_t offset = i * bs_info->n_bytes_per_sector;
+        printk("\e[A");
         printk("[fat32] reading sector %d/%d, addr=0x%08X\r\n", i + 1, bs_info->table_size_32, fat_table_addr + offset);
 
         if (vfs_read(pathname, fat_table + offset, bs_info->n_bytes_per_sector, fat_table_addr + offset) < 0)

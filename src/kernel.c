@@ -84,5 +84,13 @@ void init()
     // dump fs
     vfs_dump_fs();
 
+    char *f_path = "/volumes/NO NAME/README.MD";
+    size_t f_size = vfs_get_file_size(f_path) + 1;
+    char *f_buff = (char *)kmalloc(f_size);
+
+    printk("[init] reading file \"%s\" (%d B)\r\n", f_path, f_size);
+    vfs_read(f_path, (uint8_t *)f_buff, f_size, 0);
+    printk("%s\r\n", f_buff);
+
     syscall_exit(0);
 }
