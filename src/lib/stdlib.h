@@ -3,8 +3,8 @@
 #include <stdint.h>
 
 /**
- * Converts a signed integer to a null-terminated string in the given base.
- * Negative values are only supported for base 10.
+ * Converts a signed integer to a null-terminated string in the given base. Negative values are only
+ * supported for base 10.
  *
  * @param value: integer to convert
  * @param str: output buffer (must be large enough to hold the result)

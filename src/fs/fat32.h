@@ -276,8 +276,8 @@ int fat32_unmount(char *pathname);
 
 /**
  * vfs_handler_t read handler for FAT32 mountpoints.
- * Reads count bytes from the file described by
- * node->info (fat32_entry_reference) into buffer, starting at offset.
+ * Reads count bytes from the file described by node->info (fat32_entry_reference) into buffer,
+ * starting at offset.
  *
  * @param node:   fs_node whose info points to a fat32_entry_reference
  * @param buffer: output buffer

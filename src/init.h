@@ -8,9 +8,9 @@ void init();
 
 /**
  * Runs an interactive console loop on /dev/serial. Prompts with "> ", reads one line at a time via
- * getline, and dispatches built-in commands (ls: vfs_dump_fs). Does not return.
+ * console_getline, and dispatches built-in commands (ls: vfs_dump_fs). Does not return.
  */
-void console();
+void console(char *pathname);
 
 /**
  * Reads the next printable character from the VFS device at pathname, blocking until one arrives.
@@ -20,7 +20,7 @@ void console();
  *
  * @return the next non-escape character read
  */
-char getc(char *pathname);
+char console_getc(char *pathname);
 
 /**
  * Reads one line from the VFS device at pathname into buffer, echoing each character back.
@@ -32,4 +32,4 @@ char getc(char *pathname);
  *
  * @return number of characters read, excluding the CR terminator
  */
-int getline(char *pathname, char *buffer);
+int console_getline(char *pathname, char *buffer);

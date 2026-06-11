@@ -1,4 +1,5 @@
 #include "fat32.h"
+#include "stdbool.h"
 #include <arch/cpu.h>
 #include <ctype.h>
 #include <debug.h>
@@ -426,7 +427,7 @@ static int _fat32_read_cluster(char *pathname, struct fat32_bs_info *bs_info, ui
 }
 
 void fat32_build_cluster_chains(struct fat32_bs_info *bs_info, struct queue32 *cluster_chains) {
-    uint8_t *visited_clusters = (uint8_t *)kmalloc(bs_info->n_fat_entries);
+    bool *visited_clusters = (bool *)kmalloc(bs_info->n_fat_entries);
     memset(visited_clusters, 0, bs_info->n_fat_entries);
 
     for (uint32_t i = bs_info->root_cluster; i < bs_info->n_fat_entries; i++) {
@@ -436,7 +437,7 @@ void fat32_build_cluster_chains(struct fat32_bs_info *bs_info, struct queue32 *c
         if (visited_clusters[i])
             continue;
 
-        visited_clusters[i] = 1;
+        visited_clusters[i] = true;
 
         // skip if cluster is reserved, free or bad
         if (cluster_value == FAT32_FAT_ENTRY_RESERVED || cluster_value == FAT32_FAT_ENTRY_FREE ||
@@ -448,7 +449,7 @@ void fat32_build_cluster_chains(struct fat32_bs_info *bs_info, struct queue32 *c
         uint32_t cluster = i;
         do {
             // mark cluster as visited
-            visited_clusters[cluster] = 1;
+            visited_clusters[cluster] = true;
 
             // next cluster
             cluster = bs_info->fat_table[cluster] & 0x0FFFFFFF;

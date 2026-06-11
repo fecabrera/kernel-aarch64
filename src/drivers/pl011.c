@@ -95,11 +95,6 @@ void pl011_vprintf(const char *format, __builtin_va_list args) {
     }
 }
 
-void pl011_puts(const char *s) {
-    while (*s)
-        pl011_putc(*s++);
-}
-
 void pl011_init() {
     // Disable UART before configuring
     PL011_CR = PL011_CR_DISABLED;
@@ -136,59 +131,6 @@ uint32_t pl011_getc(char *c) {
     if (!value)
         *c = (uint8_t)(PL011_DR & PL011_DR_DATA_MASK); // mask value
     return value;
-}
-
-void pl011_read_input() {
-    int8_t _escape = 0, _arrow = 0;
-
-    // Read all available bytes (RX or timeout interrupt)
-    char c;
-    while (!pl011_getc(&c)) {
-        if (_escape) {
-            _escape = 0;
-
-            if (c == '[') {
-                _arrow = 1;
-                continue;
-            }
-        }
-
-        if (_arrow) {
-            _arrow = 0;
-
-            switch (c) {
-            case 'A':
-                pl011_puts("[up]");
-                continue;
-            case 'B':
-                pl011_puts("[down]");
-                continue;
-            case 'C':
-                pl011_puts("[right]");
-                continue;
-            case 'D':
-                pl011_puts("[left]");
-                continue;
-            }
-        }
-
-        switch (c) {
-        case ASCII_ESC:
-            _escape = 1; // set escape
-            break;
-        case ASCII_CR:
-            pl011_puts("\r\n");
-            break;
-        case ASCII_DEL:
-            pl011_puts("\b \b");
-            break;
-        case ASCII_LF:
-            pl011_puts("\t");
-            break;
-        default:
-            pl011_putc(c);
-        }
-    }
 }
 
 struct cpu_context *pl011_irq_handler(__attribute__((unused)) int irq, struct cpu_context *ctx) {

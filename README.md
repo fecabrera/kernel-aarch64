@@ -61,7 +61,6 @@ make run
 
 - Interrupt-driven RX, polled TX, 115200 8N1.
 - `pl011_getc(char *c)` reads the next byte from the RX FIFO without blocking; returns 0 if a byte was read, non-zero if the FIFO is empty.
-- `pl011_read_input` handles escape sequences for arrow keys (ESC `[` A/B/C/D) and maps CR/DEL/LF to their terminal equivalents.
 
 ### **ARM generic timer**
 
@@ -165,9 +164,9 @@ make run
 - `serial_init()` registers a `/dev/serial` I/O module backed by the PL011 UART. Must be called after `io_init()`.
 - `serial_read` blocks reading `count` bytes from the UART by calling `pl011_getc` in a loop, spinning on `wfi()` until each byte arrives; returns `count`.
 - `serial_write` writes `count` bytes to the UART one byte at a time via `pl011_putc`; returns `count`.
-- `console()` in `init.c` runs an interactive terminal loop on `/dev/serial`, prompting with `"> "` and dispatching built-in commands (`ls`: `vfs_dump_fs`).
-- `getc(pathname)` reads the next character from a VFS device, blocking and discarding ANSI escape sequences.
-- `getline(pathname, buffer)` reads one line via `getc`, echoing characters back and handling backspace and CR; returns character count.
+- `console(pathname)` in `init.c` runs an interactive terminal loop on the given VFS device, prompting with `"> "` and dispatching built-in commands (`ls`: `vfs_dump_fs`).
+- `console_getc(pathname)` reads the next character from a VFS device, blocking and discarding ANSI escape sequences.
+- `console_getline(pathname, buffer)` reads one line via `console_getc`, echoing characters back and handling backspace and CR; returns character count.
 
 ### **Storage devices**
 
@@ -196,7 +195,7 @@ init/               — files bundled into init.img at build time (FAT32 ramdisk
 
 src/
   kernel.c          — kernel_init: subsystem bring-up (DTB, memory, IRQ, VFS, I/O, serial, storage, scheduler, timer)
-  init.c/h          — init(): pid 1 entry point; mounts FAT32 block devices, runs console(); console()/getc()/getline() interactive serial terminal with built-in commands
+  init.c/h          — init(): pid 1 entry point; mounts FAT32 block devices, runs console(); console(pathname)/console_getc()/console_getline() interactive serial terminal with built-in commands
   start.S           — AArch64 boot stub, saves DTB pointer, zeros BSS
   vectors.S         — exception vector table, save/restore_context macros
 
@@ -233,6 +232,7 @@ src/
     stdio.c/h       — vsprintf, sprintf (freestanding; uses __builtin_va_* instead of <stdarg.h>)
     stdint.h        — stdint-style typedefs (uint8_t … uint64_t, intptr_t)
     stddef.h        — NULL and size_t (uint64_t)
+    stdbool.h       — bool/true/false for pre-C23 (no-op under C23+)
     uchar.c/h       — char8_t/16_t/32_t typedefs; utf16to8 conversion; utf16lencpy/utf16bencpy (UTF-16LE/BE to ASCII)
     limits.h        — integer limit macros (AArch64/LP64; unsigned char default)
     time.h          — time_t typedef (uint64_t)

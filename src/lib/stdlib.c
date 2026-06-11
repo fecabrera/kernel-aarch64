@@ -1,10 +1,11 @@
 #include "stdlib.h"
+#include "stdbool.h"
 
 static const char _itoa_digits[] = "0123456789abcdef";
 
 char *itoa(int64_t value, char *str, int base) {
     char *buff = str;
-    int neg = 0;
+    bool neg = false;
 
     if (value == 0) {
         *buff++ = '0';
@@ -13,7 +14,7 @@ char *itoa(int64_t value, char *str, int base) {
     }
 
     if (value < 0 && base == 10) {
-        neg = 1;
+        neg = true;
         value = -value;
     }
 

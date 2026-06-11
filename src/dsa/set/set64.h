@@ -3,21 +3,19 @@
 #include <stdint.h>
 #include <string.h>
 
-#define SET64_SLOT_EMPTY     0
-#define SET64_SLOT_OCCUPIED  1
+#define SET64_SLOT_EMPTY 0
+#define SET64_SLOT_OCCUPIED 1
 #define SET64_SLOT_TOMBSTONE 2
 
-// Open-addressing hash table with linear probing; maps uint64_t keys to
-// uint64_t values. Grows automatically when the load factor reaches 70%.
-struct set64_entry
-{
+// Open-addressing hash table with linear probing; maps uint64_t keys to uint64_t values. Grows
+// automatically when the load factor reaches 70%.
+struct set64_entry {
     uint64_t key;
     uint64_t value;
     uint8_t state;
 };
 
-struct set64
-{
+struct set64 {
     struct set64_entry *entries; // heap-allocated slot array
     size_t length;               // number of live entries
     size_t capacity;             // total allocated slots
@@ -39,8 +37,7 @@ void set64_init(struct set64 *set, size_t capacity);
 void set64_destroy(struct set64 *set);
 
 /**
- * Inserts or updates the entry for key. Grows the backing array if the load
- * factor reaches 70%.
+ * Inserts or updates the entry for key. Grows the backing array if the load factor reaches 70%.
  *
  * @param set:   set to insert into
  * @param key:   key to insert or update

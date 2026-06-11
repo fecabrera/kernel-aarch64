@@ -119,13 +119,6 @@ void pl011_printf(const char *format, ...);
 void pl011_vprintf(const char *format, __builtin_va_list args);
 
 /**
- * Writes a null-terminated string to the UART.
- *
- * @param s: pointer to the null-terminated string to transmit
- */
-void pl011_puts(const char *s);
-
-/**
  * Initializes the PL011 UART: sets baud rate to 115200 8N1, enables FIFOs, unmasks RX interrupts,
  * and registers the IRQ with the GIC.
  */
@@ -139,13 +132,6 @@ void pl011_init();
  * @return 0 if a byte was read, non-zero (PL011_FR_RXFE set) if the RX FIFO is empty
  */
 uint32_t pl011_getc(char *c);
-
-/**
- * Drains the RX FIFO, handling escape sequences for arrow keys (ESC [ A/B/C/D) and control
- * characters (CR → newline, DEL → backspace, LF → tab). Printable characters are echoed
- * directly via pl011_putc.
- */
-void pl011_read_input();
 
 /**
  * IRQ handler for UART RX and receive-timeout interrupts.

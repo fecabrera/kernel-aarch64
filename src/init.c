@@ -6,6 +6,7 @@
 #include <fs/fat32.h>
 #include <fs/vfs.h>
 #include <mm/heap.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -33,19 +34,17 @@ void init() {
     }
 
     // init console
-    console();
+    console("/dev/serial");
 
     syscall_exit(0);
 }
 
-void console() {
-    char *pathname = "/dev/serial";
-
-    while (1) {
+void console(char *pathname) {
+    while (true) {
         vfs_write(pathname, (uint8_t *)"> ", 2, 0);
 
         char buffer[1024] = {0};
-        int len = getline(pathname, buffer);
+        int len = console_getline(pathname, buffer);
 
         if (strcmp(buffer, "ls") == 0)
             vfs_dump_fs();
@@ -54,29 +53,29 @@ void console() {
     }
 }
 
-char getc(char *pathname) {
-    int8_t _escape = 0, _arrow = 0;
+char console_getc(char *pathname) {
+    bool _escape = 0, _arrow = 0;
 
-    while (1) {
+    while (true) {
         char c;
         vfs_read(pathname, (uint8_t *)&c, 1, 0);
 
         if (_escape) {
-            _escape = 0;
+            _escape = false;
 
             if (c == '[') {
-                _arrow = 1;
+                _arrow = true;
                 continue;
             }
         }
 
         if (_arrow) {
-            _arrow = 0;
+            _arrow = false;
             continue;
         }
 
         if (c == ASCII_ESC) {
-            _escape = 1; // set escape
+            _escape = true; // set escape
             continue;
         }
 
@@ -84,11 +83,11 @@ char getc(char *pathname) {
     }
 }
 
-int getline(char *pathname, char *buffer) {
+int console_getline(char *pathname, char *buffer) {
     int n = 0;
 
     while (1) {
-        char c = getc(pathname);
+        char c = console_getc(pathname);
 
         switch (c) {
         case ASCII_CR:

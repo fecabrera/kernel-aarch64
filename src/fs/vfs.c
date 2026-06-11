@@ -56,23 +56,20 @@ void vfs_init() {
     fs_add_subfolder(_fs_root, "volumes", 0, NULL, NULL);
 }
 
-struct vfs_mount *vfs_create_mountpoint(char *mountpoint, char *device,
-                                        void *info, vfs_handler_t read,
-                                        vfs_handler_t write) {
+struct vfs_mount *vfs_create_mountpoint(char *mountpoint, char *device, void *info,
+                                        vfs_handler_t read, vfs_handler_t write) {
     struct fs_node *mp_node = _vfs_get_node(mountpoint, _fs_root);
     if (mp_node == NULL) {
         dprintk("[vfs] mountpoint \"%s\" not found!\r\n", mountpoint);
         return NULL;
     }
 
-    if ((mp_node->attrs & FS_NODE_ATTRS_TYPE_MASK) !=
-        FS_NODE_ATTRS_TYPE_FOLDER) {
+    if ((mp_node->attrs & FS_NODE_ATTRS_TYPE_MASK) != FS_NODE_ATTRS_TYPE_FOLDER) {
         dprintk("[vfs] \"%s\" is not a folder!\r\n", mountpoint);
         return NULL;
     }
 
-    struct vfs_mount *vfs_mp =
-        (struct vfs_mount *)kmalloc(sizeof(struct vfs_mount));
+    struct vfs_mount *vfs_mp = (struct vfs_mount *)kmalloc(sizeof(struct vfs_mount));
 
     vfs_mp->mountpoint = (char *)kmalloc(strlen(mountpoint) + 1);
     strcpy(vfs_mp->mountpoint, mountpoint);
@@ -104,9 +101,7 @@ struct vfs_mount *vfs_get_mountpoint(char *mountpoint) {
     return (struct vfs_mount *)value;
 }
 
-struct fs_node *vfs_get_node_for_path(char *pathname) {
-    return _vfs_get_node(pathname, _fs_root);
-}
+struct fs_node *vfs_get_node_for_path(char *pathname) { return _vfs_get_node(pathname, _fs_root); }
 
 int vfs_destroy_mountpoint(char *mountpoint) {
     struct vfs_mount *mp = vfs_get_mountpoint(mountpoint);
@@ -143,8 +138,8 @@ size_t vfs_get_file_size(char *pathname) {
 }
 
 int vfs_read(char *pathname, uint8_t *buffer, size_t count, size_t offset) {
-    dprintk("[vfs] read(): file=\"%s\", buff=0x%08x, count=%d, offset=%d\r\n",
-            pathname, buffer, count, offset);
+    dprintk("[vfs] read(): file=\"%s\", buff=0x%08x, count=%d, offset=%d\r\n", pathname, buffer,
+            count, offset);
 
     struct fs_node *node = _vfs_get_node(pathname, _fs_root);
     if (node == NULL) {
@@ -159,8 +154,7 @@ int vfs_read(char *pathname, uint8_t *buffer, size_t count, size_t offset) {
     }
 
     if (mp->read == NULL) {
-        dprintk("[vfs] mountpoint \"%s\" didn't provide a `read` handler!\r\n",
-                mp->mountpoint);
+        dprintk("[vfs] mountpoint \"%s\" didn't provide a `read` handler!\r\n", mp->mountpoint);
         return VFS_IO_ERROR_HANDLER_NOT_PROVIDED;
     }
 
@@ -168,8 +162,8 @@ int vfs_read(char *pathname, uint8_t *buffer, size_t count, size_t offset) {
 }
 
 int vfs_write(char *pathname, uint8_t *buffer, size_t count, size_t offset) {
-    dprintk("[vfs] write(): file=\"%s\", buff=0x%08x, count=%d, offset=%d\r\n",
-            pathname, buffer, count, offset);
+    dprintk("[vfs] write(): file=\"%s\", buff=0x%08x, count=%d, offset=%d\r\n", pathname, buffer,
+            count, offset);
 
     struct fs_node *node = _vfs_get_node(pathname, _fs_root);
     if (node == NULL) {
@@ -184,16 +178,14 @@ int vfs_write(char *pathname, uint8_t *buffer, size_t count, size_t offset) {
     }
 
     if (mp->write == NULL) {
-        dprintk("[vfs] mountpoint \"%s\" didn't provide a `write` handler!\r\n",
-                mp->mountpoint);
+        dprintk("[vfs] mountpoint \"%s\" didn't provide a `write` handler!\r\n", mp->mountpoint);
         return VFS_IO_ERROR_HANDLER_NOT_PROVIDED;
     }
 
     return mp->write(node, buffer, count, offset);
 }
 
-struct fs_node *vfs_create_dir(char *path, char *name, uint16_t attrs,
-                               void *mount) {
+struct fs_node *vfs_create_dir(char *path, char *name, uint16_t attrs, void *mount) {
     struct fs_node *parent = _vfs_get_node(path, _fs_root);
     struct fs_node *node = fs_add_subfolder(parent, name, attrs, NULL, mount);
     if (node == NULL) {
@@ -204,11 +196,10 @@ struct fs_node *vfs_create_dir(char *path, char *name, uint16_t attrs,
     return node;
 }
 
-struct fs_node *vfs_create_file(char *path, char *name, size_t file_size,
-                                uint16_t attrs, void *mount) {
+struct fs_node *vfs_create_file(char *path, char *name, size_t file_size, uint16_t attrs,
+                                void *mount) {
     struct fs_node *parent = _vfs_get_node(path, _fs_root);
-    struct fs_node *node =
-        fs_add_file_to_folder(parent, name, file_size, attrs, NULL, mount);
+    struct fs_node *node = fs_add_file_to_folder(parent, name, file_size, attrs, NULL, mount);
     if (node == NULL) {
         dprintk("[vfs] cannot create \"%s/%s\"!\r\n", path, name);
         return NULL;
