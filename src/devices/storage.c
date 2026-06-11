@@ -5,11 +5,13 @@
 #include <mm/heap.h>
 #include <stdio.h>
 
+static char _next = 'a';
+
 void storage_init() {
     virtio_slot_t slot = -1;
     while ((slot = virtio_mmio_find_next_slot(VIRTIO_DEVICE_ID_BLOCK, slot)) != -1) {
         char mod_name[50] = {0};
-        sprintf(mod_name, "sd%d", slot);
+        sprintf(mod_name, "sd%c", _next++);
 
         dprintk("[storage] adding \"/dev/%s\"\r\n", mod_name);
         io_register_module(mod_name, slot, &storage_read, &storage_write);

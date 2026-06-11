@@ -1,8 +1,8 @@
 #pragma once
 
 /**
- * pid 1 entry point. Mounts all FAT32 block devices found via virtio MMIO, then launches
- * console(). Calls syscall_exit(0) on return.
+ * pid 1 entry point. Mounts /dev/sda as a FAT32 volume (exits -1 on failure), then launches
+ * console("/dev/serial"). Calls syscall_exit(0) on return.
  */
 void init();
 

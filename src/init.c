@@ -1,37 +1,28 @@
 #include "init.h"
 #include <arch/syscall.h>
+#include <ascii.h>
 #include <debug.h>
-#include <drivers/pl011.h>
 #include <drivers/virtio_mmio.h>
 #include <fs/fat32.h>
 #include <fs/vfs.h>
 #include <mm/heap.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <stdio.h>
 #include <string.h>
 #include <sys/types.h>
 
 void init() {
-    // initialize block devices
-    virtio_slot_t slot = -1;
+    char path[] = "/dev/sda";
+    printk("[init] mounting block device \"%s\"\r\n", path);
 
-    while ((slot = virtio_mmio_find_next_slot(VIRTIO_DEVICE_ID_BLOCK, slot)) != -1) {
-        // build path, will eventually replace with a direct fetch
-        char path[50] = {0};
-        sprintf(path, "/dev/sd%d", slot);
-
-        printk("[init] mounting block device \"%s\"\r\n", path);
-
-        // mount volume
-        int status = fat32_mount(path);
-        if (status < 0) {
-            printk("[init] fat32_mount() returned %d!\r\n", status);
-            continue;
-        }
-
-        printk("[init] block device \"%s\" mounted!\r\n", path);
+    // mount volume
+    int status = fat32_mount(path);
+    if (status < 0) {
+        printk("[init] fat32_mount() returned %d!\r\n", status);
+        syscall_exit(-1);
     }
+
+    printk("[init] block device \"%s\" mounted!\r\n", path);
 
     // init console
     console("/dev/serial");
@@ -54,7 +45,7 @@ void console(char *pathname) {
 }
 
 char console_getc(char *pathname) {
-    bool _escape = 0, _arrow = 0;
+    bool _escape = false, _arrow = false;
 
     while (true) {
         char c;

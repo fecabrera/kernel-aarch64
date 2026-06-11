@@ -11,8 +11,6 @@
 #include <fs/filesystem.h>
 #include <fs/vfs.h>
 #include <mm/heap.h>
-#include <stdio.h>
-#include <string.h>
 
 static virtio_slot_t _irq_to_slot[256] = {0};
 static virtio_mmio_handler_t _handlers[32];
@@ -150,7 +148,7 @@ int virtio_mmio_read(virtio_slot_t slot, uint64_t sector_number, uint8_t *data) 
 
     // 1. Fill the header
     struct virtio_blk_req_header hdr = {
-        .type = 0,
+        .type = VIRTIO_BLK_T_IN,
         .sector = sector_number,
     };
     uint8_t status = 0xFF; // device writes 0 on success, 1 on error, 2 = unsupported
@@ -183,7 +181,7 @@ int virtio_mmio_read(virtio_slot_t slot, uint64_t sector_number, uint8_t *data) 
     // 5. Poll or wait for IRQ — device writes to used ring when done
     // In the IRQ handler, check used.idx advanced and read status byte
     while (status == VIRTIO_BLK_S_NONE)
-        syscall_msleep(1);
+        wfi();
 
     dprintk("[virtio_mmio@%x] status = %u\r\n", VIRTIO_MMIO_ADDR(slot), status);
 

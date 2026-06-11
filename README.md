@@ -76,7 +76,7 @@ make run
 
 - Scans all 32 MMIO slots, validates magic, version, and device ID.
 - Negotiates features, sets up per-slot 64-entry virtqueues (`struct virtq` with desc/avail/used rings).
-- `virtio_mmio_read` submits synchronous block reads via 3-descriptor chains.
+- `virtio_mmio_read` submits synchronous block reads via 3-descriptor chains; polls the used ring via `wfi()` until the device signals completion.
 - IRQ handler acks `VIRTIO_INTERRUPT_STATUS`.
 
 ### **Filesystem abstraction**
@@ -170,7 +170,7 @@ make run
 
 ### **Storage devices**
 
-- `storage_init()` scans all virtio MMIO slots for block devices and registers each as an I/O module named `sd<slot>` (e.g. `sd0`), creating a `/dev/sd<slot>` VFS node. Must be called after `io_init()`.
+- `storage_init()` scans all virtio MMIO slots for block devices and registers each as an I/O module named `sda`, `sdb`, etc. (alphabetical, in slot order), creating a `/dev/sd<letter>` VFS node. Must be called after `io_init()`.
 - `storage_read` reads all 512-byte sectors spanning `[offset, offset+count)` into a temporary buffer via `virtio_mmio_read`, then copies exactly `count` bytes at the correct intra-sector alignment into the caller's buffer; handles non-sector-aligned offsets and multi-sector spans; returns `count` on success or a negative error code from `virtio_mmio_read` on failure.
 - `storage_write` is a stub. Both receive the virtio slot index as `slot`.
 
@@ -195,7 +195,7 @@ init/               — files bundled into init.img at build time (FAT32 ramdisk
 
 src/
   kernel.c          — kernel_init: subsystem bring-up (DTB, memory, IRQ, VFS, I/O, serial, storage, scheduler, timer)
-  init.c/h          — init(): pid 1 entry point; mounts FAT32 block devices, runs console(); console(pathname)/console_getc()/console_getline() interactive serial terminal with built-in commands
+  init.c/h          — init(): pid 1 entry point; mounts /dev/sda as FAT32, runs console("/dev/serial"); console(pathname)/console_getc()/console_getline() interactive serial terminal with built-in commands
   start.S           — AArch64 boot stub, saves DTB pointer, zeros BSS
   vectors.S         — exception vector table, save/restore_context macros
 
@@ -220,7 +220,7 @@ src/
     stack/stack64/32/16/8 — dynamic array-backed LIFO stack of uint64/32/16/8_t (stackN_init/destroy/push/pop/peek)
     deque/deque64       — doubly-linked deque of uint64_t (deque64_add/remove/peek left/right, find, find_remove, remove, next)
     hashmap/hashmap64   — open-addressing hash map: string key → uint64_t value (hashmap64_init/destroy/set/get/has/remove)
-    set/set64           — open-addressing hash map: uint64_t key → uint64_t value (set64_init/destroy/set/get/remove)
+    set/set64/32/16/8   — open-addressing hash map: uintN_t key → uintN_t value (setN_init/destroy/set/get/remove)
     ordered_set/ordered_set64 — BST-based ordered set of uint64_t (ordered_set64_init/destroy/insert/remove/contains/min/max/foreach)
 
   lib/              — architecture-independent libraries
@@ -233,6 +233,7 @@ src/
     stdint.h        — stdint-style typedefs (uint8_t … uint64_t, intptr_t)
     stddef.h        — NULL and size_t (uint64_t)
     stdbool.h       — bool/true/false for pre-C23 (no-op under C23+)
+    ascii.h         — ASCII control character macros (ASCII_LF, ASCII_CR, ASCII_ESC, ASCII_DEL)
     uchar.c/h       — char8_t/16_t/32_t typedefs; utf16to8 conversion; utf16lencpy/utf16bencpy (UTF-16LE/BE to ASCII)
     limits.h        — integer limit macros (AArch64/LP64; unsigned char default)
     time.h          — time_t typedef (uint64_t)
@@ -251,7 +252,7 @@ src/
     module.c/h      — hashmap64-backed named module registry: io_init, io_register_module, io_unregister_module, io_read, io_write; io_module carries drv_info + read/write handlers; io_file pairs a pid with a module
 
   devices/          — device drivers built on the I/O module registry
-    storage.c/h     — block storage driver: storage_init scans virtio block slots and registers each as /dev/sd<slot>; storage_read/write are the io_handler_t callbacks
+    storage.c/h     — block storage driver: storage_init scans virtio block slots and registers each as /dev/sda, /dev/sdb, etc.; storage_read/write are the io_handler_t callbacks
     serial.c/h      — serial console driver: serial_init registers /dev/serial; serial_read blocks on pl011_getc+wfi(); serial_write writes via pl011_putc
 ```
 
