@@ -6,9 +6,10 @@
 #include <fs/fat32.h>
 #include <fs/vfs.h>
 #include <mm/heap.h>
-#include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
+#include <sys/types.h>
 
 void init() {
     // initialize block devices
@@ -31,34 +32,9 @@ void init() {
         printk("[init] block device \"%s\" mounted!\r\n", path);
     }
 
-    // dump fs
-    vfs_dump_fs();
-
-    char *f_path = "/volumes/NO NAME/README.MD";
-    size_t f_size = vfs_get_file_size(f_path) + 1;
-    char *f_buff = (char *)kmalloc(f_size);
-
-    printk("[init] reading file \"%s\" (%d B)\r\n", f_path, f_size);
-
-    int status = vfs_read(f_path, (uint8_t *)f_buff, f_size, 0);
-    if (status < 0) {
-        switch (status) {
-        case VFS_IO_ERROR_FILE_NOT_FOUND:
-            printk("[init] file \"%s\" not found!\r\n", f_path);
-            break;
-        default:
-            printk("[init] cannot read \"%s\"!\r\n", f_path);
-        }
-
-        kfree(f_buff);
-        syscall_exit(1);
-    }
-
-    printk("%s\r\n", f_buff);
-
+    // init console
     console();
 
-    kfree(f_buff);
     syscall_exit(0);
 }
 
@@ -69,13 +45,18 @@ void console() {
         vfs_write(pathname, (uint8_t *)"> ", 2, 0);
 
         char buffer[1024] = {0};
-        read_line(pathname, buffer);
+        int len = getline(pathname, buffer);
+
+        if (strcmp(buffer, "ls") == 0)
+            vfs_dump_fs();
+        else
+            printk("buffer=\"%s\", len=%d\r\n", buffer, len);
     }
 }
 
-int read_line(char *pathname, char *buffer) {
-    int _len = 0;
+char getc(char *pathname) {
     int8_t _escape = 0, _arrow = 0;
+
     while (1) {
         char c;
         vfs_read(pathname, (uint8_t *)&c, 1, 0);
@@ -94,17 +75,29 @@ int read_line(char *pathname, char *buffer) {
             continue;
         }
 
-        switch (c) {
-        case ASCII_ESC:
+        if (c == ASCII_ESC) {
             _escape = 1; // set escape
-            break;
+            continue;
+        }
+
+        return c;
+    }
+}
+
+int getline(char *pathname, char *buffer) {
+    int n = 0;
+
+    while (1) {
+        char c = getc(pathname);
+
+        switch (c) {
         case ASCII_CR:
             vfs_write(pathname, (uint8_t *)"\r\n", 2, 0);
-            return _len;
+            return n;
         case ASCII_DEL:
-            if (_len > 0) {
+            if (n > 0) {
                 vfs_write(pathname, (uint8_t *)"\b \b", 3, 0);
-                buffer[_len--] = '\0';
+                buffer[--n] = '\0';
             }
             break;
         default:
@@ -112,7 +105,7 @@ int read_line(char *pathname, char *buffer) {
                 c = '\t';
 
             vfs_write(pathname, (uint8_t *)&c, 1, 0);
-            buffer[_len++] = c;
+            buffer[n++] = c;
         }
     }
 

@@ -1,8 +1,8 @@
 #pragma once
 
+#include "process.h"
 #include <arch/cpu.h>
 #include <arch/irq.h>
-#include "process.h"
 
 /**
  * Registers all scheduler syscall handlers. Must be called before irq_enable().

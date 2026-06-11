@@ -1,16 +1,26 @@
 #pragma once
 
 /**
- * pid 1 entry point. Mounts all FAT32 block devices found via virtio MMIO, dumps the VFS tree,
- * reads a test file, then launches console(). Calls syscall_exit(0) on return.
+ * pid 1 entry point. Mounts all FAT32 block devices found via virtio MMIO, then launches
+ * console(). Calls syscall_exit(0) on return.
  */
 void init();
 
 /**
- * Runs an interactive console loop on /dev/serial. Prompts with "> " and reads one line at a time
- * via read_line. Does not return.
+ * Runs an interactive console loop on /dev/serial. Prompts with "> ", reads one line at a time via
+ * getline, and dispatches built-in commands (ls: vfs_dump_fs). Does not return.
  */
 void console();
+
+/**
+ * Reads the next printable character from the VFS device at pathname, blocking until one arrives.
+ * Consumes and discards ANSI escape sequences (ESC [ A/B/C/D arrow keys) transparently.
+ *
+ * @param pathname: VFS path of the device to read from (e.g. "/dev/serial")
+ *
+ * @return the next non-escape character read
+ */
+char getc(char *pathname);
 
 /**
  * Reads one line from the VFS device at pathname into buffer, echoing each character back.
@@ -22,4 +32,4 @@ void console();
  *
  * @return number of characters read, excluding the CR terminator
  */
-int read_line(char *pathname, char *buffer);
+int getline(char *pathname, char *buffer);

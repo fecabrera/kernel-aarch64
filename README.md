@@ -141,6 +141,7 @@ make run
 - Dedicated 4KB IRQ stack.
 - `create_process`/`duplicate_process`/`destroy_process` with 16-byte aligned task stacks.
 - Idles via `halt` when the ready queue is empty.
+- waitpid and sleep queues backed by `set64` (keyed by pid), replacing the prior `deque64` lists.
 
 ### **IRQ interface**
 
@@ -164,8 +165,9 @@ make run
 - `serial_init()` registers a `/dev/serial` I/O module backed by the PL011 UART. Must be called after `io_init()`.
 - `serial_read` blocks reading `count` bytes from the UART by calling `pl011_getc` in a loop, spinning on `wfi()` until each byte arrives; returns `count`.
 - `serial_write` writes `count` bytes to the UART one byte at a time via `pl011_putc`; returns `count`.
-- `console()` in `init.c` runs an interactive terminal loop on `/dev/serial`, prompting with `"> "` and reading lines via `read_line`.
-- `read_line(pathname, buffer)` reads one line from a VFS device, echoing characters back and handling escape sequences, backspace, and CR.
+- `console()` in `init.c` runs an interactive terminal loop on `/dev/serial`, prompting with `"> "` and dispatching built-in commands (`ls`: `vfs_dump_fs`).
+- `getc(pathname)` reads the next character from a VFS device, blocking and discarding ANSI escape sequences.
+- `getline(pathname, buffer)` reads one line via `getc`, echoing characters back and handling backspace and CR; returns character count.
 
 ### **Storage devices**
 
@@ -194,7 +196,7 @@ init/               — files bundled into init.img at build time (FAT32 ramdisk
 
 src/
   kernel.c          — kernel_init: subsystem bring-up (DTB, memory, IRQ, VFS, I/O, serial, storage, scheduler, timer)
-  init.c/h          — init(): pid 1 entry point; mounts FAT32 block devices, dumps VFS tree, runs console(); console()/read_line() interactive serial terminal
+  init.c/h          — init(): pid 1 entry point; mounts FAT32 block devices, runs console(); console()/getc()/getline() interactive serial terminal with built-in commands
   start.S           — AArch64 boot stub, saves DTB pointer, zeros BSS
   vectors.S         — exception vector table, save/restore_context macros
 
@@ -237,7 +239,7 @@ src/
 
   sched/            — scheduler and process management
     process.c/h     — process struct, create/duplicate/config/destroy
-    scheduler.c/h   — FIFO ready queue (dsa/queue64) and wait queue (dsa/deque64), scheduler_enqueue/dequeue/spawn, context switch via timer and yield/exit/waitpid/fork syscalls
+    scheduler.c/h   — FIFO ready queue (dsa/queue64), waitpid/sleep queues (dsa/set64 keyed by pid), scheduler_enqueue/dequeue/spawn, context switch via timer and yield/exit/waitpid/fork/sleep syscalls
 
   fs/               — filesystem drivers
     filesystem.c/h  — fs_node tree primitives: fs_get_child, fs_remove_child, fs_create_node/file/folder, fs_add_file_to_folder, fs_add_subfolder, fs_add_to_folder, fs_node_rename, fs_destroy_node, fs_dump_node
