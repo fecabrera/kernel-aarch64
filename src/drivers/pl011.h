@@ -41,7 +41,8 @@
 #define PL011_LCR_WLEN_8 (3 << 5) // 8-bit words (standard)
 
 // IBRD / FBRD — baud rate divisor (assumes 24MHz UARTCLK, as on QEMU virt)
-// Formula: divisor = UARTCLK / (16 * baud), IBRD = integer part, FBRD = round(fraction * 64)
+// Formula: divisor = UARTCLK / (16 * baud), IBRD = integer part, FBRD =
+// round(fraction * 64)
 #define PL011_BAUD_9600_IBRD 156
 #define PL011_BAUD_9600_FBRD 16
 #define PL011_BAUD_38400_IBRD 39
@@ -125,22 +126,31 @@ void pl011_vprintf(const char *format, __builtin_va_list args);
 void pl011_puts(const char *s);
 
 /**
- * Initializes the PL011 UART: sets baud rate to 115200 8N1, enables FIFOs,
- * unmasks RX interrupts, and registers the IRQ with the GIC.
+ * Initializes the PL011 UART: sets baud rate to 115200 8N1, enables FIFOs, unmasks RX interrupts,
+ * and registers the IRQ with the GIC.
  */
 void pl011_init();
 
 /**
- * Drains the RX FIFO, handling escape sequences for arrow keys (ESC [ A/B/C/D)
- * and control characters (CR → newline, DEL → backspace, LF → tab).
- * Printable characters are echoed directly via pl011_putc.
+ * Reads the next byte from the RX FIFO without blocking.
+ *
+ * @param c: output byte; written only if the RX FIFO is non-empty
+ *
+ * @return 0 if a byte was read, non-zero (PL011_FR_RXFE set) if the RX FIFO is empty
+ */
+uint32_t pl011_getc(char *c);
+
+/**
+ * Drains the RX FIFO, handling escape sequences for arrow keys (ESC [ A/B/C/D) and control
+ * characters (CR → newline, DEL → backspace, LF → tab). Printable characters are echoed
+ * directly via pl011_putc.
  */
 void pl011_read_input();
 
 /**
  * IRQ handler for UART RX and receive-timeout interrupts.
- * Drains the RX FIFO into the ring buffer and clears the interrupt flags.
- * Registered with irq_register_handler at pl011_init time.
+ * Drains the RX FIFO into the ring buffer and clears the interrupt flags. Registered with
+ * irq_register_handler at pl011_init time.
  *
  * @param irq: IRQ ID passed by the dispatcher (unused)
  * @param ctx: saved register frame from the interrupted context

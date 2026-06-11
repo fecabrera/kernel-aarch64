@@ -3,6 +3,7 @@
 #include <arch/irq.h>
 #include <arch/syscall.h>
 #include <debug.h>
+#include <devices/serial.h>
 #include <devices/storage.h>
 #include <drivers/gic.h>
 #include <drivers/pl011.h>
@@ -44,6 +45,7 @@ void kernel_init() {
     // initialize file system and I/O
     vfs_init();
     io_init();
+    serial_init();
     storage_init();
 
     // set up root process

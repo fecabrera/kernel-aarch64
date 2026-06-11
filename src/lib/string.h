@@ -1,10 +1,6 @@
 #pragma once
 
-#include <stdint.h>
-
-#define NULL 0
-
-typedef uint64_t size_t;
+#include <stddef.h>
 
 /***************************************
  * String manipulation
@@ -61,9 +57,8 @@ size_t strntrimend(char *dest, const char *src, size_t count);
 size_t strlen(const char *str);
 
 /**
- * Returns the length of str, but reads at most count bytes.
- * Unlike strlen, will not read past count bytes even if no null terminator
- * is found — safe for buffers that may not be null-terminated.
+ * Returns the length of str, but reads at most count bytes. Unlike strlen, will not read past count
+ * bytes even if no null terminator is found — safe for buffers that may not be null-terminated.
  *
  * @param str:   pointer to the string to measure
  * @param count: maximum number of bytes to inspect

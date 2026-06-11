@@ -3,26 +3,22 @@
 
 static const char _itoa_digits[] = "0123456789abcdef";
 
-char *itoa(int64_t value, char *str, int base)
-{
+char *itoa(int64_t value, char *str, int base) {
     char *buff = str;
     int neg = 0;
 
-    if (value == 0)
-    {
+    if (value == 0) {
         *buff++ = '0';
         *buff = '\0';
         return str;
     }
 
-    if (value < 0 && base == 10)
-    {
+    if (value < 0 && base == 10) {
         neg = 1;
         value = -value;
     }
 
-    while (value != 0)
-    {
+    while (value != 0) {
         *buff++ = _itoa_digits[value % base];
         value /= base;
     }
@@ -33,8 +29,7 @@ char *itoa(int64_t value, char *str, int base)
     /* digits were written least-significant first; reverse them */
     char *start = str;
     char *end = buff - 1;
-    while (start < end)
-    {
+    while (start < end) {
         char tmp = *start;
         *start++ = *end;
         *end-- = tmp;
@@ -45,15 +40,12 @@ char *itoa(int64_t value, char *str, int base)
     return str;
 }
 
-int vsprintf(char *str, const char *format, __builtin_va_list args)
-{
+int vsprintf(char *str, const char *format, __builtin_va_list args) {
     char *out = str;
     char tmp[32];
 
-    while (*format)
-    {
-        if (*format != '%')
-        {
+    while (*format) {
+        if (*format != '%') {
             *out++ = *format++;
             continue;
         }
@@ -63,19 +55,16 @@ int vsprintf(char *str, const char *format, __builtin_va_list args)
         // parse optional pad: %[0]<width><conv> e.g. %8x or %08x
         char pad_char = ' ';
         int pad_width = 0;
-        if (*format == '0')
-        {
+        if (*format == '0') {
             pad_char = '0';
             format++;
         }
         while (*format >= '0' && *format <= '9')
             pad_width = pad_width * 10 + (*format++ - '0');
 
-        switch (*format++)
-        {
+        switch (*format++) {
         case 'd':
-        case 'i':
-        {
+        case 'i': {
             int val = __builtin_va_arg(args, int);
             itoa((int64_t)val, tmp, 10);
             int len = 0;
@@ -87,8 +76,7 @@ int vsprintf(char *str, const char *format, __builtin_va_list args)
                 *out++ = *p;
             break;
         }
-        case 'u':
-        {
+        case 'u': {
             unsigned int val = __builtin_va_arg(args, unsigned int);
             itoa((int64_t)val, tmp, 10);
             int len = 0;
@@ -101,8 +89,7 @@ int vsprintf(char *str, const char *format, __builtin_va_list args)
             break;
         }
         case 'X':
-        case 'x':
-        {
+        case 'x': {
             unsigned int val = __builtin_va_arg(args, unsigned int);
             itoa((int64_t)val, tmp, 16);
             int len = 0;
@@ -114,8 +101,7 @@ int vsprintf(char *str, const char *format, __builtin_va_list args)
                 *out++ = (*(format - 1) == 'X') ? toupper(*p) : *p;
             break;
         }
-        case 's':
-        {
+        case 's': {
             char *s = __builtin_va_arg(args, char *);
             while (*s)
                 *out++ = *s++;
@@ -138,8 +124,7 @@ int vsprintf(char *str, const char *format, __builtin_va_list args)
     return (int)(out - str);
 }
 
-int sprintf(char *str, const char *format, ...)
-{
+int sprintf(char *str, const char *format, ...) {
     __builtin_va_list args;
     __builtin_va_start(args, format);
     int n = vsprintf(str, format, args);

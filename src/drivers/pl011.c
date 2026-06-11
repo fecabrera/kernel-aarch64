@@ -1,37 +1,32 @@
-#include <dtb.h>
-#include <debug.h>
-#include <string.h>
-#include <stdlib.h>
-#include <ctype.h>
-#include <arch/irq.h>
 #include "pl011.h"
 #include "gic.h"
+#include <arch/irq.h>
+#include <ctype.h>
+#include <debug.h>
+#include <dtb.h>
+#include <stdlib.h>
+#include <string.h>
 
 static uint32_t pl011_irq;
 
-void pl011_putc(char c)
-{
+void pl011_putc(char c) {
     while (PL011_FR & PL011_FR_TXFF)
         ; // Wait if TX FIFO full
     PL011_DR = c;
 }
 
-void pl011_printf(const char *format, ...)
-{
+void pl011_printf(const char *format, ...) {
     __builtin_va_list args;
     __builtin_va_start(args, format);
     pl011_vprintf(format, args);
     __builtin_va_end(args);
 }
 
-void pl011_vprintf(const char *format, __builtin_va_list args)
-{
+void pl011_vprintf(const char *format, __builtin_va_list args) {
     char tmp[32];
 
-    while (*format)
-    {
-        if (*format != '%')
-        {
+    while (*format) {
+        if (*format != '%') {
             pl011_putc(*format++);
             continue;
         }
@@ -40,19 +35,16 @@ void pl011_vprintf(const char *format, __builtin_va_list args)
 
         char pad_char = ' ';
         int pad_width = 0;
-        if (*format == '0')
-        {
+        if (*format == '0') {
             pad_char = '0';
             format++;
         }
         while (*format >= '0' && *format <= '9')
             pad_width = pad_width * 10 + (*format++ - '0');
 
-        switch (*format++)
-        {
+        switch (*format++) {
         case 'd':
-        case 'i':
-        {
+        case 'i': {
             int val = __builtin_va_arg(args, int);
             itoa((int64_t)val, tmp, 10);
             int len = strlen(tmp);
@@ -62,8 +54,7 @@ void pl011_vprintf(const char *format, __builtin_va_list args)
                 pl011_putc(*p);
             break;
         }
-        case 'u':
-        {
+        case 'u': {
             unsigned int val = __builtin_va_arg(args, unsigned int);
             itoa((int64_t)val, tmp, 10);
             int len = strlen(tmp);
@@ -74,8 +65,7 @@ void pl011_vprintf(const char *format, __builtin_va_list args)
             break;
         }
         case 'X':
-        case 'x':
-        {
+        case 'x': {
             unsigned int val = __builtin_va_arg(args, unsigned int);
             itoa((int64_t)val, tmp, 16);
             int len = strlen(tmp);
@@ -85,8 +75,7 @@ void pl011_vprintf(const char *format, __builtin_va_list args)
                 pl011_putc((*(format - 1) == 'X') ? toupper(*p) : *p);
             break;
         }
-        case 's':
-        {
+        case 's': {
             char *s = __builtin_va_arg(args, char *);
             while (*s)
                 pl011_putc(*s++);
@@ -106,14 +95,12 @@ void pl011_vprintf(const char *format, __builtin_va_list args)
     }
 }
 
-void pl011_puts(const char *s)
-{
+void pl011_puts(const char *s) {
     while (*s)
         pl011_putc(*s++);
 }
 
-void pl011_init()
-{
+void pl011_init() {
     // Disable UART before configuring
     PL011_CR = PL011_CR_DISABLED;
 
@@ -135,45 +122,41 @@ void pl011_init()
     // Enable UART, TX, RX
     PL011_CR = PL011_CR_UARTEN | PL011_CR_TXE | PL011_CR_RXE;
 
-    if (dtb_get_pl011_irq_number(&pl011_irq) == 0)
-    {
+    if (dtb_get_pl011_irq_number(&pl011_irq) == 0) {
         dprintk("[pl011] Initializing IRQ: %i\r\n", pl011_irq);
         irq_register_handler(pl011_irq, &pl011_irq_handler);
         gic_enable_irq(pl011_irq);
-    }
-    else
-    {
+    } else {
         dprintk("[pl011] IRQ not found!!\r\n");
     }
 }
 
-void pl011_read_input()
-{
+uint32_t pl011_getc(char *c) {
+    uint32_t value = PL011_FR & PL011_FR_RXFE;
+    if (!value)
+        *c = (uint8_t)(PL011_DR & PL011_DR_DATA_MASK); // mask value
+    return value;
+}
+
+void pl011_read_input() {
     int8_t _escape = 0, _arrow = 0;
 
     // Read all available bytes (RX or timeout interrupt)
-    while (!(PL011_FR & PL011_FR_RXFE))
-    {
-        uint32_t uart_dr = PL011_DR;                         // read data register
-        uint8_t c = (uint8_t)(uart_dr & PL011_DR_DATA_MASK); // mask value
-
-        if (_escape)
-        {
+    char c;
+    while (!pl011_getc(&c)) {
+        if (_escape) {
             _escape = 0;
 
-            if (c == '[')
-            {
+            if (c == '[') {
                 _arrow = 1;
                 continue;
             }
         }
 
-        if (_arrow)
-        {
+        if (_arrow) {
             _arrow = 0;
 
-            switch (c)
-            {
+            switch (c) {
             case 'A':
                 pl011_puts("[up]");
                 continue;
@@ -189,8 +172,7 @@ void pl011_read_input()
             }
         }
 
-        switch (c)
-        {
+        switch (c) {
         case ASCII_ESC:
             _escape = 1; // set escape
             break;
@@ -209,9 +191,8 @@ void pl011_read_input()
     }
 }
 
-struct cpu_context *pl011_irq_handler(__attribute__((unused)) int irq, struct cpu_context *ctx)
-{
-    pl011_read_input();
+struct cpu_context *pl011_irq_handler(__attribute__((unused)) int irq, struct cpu_context *ctx) {
+    // pl011_read_input();
 
     // Clear the interrupt flags we handled
     PL011_ICR = PL011_INT_RX | PL011_INT_RT;

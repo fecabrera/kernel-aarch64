@@ -1,7 +1,6 @@
 #pragma once
 
-#include <stdlib.h>
-#include <string.h>
+#include <stddef.h>
 
 /**
  * Scans all virtio MMIO slots for block devices and registers each one as an

@@ -3,11 +3,11 @@
 #include <drivers/virtio_mmio.h>
 #include <io/module.h>
 #include <mm/heap.h>
+#include <stdlib.h>
 
 void storage_init() {
     virtio_slot_t slot = -1;
-    while ((slot = virtio_mmio_find_next_slot(VIRTIO_DEVICE_ID_BLOCK, slot)) !=
-           -1) {
+    while ((slot = virtio_mmio_find_next_slot(VIRTIO_DEVICE_ID_BLOCK, slot)) != -1) {
         char mod_name[50] = {0};
         sprintf(mod_name, "sd%d", slot);
 
@@ -21,13 +21,11 @@ int storage_read(uint8_t *buffer, size_t count, size_t offset, uint64_t slot) {
     uint64_t last_sector = (offset + count - 1) / VIRTIO_MMIO_BLK_SECTOR_SIZE;
     uint64_t sectors_to_read = last_sector - first_sector + 1;
 
-    dprintk(
-        "[/dev/sd%d] first_sector=%d, last_sector=%d, sectors_to_read=%d\r\n",
-        slot, first_sector, last_sector, sectors_to_read);
+    dprintk("[/dev/sd%d] first_sector=%d, last_sector=%d, sectors_to_read=%d\r\n", slot,
+            first_sector, last_sector, sectors_to_read);
 
     // allocate temporary buffer
-    uint8_t *tmp =
-        (uint8_t *)kmalloc(sectors_to_read * VIRTIO_MMIO_BLK_SECTOR_SIZE);
+    uint8_t *tmp = (uint8_t *)kmalloc(sectors_to_read * VIRTIO_MMIO_BLK_SECTOR_SIZE);
 
     // read boot sectors
     for (uint64_t i = 0; i < sectors_to_read; i++) {
@@ -62,9 +60,8 @@ int storage_write(uint8_t *buffer, size_t count, size_t offset, uint64_t slot) {
     uint64_t last_sector = (offset + count - 1) / VIRTIO_MMIO_BLK_SECTOR_SIZE;
     uint64_t sectors_to_read = last_sector - first_sector + 1;
 
-    dprintk(
-        "[/dev/sd%d] first_sector=%d, last_sector=%d, sectors_to_read=%d\r\n",
-        slot, first_sector, last_sector, sectors_to_read);
+    dprintk("[/dev/sd%d] first_sector=%d, last_sector=%d, sectors_to_read=%d\r\n", slot,
+            first_sector, last_sector, sectors_to_read);
 
     return 0;
 }
