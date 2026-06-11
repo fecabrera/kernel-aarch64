@@ -1,8 +1,8 @@
-#include <mm/heap.h>
 #include "deque64.h"
+#include <mm/heap.h>
 
-static void _deque64_insert_entry(struct deque64_entry *entry, struct deque64_entry *prev, struct deque64_entry *next)
-{
+static void _deque64_insert_entry(struct deque64_entry *entry, struct deque64_entry *prev,
+                                  struct deque64_entry *next) {
     entry->next = next;
     entry->prev = prev;
 
@@ -13,8 +13,7 @@ static void _deque64_insert_entry(struct deque64_entry *entry, struct deque64_en
         next->prev = entry;
 }
 
-static void _deque64_remove_entry(struct deque64_entry *entry)
-{
+static void _deque64_remove_entry(struct deque64_entry *entry) {
     struct deque64_entry *prev = entry->prev;
     struct deque64_entry *next = entry->next;
 
@@ -25,8 +24,7 @@ static void _deque64_remove_entry(struct deque64_entry *entry)
         next->prev = prev;
 }
 
-void deque64_add_left(struct deque64 *dq, uint64_t value)
-{
+void deque64_add_left(struct deque64 *dq, uint64_t value) {
     struct deque64_entry *entry = (struct deque64_entry *)kmalloc(sizeof(struct deque64_entry));
     entry->value = value;
 
@@ -38,8 +36,7 @@ void deque64_add_left(struct deque64 *dq, uint64_t value)
         dq->tail = entry;
 }
 
-void deque64_add_right(struct deque64 *dq, uint64_t value)
-{
+void deque64_add_right(struct deque64 *dq, uint64_t value) {
     struct deque64_entry *entry = (struct deque64_entry *)kmalloc(sizeof(struct deque64_entry));
     entry->value = value;
 
@@ -51,8 +48,7 @@ void deque64_add_right(struct deque64 *dq, uint64_t value)
         dq->head = entry;
 }
 
-uint64_t deque64_remove_left(struct deque64 *dq)
-{
+uint64_t deque64_remove_left(struct deque64 *dq) {
     struct deque64_entry *entry = dq->head;
     uint64_t value = entry->value;
 
@@ -66,8 +62,7 @@ uint64_t deque64_remove_left(struct deque64 *dq)
     return value;
 }
 
-uint64_t deque64_remove_right(struct deque64 *dq)
-{
+uint64_t deque64_remove_right(struct deque64 *dq) {
     struct deque64_entry *entry = dq->tail;
     uint64_t value = entry->value;
 
@@ -80,23 +75,13 @@ uint64_t deque64_remove_right(struct deque64 *dq)
     return value;
 }
 
-uint64_t deque64_peek_left(struct deque64 *dq)
-{
-    return dq->head->value;
-}
+uint64_t deque64_peek_left(struct deque64 *dq) { return dq->head->value; }
 
-uint64_t deque64_peek_right(struct deque64 *dq)
-{
-    return dq->tail->value;
-}
+uint64_t deque64_peek_right(struct deque64 *dq) { return dq->tail->value; }
 
-int deque64_is_empty(struct deque64 *dq)
-{
-    return dq->head == NULL;
-}
+int deque64_is_empty(struct deque64 *dq) { return dq->head == NULL; }
 
-struct deque64_entry *deque64_remove(struct deque64 *dq, struct deque64_entry *entry)
-{
+struct deque64_entry *deque64_remove(struct deque64 *dq, struct deque64_entry *entry) {
     if (entry == NULL)
         return NULL;
 
@@ -111,12 +96,11 @@ struct deque64_entry *deque64_remove(struct deque64 *dq, struct deque64_entry *e
     return entry;
 }
 
-struct deque64_entry *deque64_find(struct deque64 *dq, struct deque64_entry *start, int (*cmp)(struct deque64_entry *, void *), void *ctx)
-{
+struct deque64_entry *deque64_find(struct deque64 *dq, struct deque64_entry *start,
+                                   int (*cmp)(struct deque64_entry *, void *), void *ctx) {
     struct deque64_entry *entry = NULL;
 
-    while ((entry = deque64_next(dq, start)))
-    {
+    while ((entry = deque64_next(dq, start))) {
         if (cmp(entry, ctx) == 0)
             return entry;
     }
@@ -124,8 +108,8 @@ struct deque64_entry *deque64_find(struct deque64 *dq, struct deque64_entry *sta
     return NULL;
 }
 
-int deque64_find_remove(struct deque64 *dq, struct deque64_entry *start, int (*cmp)(struct deque64_entry *, void *), void *ctx, uint64_t *out)
-{
+int deque64_find_remove(struct deque64 *dq, struct deque64_entry *start,
+                        int (*cmp)(struct deque64_entry *, void *), void *ctx, uint64_t *out) {
     struct deque64_entry *entry = deque64_remove(dq, deque64_find(dq, start, cmp, ctx));
     if (entry == NULL)
         return -1;
@@ -136,7 +120,6 @@ int deque64_find_remove(struct deque64 *dq, struct deque64_entry *start, int (*c
     return 0;
 }
 
-struct deque64_entry *deque64_next(struct deque64 *dq, struct deque64_entry *start)
-{
+struct deque64_entry *deque64_next(struct deque64 *dq, struct deque64_entry *start) {
     return start ? start->next : dq->head;
 }

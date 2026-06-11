@@ -21,6 +21,7 @@ SRCS := $(wildcard \
 		  src/dsa/queue/*.c \
 		  src/dsa/set/*.c \
 		  src/dsa/stack/*.c \
+		  src/dsa/vector/*.c \
 		  src/drivers/*.c \
 		  src/arch/*.c \
 		  src/mm/*.c \

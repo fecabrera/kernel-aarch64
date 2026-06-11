@@ -13,3 +13,31 @@
  * @return str
  */
 char *itoa(int64_t value, char *str, int base);
+
+/**
+ * Converts the initial decimal digits of str to an integer, skipping leading whitespace and
+ * handling an optional leading sign. Stops at the first non-digit character.
+ *
+ * @param str: null-terminated string to parse
+ *
+ * @return parsed value; 0 if no digits are found
+ */
+int atoi(const char *str);
+
+/**
+ * Same as atoi but returns long.
+ *
+ * @param str: null-terminated string to parse
+ *
+ * @return parsed value; 0 if no digits are found
+ */
+long atol(const char *str);
+
+/**
+ * Same as atoi but returns long long.
+ *
+ * @param str: null-terminated string to parse
+ *
+ * @return parsed value; 0 if no digits are found
+ */
+long long atoll(const char *str);

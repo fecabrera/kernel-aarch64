@@ -222,13 +222,14 @@ src/
     hashmap/hashmap64   — open-addressing hash map: string key → uint64_t value (hashmap64_init/destroy/set/get/has/remove)
     set/set64/32/16/8   — open-addressing hash map: uintN_t key → uintN_t value (setN_init/destroy/set/get/remove)
     ordered_set/ordered_set64 — BST-based ordered set of uint64_t (ordered_set64_init/destroy/insert/remove/contains/min/max/foreach)
+    vector/vector64/32/16/8 — dynamic contiguous array of uintN_t values (vectorN_init/destroy/reset/get/set/append)
 
   lib/              — architecture-independent libraries
     debug.c/h       — printk (always on) and dprintk (DEBUG=1 only), both backed by pl011_vprintf
     dtb.c/h         — FDT parser (node/property walker); IRQ number lookup for timer, RTC, and virtio MMIO slots
     string.c/h      — freestanding string library (memcpy, memset, strcmp, strntrimend, ...)
     ctype.c/h       — freestanding character classification and conversion (isalpha, isdigit, isspace, tolower, toupper, ...)
-    stdlib.c/h      — itoa (integer-to-string, freestanding)
+    stdlib.c/h      — itoa (integer-to-string); atoi/atol/atoll (string-to-integer, freestanding)
     stdio.c/h       — vsprintf, sprintf (freestanding; uses __builtin_va_* instead of <stdarg.h>)
     stdint.h        — stdint-style typedefs (uint8_t … uint64_t, intptr_t)
     stddef.h        — NULL and size_t (uint64_t)

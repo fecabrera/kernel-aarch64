@@ -39,3 +39,27 @@ char *itoa(int64_t value, char *str, int base) {
 
     return str;
 }
+
+static long long _ato(const char *str) {
+    while (*str == ' ' || *str == '\t' || *str == '\n' || *str == '\r' || *str == '\f' ||
+           *str == '\v')
+        str++;
+
+    int sign = 1;
+    if (*str == '-') {
+        sign = -1;
+        str++;
+    } else if (*str == '+') {
+        str++;
+    }
+
+    long long result = 0;
+    while (*str >= '0' && *str <= '9')
+        result = result * 10 + (*str++ - '0');
+
+    return sign * result;
+}
+
+int atoi(const char *str) { return (int)_ato(str); }
+long atol(const char *str) { return (long)_ato(str); }
+long long atoll(const char *str) { return _ato(str); }
