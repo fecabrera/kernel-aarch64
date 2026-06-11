@@ -1,18 +1,16 @@
-#pragma once
+#pragma once // IWYU pragma: private, include "dsa/deque.h"
 
 #include <stdint.h>
 
 // Doubly-linked list deque of uint64_t values.
 // Each element is heap-allocated; head points left, tail points right.
-struct deque64_entry
-{
+struct deque64_entry {
     uint64_t value;
     struct deque64_entry *prev;
     struct deque64_entry *next;
 };
 
-struct deque64
-{
+struct deque64 {
     struct deque64_entry *head; // leftmost element, or NULL if empty
     struct deque64_entry *tail; // rightmost element, or NULL if empty
 };
@@ -105,7 +103,8 @@ struct deque64_entry *deque64_remove(struct deque64 *dq, struct deque64_entry *e
  *
  * @return pointer to the matching entry, or NULL
  */
-struct deque64_entry *deque64_find(struct deque64 *dq, struct deque64_entry *start, int (*cmp)(struct deque64_entry *, void *), void *ctx);
+struct deque64_entry *deque64_find(struct deque64 *dq, struct deque64_entry *start,
+                                   int (*cmp)(struct deque64_entry *, void *), void *ctx);
 
 /**
  * Finds the first entry after start for which cmp returns 0, writes its value
@@ -119,7 +118,8 @@ struct deque64_entry *deque64_find(struct deque64 *dq, struct deque64_entry *sta
  *
  * @return 0 on success, -1 if no matching entry is found
  */
-int deque64_find_remove(struct deque64 *dq, struct deque64_entry *start, int (*cmp)(struct deque64_entry *, void *), void *ctx, uint64_t *out);
+int deque64_find_remove(struct deque64 *dq, struct deque64_entry *start,
+                        int (*cmp)(struct deque64_entry *, void *), void *ctx, uint64_t *out);
 
 /**
  * Returns the entry after start, or the head if start is NULL. Returns NULL

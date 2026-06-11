@@ -1,4 +1,4 @@
-#pragma once
+#pragma once // IWYU pragma: private, include "dsa/set.h"
 
 #include <stdint.h>
 #include <string.h>

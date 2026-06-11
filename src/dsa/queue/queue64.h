@@ -1,10 +1,11 @@
+#pragma once // IWYU pragma: private, include "dsa/queue.h"
+
 #include <stdint.h>
 #include <string.h>
 
 // Dynamic ring-buffer FIFO queue of uint64_t values.
 // Grows automatically when full; never shrinks.
-struct queue64
-{
+struct queue64 {
     uint64_t *data;  // heap-allocated element buffer
     size_t head;     // index of the front element
     size_t length;   // number of live elements
@@ -35,9 +36,8 @@ void queue64_destroy(struct queue64 *q);
 void queue64_push(struct queue64 *q, uint64_t value);
 
 /**
- * Returns the element at logical index without removing it. Index 0 is the
- * front. Caller must ensure index < q->length — behaviour is undefined
- * otherwise.
+ * Returns the element at logical index without removing it. Index 0 is the front. Caller must
+ * ensure index < q->length — behaviour is undefined otherwise.
  *
  * @param q:     queue to index into
  * @param index: logical position from the front
@@ -47,8 +47,8 @@ void queue64_push(struct queue64 *q, uint64_t value);
 uint64_t queue64_at(struct queue64 *q, size_t index);
 
 /**
- * Removes and returns the front element. Caller must ensure q->length > 0
- * before calling — behaviour is undefined on an empty queue.
+ * Removes and returns the front element. Caller must ensure q->length > 0 before calling —
+ * behaviour is undefined on an empty queue.
  *
  * @param q: queue to pop from
  *
@@ -57,8 +57,8 @@ uint64_t queue64_at(struct queue64 *q, size_t index);
 uint64_t queue64_pop(struct queue64 *q);
 
 /**
- * Returns the front element without removing it. Caller must ensure q->length > 0
- * before calling — behaviour is undefined on an empty queue.
+ * Returns the front element without removing it. Caller must ensure q->length > 0 before calling —
+ * behaviour is undefined on an empty queue.
  *
  * @param q: queue to peek at
  *

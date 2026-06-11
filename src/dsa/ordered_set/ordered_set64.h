@@ -1,19 +1,17 @@
-#pragma once
+#pragma once // IWYU pragma: private, include "dsa/ordered_set.h"
 
 #include <stdint.h>
 #include <string.h>
 
 // BST-based ordered set of unique uint64_t values.
 // Iteration and min/max operate in sorted order; no balancing is performed.
-struct ordered_set64_node
-{
+struct ordered_set64_node {
     uint64_t value;
     struct ordered_set64_node *left;
     struct ordered_set64_node *right;
 };
 
-struct ordered_set64
-{
+struct ordered_set64 {
     struct ordered_set64_node *root;
     size_t length; // number of live elements
 };
@@ -71,8 +69,8 @@ int ordered_set64_contains(struct ordered_set64 *set, uint64_t value);
 uint64_t ordered_set64_min(struct ordered_set64 *set);
 
 /**
- * Returns the largest value in the set. Caller must ensure set->length > 0
- * before calling — behaviour is undefined on an empty set.
+ * Returns the largest value in the set. Caller must ensure set->length > 0 before calling —
+ * behaviour is undefined on an empty set.
  *
  * @param set: set to query
  *
