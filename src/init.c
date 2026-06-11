@@ -77,7 +77,7 @@ char console_getc(char *pathname) {
 int console_getline(char *pathname, char *buffer) {
     int n = 0;
 
-    while (1) {
+    while (true) {
         char c = console_getc(pathname);
 
         switch (c) {

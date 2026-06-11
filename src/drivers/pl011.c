@@ -1,5 +1,6 @@
 #include "pl011.h"
 #include "gic.h"
+#include <arch/cpu.h>
 #include <arch/irq.h>
 #include <ctype.h>
 #include <debug.h>
@@ -10,8 +11,7 @@
 static uint32_t pl011_irq;
 
 void pl011_putc(char c) {
-    while (PL011_FR & PL011_FR_TXFF)
-        ; // Wait if TX FIFO full
+    _wfi_while(PL011_FR & PL011_FR_TXFF); // Wait if TX FIFO full
     PL011_DR = c;
 }
 

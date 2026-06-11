@@ -1,12 +1,11 @@
 #include "fat32.h"
-#include "stdbool.h"
 #include <arch/cpu.h>
-#include <ctype.h>
 #include <debug.h>
 #include <dsa/set.h>
 #include <dsa/stack.h>
 #include <fs/vfs.h>
 #include <mm/heap.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 #include <uchar.h>
@@ -331,7 +330,7 @@ static int _fat32_read_cluster(char *pathname, struct fat32_bs_info *bs_info, ui
         // parse lfn entries
         uint8_t attributes;
         int n_lfn_entries = 0;
-        while (1) {
+        while (true) {
             memcpy(&attributes, &dir_entry->attributes, 1);
 
             if (attributes != FAT32_ATTR_LFN)
@@ -514,13 +513,13 @@ static int _fat32_build_fs_tree(char *pathname, struct fat32_bs_info *bs_info,
 
 static int _read_fat_table(char *pathname, struct fat32_bs_info *bs_info, uint8_t *fat_table) {
     size_t fat_table_addr = bs_info->first_fat_sector * bs_info->n_bytes_per_sector;
-    printk("[fat32] will read %d sectors\r\n", bs_info->table_size_32);
+    dprintk("[fat32] will read %d sectors\r\n", bs_info->table_size_32);
 
     for (size_t i = 0; i < bs_info->table_size_32; i++) {
         size_t offset = i * bs_info->n_bytes_per_sector;
-        printk("\e[A");
-        printk("[fat32] reading sector %d/%d, addr=0x%08X\r\n", i + 1, bs_info->table_size_32,
-               fat_table_addr + offset);
+        dprintk("\e[A");
+        dprintk("[fat32] reading sector %d/%d, addr=0x%08X\r\n", i + 1, bs_info->table_size_32,
+                fat_table_addr + offset);
 
         if (vfs_read(pathname, fat_table + offset, bs_info->n_bytes_per_sector,
                      fat_table_addr + offset) < 0)
@@ -584,6 +583,7 @@ int fat32_mount(char *pathname) {
 
     // mount volume
     printk("[fat32] creating mountpoint \"%s\"...\r\n", mountpoint);
+
     struct vfs_mount *vfs_mp =
         vfs_create_mountpoint(mountpoint, pathname, bs_info, &fat32_read, &fat32_write);
     if (vfs_mp == NULL) {

@@ -257,7 +257,7 @@ void fat32_build_cluster_chains(struct fat32_bs_info *bs_info, struct queue32 *c
  * recursively traverses all directories via _fat32_read_cluster. Creates the volume as a subfolder
  * of "/volumes" and registers a mountpoint at "/volumes/<label>".
  *
- * @param pathname: VFS path to the block device (e.g. "/dev/sd0")
+ * @param pathname: VFS path to the block device (e.g. "/dev/sda")
  *
  * @return 0 on success, -1 on I/O error, -2 if not a valid FAT32 volume
  */
@@ -268,7 +268,7 @@ int fat32_mount(char *pathname);
  * Frees bs_info->fat_table, then destroys the mountpoint via vfs_destroy_mountpoint.
  * Not yet implemented.
  *
- * @param pathname: VFS path to the block device used when mounting (e.g. "/dev/sd0")
+ * @param pathname: VFS path to the block device used when mounting (e.g. "/dev/sda")
  *
  * @return 0 on success, -1 on error
  */

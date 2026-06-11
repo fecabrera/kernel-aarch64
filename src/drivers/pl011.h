@@ -88,7 +88,7 @@
 #define RX_BUF_SIZE 1024
 
 /**
- * Writes a single character to the UART, blocking until the TX FIFO has space.
+ * Writes a single character to the UART, spinning via wfi() until the TX FIFO has space.
  *
  * @param c: character to transmit
  */

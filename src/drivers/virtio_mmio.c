@@ -180,8 +180,7 @@ int virtio_mmio_read(virtio_slot_t slot, uint64_t sector_number, uint8_t *data) 
 
     // 5. Poll or wait for IRQ — device writes to used ring when done
     // In the IRQ handler, check used.idx advanced and read status byte
-    while (status == VIRTIO_BLK_S_NONE)
-        wfi();
+    _wfi_while(status == VIRTIO_BLK_S_NONE);
 
     dprintk("[virtio_mmio@%x] status = %u\r\n", VIRTIO_MMIO_ADDR(slot), status);
 

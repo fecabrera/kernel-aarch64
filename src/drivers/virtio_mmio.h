@@ -190,16 +190,14 @@ virtio_slot_t virtio_mmio_find_next_slot(uint32_t device_id, int start);
 /**
  * Submits a synchronous read request to the virtio-blk device at the given slot. Builds a
  * 3-descriptor chain (request header → data buffer → status), posts it to the available ring, kicks
- * the device via QUEUE_NOTIFY, then sleeps via syscall_msleep until the device writes the status
- * byte.
+ * the device via QUEUE_NOTIFY, then spins via wfi() until the device writes the status byte.
  *
- * @param slot:          virtio MMIO slot index (e.g. VIRTIO_MMIO_SLOT_BLK)
+ * @param slot:          virtio MMIO slot index
  * @param sector_number: 512-byte sector to read from
  * @param data:          output buffer of at least VIRTIO_MMIO_BLK_SECTOR_SIZE bytes
  *
- * @return VIRTIO_BLK_S_OK (0) on success, VIRTIO_BLK_S_IOERR or
- *         VIRTIO_BLK_S_UNSUPP on device error, VIRTIO_MMIO_INVALID_DEVICE
- *         if the slot has no initialized device.
+ * @return VIRTIO_BLK_S_OK (0) on success, VIRTIO_BLK_S_IOERR or VIRTIO_BLK_S_UNSUPP on device
+ *         error, VIRTIO_MMIO_INVALID_DEVICE if the slot has no initialized device
  */
 int virtio_mmio_read(virtio_slot_t slot, uint64_t sector_number, uint8_t *data);
 

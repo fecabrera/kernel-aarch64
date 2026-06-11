@@ -1,7 +1,8 @@
+#include "dtb.h"
 #include <arch/cpu.h>
 #include <debug.h>
 #include <drivers/virtio_mmio.h>
-#include <dtb.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -51,7 +52,7 @@ int dtb_find_prop(const char *node_path, const char *prop_name, struct fdt_prop 
     int depth = 0;
     int in_target = 0;
 
-    while (1) {
+    while (true) {
         uint32_t token = _be32(*p++);
 
         switch (token) {
@@ -112,7 +113,7 @@ void dtb_dump() {
     const uint32_t *p = struct_base;
     int depth = 0;
 
-    while (1) {
+    while (true) {
         uint32_t token = _be32(*p++);
 
         if (token == FDT_BEGIN_NODE) {

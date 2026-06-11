@@ -14,8 +14,7 @@ int serial_read(uint8_t *buffer, size_t count, __attribute__((unused)) size_t of
                 __attribute__((unused)) uint64_t drv_info) {
     char c;
     for (size_t i = 0; i < count; i++) {
-        while (pl011_getc(&c))
-            wfi();
+        _wfi_while(pl011_getc(&c));
         *buffer++ = c;
     }
     return count;

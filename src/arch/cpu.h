@@ -2,6 +2,16 @@
 
 #include <stdint.h>
 
+// Spins on condition X, issuing wfi() each iteration to yield the CPU until an interrupt arrives.
+#define _wfi_while(X)                                                                              \
+    while (X)                                                                                      \
+        wfi();
+
+// Spins on condition X, issuing wfe() each iteration to yield the CPU until an event or interrupt.
+#define _wfe_while(X)                                                                              \
+    while (X)                                                                                      \
+        wfe();
+
 // Endian conversion macros. On a little-endian host (AArch64 in LE mode),
 // _be32/_be64 byte-swap to/from big-endian (e.g. DTB fields);
 // _le32/_le64 are no-ops. Reversed on a big-endian host.

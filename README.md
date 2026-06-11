@@ -109,7 +109,7 @@ make run
 - `fat32_read_fat_table` parses one pre-read FAT sector directly into `bs_info->fat_table` (28-bit masked, LE-converted); call once per FAT sector in order to populate the full table.
 - `fat32_entry_reference` records a directory entry's on-disk location (cluster number, 8.3 entry index within the sector, and LFN entry count) and is stored in each `fs_node`'s `info` field.
 - Directory cluster parsing is handled by `_fat32_read_cluster` in `fat32.c`; handles multi-fragment LFN sequences, populates an `fs_node` tree, and records subfolder nodes in a `set64` map for recursive traversal.
-- `fat32_mount(pathname)` takes a VFS path to a block device (e.g. `/dev/sd0`), reads the boot sector and full FAT table via `vfs_read`, validates the FAT32 signature, builds the cluster chain queue, recursively traverses all directories via `_fat32_read_cluster`, and creates the volume under `/volumes/<label>` registering `fat32_read`/`fat32_write` as `vfs_handler_t` callbacks; the full FAT table is kept alive in `bs_info->fat_table` for cluster chain traversal at read time; returns 0 on success, -1 on I/O error, -2 if not a valid FAT32 volume.
+- `fat32_mount(pathname)` takes a VFS path to a block device (e.g. `/dev/sda`), reads the boot sector and full FAT table via `vfs_read`, validates the FAT32 signature, builds the cluster chain queue, recursively traverses all directories via `_fat32_read_cluster`, and creates the volume under `/volumes/<label>` registering `fat32_read`/`fat32_write` as `vfs_handler_t` callbacks; the full FAT table is kept alive in `bs_info->fat_table` for cluster chain traversal at read time; returns 0 on success, -1 on I/O error, -2 if not a valid FAT32 volume.
 - `fat32_unmount(pathname)` frees `bs_info->fat_table` and destroys the mountpoint; not yet implemented.
 - `fat32_read` re-reads the dir entry from disk to get the file's first cluster and size, walks `bs_info->fat_table` to the cluster containing `offset`, reads the required sectors into a temporary buffer, and copies `count` bytes into `buffer`. `fat32_write` is not yet implemented.
 - `_fat32_read_cluster` and `_fat32_build_fs_tree` are internal helpers that traverse the directory cluster chain and populate the `fs_node` tree via `vfs_read`; each node is stamped with the `vfs_mount *` so dispatch is O(1) at read time.
@@ -200,7 +200,7 @@ src/
   vectors.S         — exception vector table, save/restore_context macros
 
   arch/             — AArch64-specific
-    cpu.c/h         — system register accessors (cntpct, cntfrq, cntp, DAIF), SPSR defines, halt/hang
+    cpu.c/h         — system register accessors (cntpct, cntfrq, cntp, DAIF), SPSR defines, halt/hang, _wfi_while/_wfe_while spin macros
     irq.c/h         — exception handlers, IRQ dispatch table, cpu_context, irq_init
     syscall.c/h     — syscall dispatch table (set64-backed), syscall_init, syscall_handler, syscall_register_handler, syscall_unregister_handler, syscall_yield, syscall_exit, syscall_getpid, syscall_waitpid, syscall_fork
 
