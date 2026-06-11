@@ -141,6 +141,7 @@ make run
 - `create_process`/`duplicate_process`/`destroy_process` with 16-byte aligned task stacks.
 - Idles via `halt` when the ready queue is empty.
 - waitpid and sleep queues backed by `set64` (keyed by pid), replacing the prior `deque64` lists.
+- Context-switch logging (`dprintk`) is silent unless `DEBUG=1`.
 
 ### **IRQ interface**
 
@@ -164,7 +165,8 @@ make run
 - `serial_init()` registers a `/dev/serial` I/O module backed by the PL011 UART. Must be called after `io_init()`.
 - `serial_read` blocks reading `count` bytes from the UART by calling `pl011_getc` in a loop, spinning on `wfi()` until each byte arrives; returns `count`.
 - `serial_write` writes `count` bytes to the UART one byte at a time via `pl011_putc`; returns `count`.
-- `console(pathname)` in `init.c` runs an interactive terminal loop on the given VFS device, prompting with `"> "` and dispatching built-in commands (`ls`: `vfs_dump_fs`).
+- `console(pathname)` in `console.c` runs an interactive terminal loop on the given VFS device, prompting with `"> "`, tokenizing each input line into `argc/argv`, and dispatching to `console_parse_command`.
+- `console_parse_command(argc, argv)` forks a child process for each command; parent waits via `syscall_waitpid`. Built-ins: `ls` (`vfs_dump_fs`), `exit [status]` (`syscall_exit`); unknown commands exit silently.
 - `console_getc(pathname)` reads the next character from a VFS device, blocking and discarding ANSI escape sequences.
 - `console_getline(pathname, buffer)` reads one line via `console_getc`, echoing characters back and handling backspace and CR; returns character count.
 
@@ -195,7 +197,8 @@ init/               — files bundled into init.img at build time (FAT32 ramdisk
 
 src/
   kernel.c          — kernel_init: subsystem bring-up (DTB, memory, IRQ, VFS, I/O, serial, storage, scheduler, timer)
-  init.c/h          — init(): pid 1 entry point; mounts /dev/sda as FAT32, runs console("/dev/serial"); console(pathname)/console_getc()/console_getline() interactive serial terminal with built-in commands
+  init.c/h          — init(): pid 1 entry point; mounts /dev/sda as FAT32, launches console("/dev/serial")
+  console.c/h       — console(pathname)/console_getc()/console_getline()/console_parse_command(): interactive terminal loop with argc/argv tokenization and fork-per-command dispatch; built-ins: ls, exit
   start.S           — AArch64 boot stub, saves DTB pointer, zeros BSS
   vectors.S         — exception vector table, save/restore_context macros
 

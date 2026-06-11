@@ -114,18 +114,18 @@ struct cpu_context *scheduler_handler(struct cpu_context *ctx, time_t ms_elapsed
     current = (struct process *)queue64_pop(&ready_queue);
 
     if (previous && (previous->pid != current->pid)) {
-        printk("[scheduler] context_switch(), q = { ");
+        dprintk("[scheduler] context_switch(), q = { ");
 
         struct process **procs = (struct process **)ready_queue.data;
         for (uint64_t i = 0; i < ready_queue.length; i++)
-            printk("%i ", procs[i]->pid);
+            dprintk("%i ", procs[i]->pid);
 
-        printk("}, ");
+        dprintk("}, ");
         if (previous)
-            printk("previous = %i, ", previous->pid);
+            dprintk("previous = %i, ", previous->pid);
         else
-            printk("previous = <null>, ");
-        printk("current = %i, ms_elapsed = %d ms\r\n", current->pid, ms_elapsed);
+            dprintk("previous = <null>, ");
+        dprintk("current = %i, ms_elapsed = %d ms\r\n", current->pid, ms_elapsed);
     }
 
     return current->ctx;
