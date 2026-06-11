@@ -218,7 +218,7 @@ src/
 
   dsa/              — generic data structures (top-level .h files are forwarding includes)
     queue/queue64/32/16/8 — dynamic ring-buffer FIFO queue of uint64/32/16/8_t (queueN_init/push/pop/pop/at)
-    stack/stack64       — dynamic array-backed LIFO stack of uint64_t (stack64_init/push/pop/peek)
+    stack/stack64/32/16/8 — dynamic array-backed LIFO stack of uint64/32/16/8_t (stackN_init/destroy/push/pop/peek)
     deque/deque64       — doubly-linked deque of uint64_t (deque64_add/remove/peek left/right, find, find_remove, remove, next)
     hashmap/hashmap64   — open-addressing hash map: string key → uint64_t value (hashmap64_init/destroy/set/get/has/remove)
     set/set64           — open-addressing hash map: uint64_t key → uint64_t value (set64_init/destroy/set/get/remove)
