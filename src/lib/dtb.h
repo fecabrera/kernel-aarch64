@@ -3,8 +3,7 @@
 #include <stdint.h>
 
 // DTB header — all fields big-endian
-struct fdt_header
-{
+struct fdt_header {
     uint32_t magic; // 0xD00DFEED
     uint32_t totalsize;
     uint32_t off_dt_struct;  // offset to structure block
@@ -32,30 +31,28 @@ struct fdt_header
 #define FDT_NOP 0x00000004
 #define FDT_END 0x00000009
 
-struct memreg
-{
+struct memreg {
     uint64_t base;
     uint64_t size;
 };
 
 // Result of a property lookup
-struct fdt_prop
-{
+struct fdt_prop {
     const void *data;
     uint32_t len;
 };
 
 /**
- * Initializes the DTB parser by validating the magic number and storing
- * pointers to the structure and strings blocks for subsequent lookups.
+ * Initializes the DTB parser by validating the magic number and storing pointers to the structure
+ * and strings blocks for subsequent lookups.
  *
  * @return 0 on success, -1 if the magic number is invalid.
  */
 int dtb_init();
 
 /**
- * Walks the DTB structure block and prints every node name and property
- * (name and byte length) to the UART. Useful for inspecting available hardware.
+ * Walks the DTB structure block and prints every node name and property (name and byte length) to
+ * the UART. Useful for inspecting available hardware.
  */
 void dtb_dump();
 
@@ -72,8 +69,8 @@ void dtb_dump();
 int dtb_find_prop(const char *node_path, const char *prop_name, struct fdt_prop *out);
 
 /**
- * Reads the base address and size of the main RAM region from the DTB
- * memory@40000000 node's reg property and writes them to ptr.
+ * Reads the base address and size of the main RAM region from the DTB memory@40000000 node's reg
+ * property and writes them to ptr.
  *
  * @param ptr: output struct populated with the physical base address and size in bytes
  *
@@ -129,9 +126,8 @@ int dtb_get_timer_irq_number(uint32_t *ptr);
 int dtb_get_rtc_irq_number(uint32_t *ptr);
 
 /**
- * Reads the absolute GIC IRQ ID for the nth virtio MMIO device from the DTB.
- * virtio MMIO devices are enumerated in address order (virtio_mmio@a000000
- * is n=0, virtio_mmio@a000200 is n=1, etc.).
+ * Reads the absolute GIC IRQ ID for the nth virtio MMIO device from the DTB. virtio MMIO devices
+ * are enumerated in address order (virtio_mmio@a000000 is n=0, virtio_mmio@a000200 is n=1, etc.).
  *
  * @param n:   zero-based index of the virtio MMIO device
  * @param ptr: output pointer to store the absolute GIC IRQ ID

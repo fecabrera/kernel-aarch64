@@ -3,7 +3,7 @@
 #include <drivers/virtio_mmio.h>
 #include <io/module.h>
 #include <mm/heap.h>
-#include <stdlib.h>
+#include <stdio.h>
 
 void storage_init() {
     virtio_slot_t slot = -1;

@@ -1,10 +1,10 @@
 #pragma once
 
+#include <dsa/queue.h>
+#include <dsa/set.h>
+#include <fs/filesystem.h>
 #include <stdint.h>
 #include <uchar.h>
-#include <dsa/set.h>
-#include <dsa/queue.h>
-#include <fs/filesystem.h>
 
 // Partition type byte
 #define MBR_PARTITION_TYPE_EMPTY 0
@@ -29,31 +29,30 @@
  * FAT32 volume boot sector, immediately after the common BPB fields.
  * All multi-byte fields are little-endian.
  */
-struct __attribute__((packed)) fat32_ext_bs
-{
-    uint32_t table_size_32;    // sectors per FAT (FAT32 only)
-    uint16_t extended_flags;   // mirroring flags; bit 7: single active FAT, bits 3:0: active FAT number
-    uint16_t fat_version;      // FAT32 version (high byte = major, low = minor; typically 0x0000)
-    uint32_t root_cluster;     // cluster number of the root directory (usually 2)
-    uint16_t fat_info;         // sector number of the FSInfo structure
+struct __attribute__((packed)) fat32_ext_bs {
+    uint32_t table_size_32; // sectors per FAT (FAT32 only)
+    uint16_t
+        extended_flags;    // mirroring flags; bit 7: single active FAT, bits 3:0: active FAT number
+    uint16_t fat_version;  // FAT32 version (high byte = major, low = minor; typically 0x0000)
+    uint32_t root_cluster; // cluster number of the root directory (usually 2)
+    uint16_t fat_info;     // sector number of the FSInfo structure
     uint16_t backup_bs_sector; // sector number of the backup boot sector (usually 6)
     uint8_t reserved_0[12];
     uint8_t drive_number; // BIOS drive number (0x00 = floppy, 0x80 = hard disk)
     uint8_t reserved_1;
-    uint8_t boot_signature;    // extended boot signature (0x29 = volume_id/label/type fields present)
-    uint32_t volume_id;        // volume serial number
+    uint8_t boot_signature; // extended boot signature (0x29 = volume_id/label/type fields present)
+    uint32_t volume_id;     // volume serial number
     uint8_t volume_label[11];  // volume label, padded with spaces (not null-terminated)
     uint8_t fat_type_label[8]; // always "FAT32   " (informational only, not for type detection)
 };
 
 /**
  * Master Boot Record boot sector (sector 0 of the disk).
- * Contains the BIOS Parameter Block (BPB), bootstrap code, and the
- * 512-byte boot sector signature. All multi-byte fields are little-endian.
- * Use memcpy to read uint16_t/uint32_t fields to avoid alignment faults.
+ * Contains the BIOS Parameter Block (BPB), bootstrap code, and the 512-byte boot sector signature.
+ * All multi-byte fields are little-endian. Use memcpy to read uint16_t/uint32_t fields to avoid
+ * alignment faults.
  */
-struct __attribute__((packed)) mbr_boot_sector
-{
+struct __attribute__((packed)) mbr_boot_sector {
     uint8_t mbr_jump_boot[3];      // x86 jump instruction to bootstrap code
     uint8_t oem_name[8];           // OEM name string, NOT null-terminated (e.g. "mkfs.fat")
     uint16_t n_bytes_per_sector;   // bytes per sector (typically 512)
@@ -81,7 +80,8 @@ struct __attribute__((packed)) mbr_boot_sector
 #define FAT32_ATTR_DIRECTORY (1 << 4) // entry is a subdirectory
 #define FAT32_ATTR_ARCHIVE (1 << 5)   // file has been modified since last backup
 // combination used to mark a long file name entry
-#define FAT32_ATTR_LFN (FAT32_ATTR_READ_ONLY | FAT32_ATTR_HIDDEN | FAT32_ATTR_SYSTEM | FAT32_ATTR_VOLUME_ID)
+#define FAT32_ATTR_LFN                                                                             \
+    (FAT32_ATTR_READ_ONLY | FAT32_ATTR_HIDDEN | FAT32_ATTR_SYSTEM | FAT32_ATTR_VOLUME_ID)
 
 // ── Special first-byte values for dir_entry.name[0] ──────────────────────────
 
@@ -105,8 +105,7 @@ struct __attribute__((packed)) mbr_boot_sector
  * All multi-byte fields are little-endian.
  * Use memcpy when accessing uint16_t/uint32_t fields through a pointer.
  */
-struct __attribute__((packed)) fat32_dir_entry
-{
+struct __attribute__((packed)) fat32_dir_entry {
     uint8_t name[11];       // short name: 8 chars name + 3 chars extension, space-padded
     uint8_t attributes;     // FAT32_ATTR_* flags
     uint8_t reserved;       // reserved for Windows NT
@@ -126,8 +125,7 @@ struct __attribute__((packed)) fat32_dir_entry
  * LFN entries precede their corresponding 8.3 entry in reverse order.
  * Name characters are UTF-16LE; unused trailing chars are 0xFFFF.
  */
-struct __attribute__((packed)) fat32_lfn_entry
-{
+struct __attribute__((packed)) fat32_lfn_entry {
     uint8_t order;      // sequence number (1-based); OR'd with FAT32_LFN_LAST_ENTRY if last
     char16_t name1[5];  // UTF-16LE name characters 1–5
     uint8_t attributes; // always FAT32_ATTR_LFN (0x0F)
@@ -138,10 +136,10 @@ struct __attribute__((packed)) fat32_lfn_entry
     char16_t name3[2];  // UTF-16LE name characters 12–13
 };
 
-typedef uint32_t fat_table_entry_t; // bitfield: see FAT_TABLE_ENTRY_TYPE_* and FAT_TABLE_ENTRY_MASK_*
+typedef uint32_t
+    fat_table_entry_t; // bitfield: see FAT_TABLE_ENTRY_TYPE_* and FAT_TABLE_ENTRY_MASK_*
 
-struct fat32_bs_info
-{
+struct fat32_bs_info {
     // fields from MBR boot sector
     char volume_label[12]; // volume label from EBR, null-terminated
     uint8_t n_fat;
@@ -160,16 +158,16 @@ struct fat32_bs_info
     uint32_t total_sectors;
     uint32_t data_sectors;
     uint32_t total_clusters;
-    fat_table_entry_t *fat_table; // full FAT table loaded at mount time; kept alive for cluster chain traversal at read time
+    fat_table_entry_t *fat_table; // full FAT table loaded at mount time; kept alive for cluster
+                                  // chain traversal at read time
     uint32_t n_fat_entries;
 };
 
-// Locates a directory entry on disk: the cluster it lives in and its index
-// within that cluster's sector buffer (0-based, relative to the sector start).
-struct fat32_entry_reference
-{
-    uint32_t cluster;       // cluster number of the directory containing this entry
-    uint32_t offset;        // index of the 8.3 dir entry within the cluster's sector buffer (0-based)
+// Locates a directory entry on disk: the cluster it lives in and its index within that cluster's
+// sector buffer (0-based, relative to the sector start).
+struct fat32_entry_reference {
+    uint32_t cluster; // cluster number of the directory containing this entry
+    uint32_t offset;  // index of the 8.3 dir entry within the cluster's sector buffer (0-based)
     uint32_t n_lfn_entries; // number of LFN entries preceding the 8.3 entry (0 if short name only)
 };
 
@@ -206,8 +204,8 @@ void fat32_dump_lfn_entry(struct fat32_lfn_entry *lfn_dir_entry);
 
 /**
  * Checks whether a 512-byte sector buffer contains a valid FAT32 boot sector.
- * Verifies the boot signature (0xAA55), and that the EBR fields table_size_32
- * and root_cluster are non-zero.
+ * Verifies the boot signature (0xAA55), and that the EBR fields table_size_32 and root_cluster are
+ * non-zero.
  *
  * @param buff: 512-byte sector buffer to inspect
  *
@@ -217,11 +215,10 @@ int fat32_is_boot_sector(uint8_t *buff);
 
 /**
  * Parses a raw 512-byte boot sector buffer into a fat32_bs_info struct.
- * Reads BPB fields from mbr_boot_sector and EBR fields from the embedded
- * fat32_ext_bs using memcpy to avoid alignment faults. Also computes derived
- * fields: first_fat_sector, first_data_sector, data_sectors, total_clusters.
- * Copies the EBR volume label into bs_info->volume_label, null-terminated
- * and with trailing spaces stripped.
+ * Reads BPB fields from mbr_boot_sector and EBR fields from the embedded fat32_ext_bs using memcpy
+ * to avoid alignment faults. Also computes derived fields: first_fat_sector, first_data_sector,
+ * data_sectors, total_clusters. Copies the EBR volume label into bs_info->volume_label,
+ * null-terminated and with trailing spaces stripped.
  *
  * @param buff:    512-byte buffer containing the boot sector read from disk
  * @param bs_info: output struct populated with parsed and derived fields
@@ -229,15 +226,14 @@ int fat32_is_boot_sector(uint8_t *buff);
 void fat32_parse_boot_sector(uint8_t *buff, struct fat32_bs_info *bs_info);
 
 /**
- * Parses one pre-read FAT sector into bs_info->fat_table, applying _le32 and
- * masking to 28 bits per the spec. Writes entries starting at
- * bs_info->fat_table[sector_offset * n_entries_per_sector].
- * Each entry holds the raw next-cluster value; compare against FAT32_FAT_ENTRY_*
- * to interpret (free, bad, EOC, or next cluster number).
- * bs_info->fat_table must be allocated before calling. Call once per FAT sector,
- * in order, to populate the full table.
+ * Parses one pre-read FAT sector into bs_info->fat_table, applying _le32 and masking to 28 bits per
+ * the spec. Writes entries starting at bs_info->fat_table[sector_offset * n_entries_per_sector].
+ * Each entry holds the raw next-cluster value; compare against FAT32_FAT_ENTRY_* to interpret
+ * (free, bad, EOC, or next cluster number). bs_info->fat_table must be allocated before calling.
+ * Call once per FAT sector, in order, to populate the full table.
  *
- * @param bs_info:       parsed boot sector info (fat_table must be allocated; provides sector/entry sizes)
+ * @param bs_info:       parsed boot sector info (fat_table must be allocated; provides sector/entry
+ * sizes)
  * @param buff:          512-byte buffer containing the FAT sector already read from disk
  * @param sector_offset: index of this sector within the FAT (0-based)
  *
@@ -246,10 +242,9 @@ void fat32_parse_boot_sector(uint8_t *buff, struct fat32_bs_info *bs_info);
 uint32_t fat32_read_fat_table(struct fat32_bs_info *bs_info, uint8_t *buff, uint32_t sector_offset);
 
 /**
- * Scans bs_info->fat_table and pushes the starting cluster number of each
- * distinct chain into cluster_chains. Iterates from root_cluster to
- * n_fat_entries, marking visited clusters so each chain is enqueued exactly
- * once. FREE, RESERVED, and BAD entries are skipped.
+ * Scans bs_info->fat_table and pushes the starting cluster number of each distinct chain into
+ * cluster_chains. Iterates from root_cluster to n_fat_entries, marking visited clusters so each
+ * chain is enqueued exactly once. FREE, RESERVED, and BAD entries are skipped.
  *
  * @param bs_info:        parsed boot sector info (fat_table and n_fat_entries must be set)
  * @param cluster_chains: output queue; receives one uint32_t per chain (the start cluster)
@@ -257,11 +252,10 @@ uint32_t fat32_read_fat_table(struct fat32_bs_info *bs_info, uint8_t *buff, uint
 void fat32_build_cluster_chains(struct fat32_bs_info *bs_info, struct queue32 *cluster_chains);
 
 /**
- * Mounts a FAT32 volume accessible at the given VFS pathname. Reads the boot
- * sector and FAT table via vfs_read, validates the FAT32 signature, parses the
- * BPB, builds the cluster chain queue, then recursively traverses all
- * directories via _fat32_read_cluster. Creates the volume as a subfolder of
- * "/volumes" and registers a mountpoint at "/volumes/<label>".
+ * Mounts a FAT32 volume accessible at the given VFS pathname. Reads the boot sector and FAT table
+ * via vfs_read, validates the FAT32 signature, parses the BPB, builds the cluster chain queue, then
+ * recursively traverses all directories via _fat32_read_cluster. Creates the volume as a subfolder
+ * of "/volumes" and registers a mountpoint at "/volumes/<label>".
  *
  * @param pathname: VFS path to the block device (e.g. "/dev/sd0")
  *
@@ -281,9 +275,9 @@ int fat32_mount(char *pathname);
 int fat32_unmount(char *pathname);
 
 /**
- * vfs_handler_t read handler for FAT32 mountpoints. Reads count bytes from
- * the file described by node->info (fat32_entry_reference) into buffer,
- * starting at offset.
+ * vfs_handler_t read handler for FAT32 mountpoints.
+ * Reads count bytes from the file described by
+ * node->info (fat32_entry_reference) into buffer, starting at offset.
  *
  * @param node:   fs_node whose info points to a fat32_entry_reference
  * @param buffer: output buffer

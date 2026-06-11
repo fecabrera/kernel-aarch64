@@ -1,15 +1,13 @@
-#include <debug.h>
-#include <stdlib.h>
-#include <mm/heap.h>
-#include <dsa/hashmap.h>
-#include <arch/cpu.h>
 #include "filesystem.h"
+#include <arch/cpu.h>
+#include <debug.h>
+#include <dsa/hashmap.h>
+#include <mm/heap.h>
+#include <stdio.h>
 
-struct fs_node *fs_get_child(struct fs_node *node, char *name)
-{
+struct fs_node *fs_get_child(struct fs_node *node, char *name) {
     struct fs_node *current = node->child;
-    while (current)
-    {
+    while (current) {
         if (strcmp(current->name, name) == 0)
             return current;
 
@@ -18,14 +16,11 @@ struct fs_node *fs_get_child(struct fs_node *node, char *name)
     return NULL;
 }
 
-int fs_remove_child(struct fs_node *node, char *name)
-{
+int fs_remove_child(struct fs_node *node, char *name) {
     struct fs_node *prev = NULL;
     struct fs_node *current = node->child;
-    while (current)
-    {
-        if (strcmp(current->name, name) == 0)
-        {
+    while (current) {
+        if (strcmp(current->name, name) == 0) {
             if (prev)
                 prev->next = current->next;
             else
@@ -40,8 +35,8 @@ int fs_remove_child(struct fs_node *node, char *name)
     return -1;
 }
 
-struct fs_node *fs_create_node(char *name, size_t file_size, uint16_t attrs, void *info, void *mount, struct fs_node *next, struct fs_node *child)
-{
+struct fs_node *fs_create_node(char *name, size_t file_size, uint16_t attrs, void *info,
+                               void *mount, struct fs_node *next, struct fs_node *child) {
     struct fs_node *node = (struct fs_node *)kmalloc(sizeof(struct fs_node));
 
     node->name = NULL;
@@ -58,8 +53,7 @@ struct fs_node *fs_create_node(char *name, size_t file_size, uint16_t attrs, voi
     return node;
 }
 
-void fs_destroy_node(struct fs_node *node)
-{
+void fs_destroy_node(struct fs_node *node) {
     if (node == NULL)
         return;
 
@@ -73,30 +67,29 @@ void fs_destroy_node(struct fs_node *node)
     kfree(node);
 }
 
-static struct fs_node *_fs_create_self_ref(struct fs_node *folder)
-{
-    struct fs_node *self_ref = fs_create_node(".", 0, FS_NODE_ATTRS_TYPE_FOLDER, NULL, folder->mount, NULL, NULL);
+static struct fs_node *_fs_create_self_ref(struct fs_node *folder) {
+    struct fs_node *self_ref =
+        fs_create_node(".", 0, FS_NODE_ATTRS_TYPE_FOLDER, NULL, folder->mount, NULL, NULL);
     self_ref->child = folder;
     fs_add_to_folder(folder, self_ref);
     return self_ref;
 }
 
-static struct fs_node *_fs_create_parent_ref(struct fs_node *parent, struct fs_node *folder)
-{
-    struct fs_node *parent_ref = fs_create_node("..", 0, FS_NODE_ATTRS_TYPE_FOLDER, NULL, folder->mount, NULL, NULL);
+static struct fs_node *_fs_create_parent_ref(struct fs_node *parent, struct fs_node *folder) {
+    struct fs_node *parent_ref =
+        fs_create_node("..", 0, FS_NODE_ATTRS_TYPE_FOLDER, NULL, folder->mount, NULL, NULL);
     parent_ref->child = parent;
     fs_add_to_folder(folder, parent_ref);
     return parent_ref;
 }
 
-struct fs_node *fs_create_file(char *name, size_t file_size, uint16_t attrs, void *data, void *mount)
-{
+struct fs_node *fs_create_file(char *name, size_t file_size, uint16_t attrs, void *data,
+                               void *mount) {
     uint16_t _attrs = (attrs & FS_NODE_ATTRS_FLAG_MASK) | FS_NODE_ATTRS_TYPE_FILE;
     return fs_create_node(name, file_size, _attrs, data, mount, NULL, NULL);
 }
 
-struct fs_node *fs_create_folder(char *name, uint16_t attrs, void *data, void *mount)
-{
+struct fs_node *fs_create_folder(char *name, uint16_t attrs, void *data, void *mount) {
     uint16_t _attrs = (attrs & FS_NODE_ATTRS_FLAG_MASK) | FS_NODE_ATTRS_TYPE_FOLDER;
 
     struct fs_node *folder = fs_create_node(name, 0, _attrs, data, mount, NULL, NULL);
@@ -105,24 +98,20 @@ struct fs_node *fs_create_folder(char *name, uint16_t attrs, void *data, void *m
     return folder;
 }
 
-void fs_add_to_folder(struct fs_node *parent, struct fs_node *node)
-{
+void fs_add_to_folder(struct fs_node *parent, struct fs_node *node) {
     struct fs_node *current = parent->child;
-    if (current)
-    {
+    if (current) {
         while (current->next)
             current = current->next;
 
         current->next = node;
-    }
-    else
+    } else
         parent->child = node;
 }
 
-struct fs_node *fs_add_file_to_folder(struct fs_node *parent, char *name, size_t file_size, uint16_t attrs, void *data, void *mount)
-{
-    if ((parent->attrs & FS_NODE_ATTRS_TYPE_MASK) != FS_NODE_ATTRS_TYPE_FOLDER)
-    {
+struct fs_node *fs_add_file_to_folder(struct fs_node *parent, char *name, size_t file_size,
+                                      uint16_t attrs, void *data, void *mount) {
+    if ((parent->attrs & FS_NODE_ATTRS_TYPE_MASK) != FS_NODE_ATTRS_TYPE_FOLDER) {
         dprintk("[filesystem] Node is not a folder!\r\n");
         return NULL;
     }
@@ -133,10 +122,9 @@ struct fs_node *fs_add_file_to_folder(struct fs_node *parent, char *name, size_t
     return file;
 }
 
-struct fs_node *fs_add_subfolder(struct fs_node *parent, char *name, uint16_t attrs, void *data, void *mount)
-{
-    if ((parent->attrs & FS_NODE_ATTRS_TYPE_MASK) != FS_NODE_ATTRS_TYPE_FOLDER)
-    {
+struct fs_node *fs_add_subfolder(struct fs_node *parent, char *name, uint16_t attrs, void *data,
+                                 void *mount) {
+    if ((parent->attrs & FS_NODE_ATTRS_TYPE_MASK) != FS_NODE_ATTRS_TYPE_FOLDER) {
         dprintk("[filesystem] node is not a folder!\r\n");
         return NULL;
     }
@@ -147,13 +135,9 @@ struct fs_node *fs_add_subfolder(struct fs_node *parent, char *name, uint16_t at
     return folder;
 }
 
-size_t fs_get_node_file_size(struct fs_node *node)
-{
-    return node->file_size;
-}
+size_t fs_get_node_file_size(struct fs_node *node) { return node->file_size; }
 
-void fs_node_rename(struct fs_node *node, char *name)
-{
+void fs_node_rename(struct fs_node *node, char *name) {
     if (node->name)
         kfree(node->name);
 
@@ -165,8 +149,7 @@ void fs_node_rename(struct fs_node *node, char *name)
     node->name = _name;
 }
 
-static void _fs_dump_file(struct fs_node *node, char *prefix)
-{
+static void _fs_dump_file(struct fs_node *node, char *prefix) {
     if (node->name == NULL)
         return;
 
@@ -176,26 +159,20 @@ static void _fs_dump_file(struct fs_node *node, char *prefix)
     printk("%s\r\n", node->name);
 }
 
-void fs_dump_node(struct fs_node *node, char *prefix)
-{
+void fs_dump_node(struct fs_node *node, char *prefix) {
     _fs_dump_file(node, prefix);
 
     uint16_t attrs = node->attrs & FS_NODE_ATTRS_TYPE_MASK;
-    if (attrs == FS_NODE_ATTRS_TYPE_FOLDER && strcmp(node->name, ".") != 0 && strcmp(node->name, "..") != 0)
-    {
+    if (attrs == FS_NODE_ATTRS_TYPE_FOLDER && strcmp(node->name, ".") != 0 &&
+        strcmp(node->name, "..") != 0) {
         char *_prefix;
-        if (node->name && prefix)
-        {
+        if (node->name && prefix) {
             size_t _strlen = strlen(prefix) + strlen(node->name) + 2;
             _prefix = (char *)kmalloc(_strlen);
             sprintf(_prefix, "%s/%s", prefix, node->name);
-        }
-        else if (prefix)
-        {
+        } else if (prefix) {
             _prefix = prefix;
-        }
-        else
-        {
+        } else {
             _prefix = node->name;
         }
 

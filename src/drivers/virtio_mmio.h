@@ -1,7 +1,7 @@
 #pragma once
 
-#include <stdint.h>
 #include <arch/irq.h>
+#include <stdint.h>
 
 #define DEFAULT_VIRTIO_QUEUE_NUM 64
 
@@ -126,48 +126,41 @@
 
 typedef int8_t virtio_slot_t;
 
-struct virtq_desc
-{
+struct virtq_desc {
     uint64_t addr;  // physical address of the buffer
     uint32_t len;   // length in bytes
     uint16_t flags; // VIRTQ_DESC_F_NEXT, VIRTQ_DESC_F_WRITE, etc.
     uint16_t next;  // index of next descriptor in chain (if F_NEXT set)
 };
 
-struct virtq_avail
-{
+struct virtq_avail {
     uint16_t flags;                          // VIRTQ_AVAIL_F_NO_INTERRUPT
     uint16_t idx;                            // next slot the driver will write
     uint16_t ring[DEFAULT_VIRTIO_QUEUE_NUM]; // descriptor indices
 };
 
-struct virtq_used
-{
+struct virtq_used {
     uint16_t flags; // VIRTQ_USED_F_NO_NOTIFY
     uint16_t idx;   // next slot the device will write
-    struct
-    {
+    struct {
         uint32_t id;  // descriptor chain head index
         uint32_t len; // bytes written (for reads)
     } ring[DEFAULT_VIRTIO_QUEUE_NUM];
 };
 
-struct virtq
-{
+struct virtq {
     struct virtq_desc desc[DEFAULT_VIRTIO_QUEUE_NUM];
     struct virtq_avail avail;
     struct virtq_used used;
 };
 
-struct virtio_blk_req_header
-{
+struct virtio_blk_req_header {
     uint32_t type; // VIRTIO_BLK_T_IN (0) = read, VIRTIO_BLK_T_OUT (1) = write
     uint32_t reserved;
     uint64_t sector; // 512-byte sector number to start from
 };
 
-struct virtio_mmio_device
-{
+struct virtio_mmio_device {
     uint32_t irq_id;
     uint32_t device_id;
     struct virtq queue;
@@ -176,17 +169,16 @@ struct virtio_mmio_device
 typedef struct cpu_context *(*virtio_mmio_handler_t)(int i, struct cpu_context *);
 
 /**
- * Scans all 32 virtio MMIO slots, initializes each valid device found
- * (modern version, non-zero device ID), reads its feature words, and
- * registers its IRQ handler with the GIC. Must be called after gic_init
- * and irq_init, and before irq_enable.
+ * Scans all 32 virtio MMIO slots, initializes each valid device found (modern version, non-zero
+ * device ID), reads its feature words, and registers its IRQ handler with the GIC. Must be called
+ * after gic_init and irq_init, and before irq_enable.
  */
 void virtio_mmio_init();
 
 /**
- * Scans initialized slots after `start` and returns the index of the first
- * slot whose device_id matches. Pass -1 to start from slot 0. Useful for
- * iterating all devices of a given type when multiple are present.
+ * Scans initialized slots after `start` and returns the index of the first slot whose device_id
+ * matches. Pass -1 to start from slot 0. Useful for iterating all devices of a given type when
+ * multiple are present.
  *
  * @param device_id: device type to search for (see VIRTIO_DEVICE_ID_*)
  * @param start:     slot index to start after (exclusive); pass -1 to begin at 0
@@ -196,10 +188,10 @@ void virtio_mmio_init();
 virtio_slot_t virtio_mmio_find_next_slot(uint32_t device_id, int start);
 
 /**
- * Submits a synchronous read request to the virtio-blk device at the given
- * slot. Builds a 3-descriptor chain (request header → data buffer → status),
- * posts it to the available ring, kicks the device via QUEUE_NOTIFY, then
- * sleeps via syscall_msleep until the device writes the status byte.
+ * Submits a synchronous read request to the virtio-blk device at the given slot. Builds a
+ * 3-descriptor chain (request header → data buffer → status), posts it to the available ring, kicks
+ * the device via QUEUE_NOTIFY, then sleeps via syscall_msleep until the device writes the status
+ * byte.
  *
  * @param slot:          virtio MMIO slot index (e.g. VIRTIO_MMIO_SLOT_BLK)
  * @param sector_number: 512-byte sector to read from
@@ -212,11 +204,10 @@ virtio_slot_t virtio_mmio_find_next_slot(uint32_t device_id, int start);
 int virtio_mmio_read(virtio_slot_t slot, uint64_t sector_number, uint8_t *data);
 
 /**
- * IRQ handler for virtio MMIO device interrupts. Maps the IRQ ID to its
- * slot via _irq_to_slot, reads VIRTIO_INTERRUPT_STATUS to determine the
- * cause (used-buffer or config change), acks it via VIRTIO_INTERRUPT_ACK,
- * then dispatches to the per-slot handler registered in _handlers[slot].
- * If no handler is registered for the slot, returns ctx unchanged.
+ * IRQ handler for virtio MMIO device interrupts. Maps the IRQ ID to its slot via _irq_to_slot,
+ * reads VIRTIO_INTERRUPT_STATUS to determine the cause (used-buffer or config change), acks it via
+ * VIRTIO_INTERRUPT_ACK, then dispatches to the per-slot handler registered in _handlers[slot]. If
+ * no handler is registered for the slot, returns ctx unchanged.
  *
  * @param irq: GIC IRQ ID, used to look up the virtio slot
  * @param ctx: saved register frame from the interrupted context
