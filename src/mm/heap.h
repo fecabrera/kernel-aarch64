@@ -3,8 +3,7 @@
 #include <stdint.h>
 #include <string.h>
 
-struct block_header
-{
+struct block_header {
     size_t size;               // usable bytes (not including header)
     uint32_t free;             // 1 = free, 0 = used
     struct block_header *next; // next block in list (adjacent in memory)
@@ -36,7 +35,8 @@ void merge_free_blocks();
  *
  * @param size: number of bytes to allocate
  *
- * @return pointer to allocated memory, or NULL if the heap is exhausted or size is 0.
+ * @return pointer to allocated memory, or NULL if the heap is exhausted or size
+ * is 0.
  */
 void *kmalloc(size_t size);
 

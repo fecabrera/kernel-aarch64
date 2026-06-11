@@ -58,12 +58,12 @@ kernel.img: kernel.elf
 	$(OBJCOPY) -O binary $< $@
 
 init.img:
-	dd if=/dev/zero of=$@ bs=1M count=100; \
-	mkfs.fat -F 32 $@; \
-	dev=$$(hdiutil attach $@ | grep -o '/Volumes/.*'); \
-	dot_clean -n init; \
-	cp -R README.md init/* "$$dev"; \
-	dot_clean -n "$$dev"; \
+	dd if=/dev/zero of=$@ bs=1M count=100 && \
+	mkfs.fat -F 32 $@ && \
+	dev=$$(hdiutil attach $@ | grep -o '/Volumes/.*') && \
+	dot_clean -n init && \
+  	cp -R README.md init/* "$$dev" && \
+	dot_clean -n "$$dev" && \
 	hdiutil detach "$$dev"
 
 run: all

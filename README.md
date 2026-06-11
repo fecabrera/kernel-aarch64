@@ -184,7 +184,8 @@ make run
 init/               — files bundled into init.img at build time (FAT32 ramdisk)
 
 src/
-  kernel.c          — kernel_init (subsystem bring-up), init (pid 1), child (pid 2, forks to create pid 3)
+  kernel.c          — kernel_init: subsystem bring-up (DTB, memory, IRQ, VFS, scheduler, timer)
+  init.c/h          — init(): pid 1 entry point; mounts FAT32 block devices, dumps VFS tree
   start.S           — AArch64 boot stub, saves DTB pointer, zeros BSS
   vectors.S         — exception vector table, save/restore_context macros
 

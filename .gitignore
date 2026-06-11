@@ -13,3 +13,6 @@ build/
 
 # IDE config
 .vscode/
+.cache/
+
+compile_commands.json

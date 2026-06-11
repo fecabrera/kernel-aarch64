@@ -1,47 +1,37 @@
-#include <debug.h>
 #include "heap.h"
+#include <debug.h>
 
 static struct block_header *heap_head = 0;
 
-// extern uint8_t _heap_start[];
-// extern uint8_t _heap_end[];
-
 static uint8_t _heap[HEAP_SIZE] = {0};
 
-void heap_init()
-{
+void heap_init() {
     heap_head = (struct block_header *)_heap;
     heap_head->size = (size_t)(_heap + HEAP_SIZE - _heap) - HEADER_SIZE;
     heap_head->free = BLOCK_FREE;
     heap_head->next = NULL;
 
-    printk("[heap] heap initialized: start=0x%x, size=%d B\r\n", _heap, heap_head->size);
+    printk("[heap] heap initialized: start=0x%x, size=%d B\r\n", _heap,
+           heap_head->size);
 }
 
 // Merge adjacent free blocks (called after kfree, prevents fragmentation)
-void merge_free_blocks()
-{
+void merge_free_blocks() {
     struct block_header *cur = heap_head;
-    while (cur && cur->next)
-    {
-        if (cur->free && cur->next->free)
-        {
+    while (cur && cur->next) {
+        if (cur->free && cur->next->free) {
             // Absorb next block into current
             cur->size += HEADER_SIZE + cur->next->size;
             cur->next = cur->next->next;
             // Don't advance — merged block might be mergeable again
-        }
-        else
-        {
+        } else {
             cur = cur->next;
         }
     }
 }
 
-void *kmalloc(size_t size)
-{
-    if (size == 0)
-    {
+void *kmalloc(size_t size) {
+    if (size == 0) {
         return NULL;
     }
 
@@ -50,14 +40,13 @@ void *kmalloc(size_t size)
 
     struct block_header *cur = heap_head;
 
-    while (cur)
-    {
-        if (cur->free && cur->size >= size)
-        {
+    while (cur) {
+        if (cur->free && cur->size >= size) {
             // Split block if remainder is large enough to be useful
-            if (cur->size >= size + HEADER_SIZE + MIN_BLOCK_SIZE)
-            {
-                struct block_header *new_block = (struct block_header *)((uint8_t *)cur + HEADER_SIZE + size);
+            if (cur->size >= size + HEADER_SIZE + MIN_BLOCK_SIZE) {
+                struct block_header *new_block =
+                    (struct block_header *)((uint8_t *)cur + HEADER_SIZE +
+                                            size);
                 new_block->size = cur->size - size - HEADER_SIZE;
                 new_block->free = BLOCK_FREE;
                 new_block->next = cur->next;
@@ -75,33 +64,30 @@ void *kmalloc(size_t size)
     printk("[heap] kmalloc: out of memory!\r\n");
 
     struct block_header *_head = heap_head;
-    while (_head)
-    {
-        printk("block at 0x%x: size=%d B %s\r\n", _head + HEADER_SIZE, _head->size, _head->free ? "FREE" : "USED");
+    while (_head) {
+        printk("block at 0x%x: size=%d B %s\r\n", _head + HEADER_SIZE,
+               _head->size, _head->free ? "FREE" : "USED");
         _head = _head->next;
     }
 
     return NULL;
 }
 
-int kfree(void *ptr)
-{
-    if (!ptr)
-    {
+int kfree(void *ptr) {
+    if (!ptr) {
         return -1;
     }
 
-    struct block_header *hdr = (struct block_header *)((uint8_t *)ptr - HEADER_SIZE);
+    struct block_header *hdr =
+        (struct block_header *)((uint8_t *)ptr - HEADER_SIZE);
 
     // Sanity check — ptr should be inside heap
-    if ((uint8_t *)hdr < _heap || (uint8_t *)hdr >= _heap + HEAP_SIZE)
-    {
+    if ((uint8_t *)hdr < _heap || (uint8_t *)hdr >= _heap + HEAP_SIZE) {
         printk("[heap] kfree: pointer out of range!\r\n");
         return -2;
     }
 
-    if (hdr->free)
-    {
+    if (hdr->free) {
         printk("[heap] kfree: double free detected!\r\n");
         return -3;
     }
@@ -111,28 +97,25 @@ int kfree(void *ptr)
     return 0;
 }
 
-void *krealloc(void *ptr, size_t new_size)
-{
-    if (!ptr)
-    {
+void *krealloc(void *ptr, size_t new_size) {
+    if (!ptr) {
         return kmalloc(new_size);
     }
 
-    if (!new_size)
-    {
+    if (!new_size) {
         kfree(ptr);
         return 0;
     }
 
-    struct block_header *hdr = (struct block_header *)((uint8_t *)ptr - HEADER_SIZE);
+    struct block_header *hdr =
+        (struct block_header *)((uint8_t *)ptr - HEADER_SIZE);
 
     // Already big enough (and not wasteful to keep)
     if (hdr->size >= new_size && hdr->size <= new_size * 2)
         return ptr;
 
     void *new_ptr = kmalloc(new_size);
-    if (!new_ptr)
-    {
+    if (!new_ptr) {
         return 0;
     }
 
@@ -142,8 +125,7 @@ void *krealloc(void *ptr, size_t new_size)
     return new_ptr;
 }
 
-void *kmalloc_aligned(size_t size, size_t align)
-{
+void *kmalloc_aligned(size_t size, size_t align) {
     // Round size up to the next multiple of align. The returned pointer is
     // always (block_header base + HEADER_SIZE); since HEADER_SIZE is a
     // multiple of 8 and every block base is 8-byte aligned, any align that
@@ -154,17 +136,16 @@ void *kmalloc_aligned(size_t size, size_t align)
     return kmalloc(aligned_size);
 }
 
-void heap_dump()
-{
+void heap_dump() {
     dprintk("\r\n=== heap dump ===\r\n");
 
     struct block_header *cur = heap_head;
     size_t used = 0, free = 0;
 
     int i = 0;
-    while (cur)
-    {
-        dprintk("  [%i] addr=0x%x size=%i %s\r\n", i++, cur + HEADER_SIZE, cur->size, cur->free ? "FREE" : "USED");
+    while (cur) {
+        dprintk("  [%i] addr=0x%x size=%i %s\r\n", i++, cur + HEADER_SIZE,
+                cur->size, cur->free ? "FREE" : "USED");
 
         if (cur->free)
             free += cur->size;

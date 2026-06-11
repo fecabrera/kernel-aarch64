@@ -8,11 +8,11 @@
 
 typedef int (*vfs_handler_t)(struct fs_node *, uint8_t *, size_t, size_t);
 
-struct vfs_mount
-{
+struct vfs_mount {
     char *mountpoint; // VFS path this mount is registered under
     char *device;     // VFS path of the underlying block device, or NULL
-    void *info;       // filesystem-private superblock data (heap-allocated; freed by vfs_destroy_mountpoint)
+    void *info; // filesystem-private superblock data (heap-allocated; freed by
+                // vfs_destroy_mountpoint)
     struct fs_node *root;
     vfs_handler_t read;
     vfs_handler_t write;
@@ -32,15 +32,21 @@ void vfs_init();
  * mount table keyed by mountpoint. Does not insert any node into the VFS
  * tree; the caller is responsible for creating the node before mounting.
  *
- * @param mountpoint: null-terminated path of an existing VFS folder (e.g. "/volumes/NO NAME")
- * @param device:     VFS path of the underlying block device (e.g. "/dev/sd0"), or NULL
- * @param info:       filesystem-private superblock data (heap-allocated; ownership transferred to mount), or NULL
+ * @param mountpoint: null-terminated path of an existing VFS folder (e.g.
+ * "/volumes/NO NAME")
+ * @param device:     VFS path of the underlying block device (e.g. "/dev/sd0"),
+ * or NULL
+ * @param info:       filesystem-private superblock data (heap-allocated;
+ * ownership transferred to mount), or NULL
  * @param read:       read handler for this mount, or NULL
  * @param write:      write handler for this mount, or NULL
  *
- * @return pointer to the new vfs_mount on success, NULL if the mountpoint is not found or not a folder
+ * @return pointer to the new vfs_mount on success, NULL if the mountpoint is
+ * not found or not a folder
  */
-struct vfs_mount *vfs_create_mountpoint(char *mountpoint, char *device, void *info, vfs_handler_t read, vfs_handler_t write);
+struct vfs_mount *vfs_create_mountpoint(char *mountpoint, char *device,
+                                        void *info, vfs_handler_t read,
+                                        vfs_handler_t write);
 
 /**
  * Looks up a mount entry by its exact mountpoint path.
@@ -76,28 +82,36 @@ int vfs_destroy_mountpoint(char *mountpoint);
  * Resolves path via _vfs_get_node and creates a new subfolder named name
  * inside it via fs_add_subfolder.
  *
- * @param path:  null-terminated absolute path of the parent folder (e.g. "/volumes")
+ * @param path:  null-terminated absolute path of the parent folder (e.g.
+ * "/volumes")
  * @param name:  null-terminated name for the new directory
  * @param attrs: attribute flags (FS_NODE_ATTRS_FLAG_*)
- * @param mount: vfs_mount pointer stored in node->mount (void * to avoid circular include), or NULL
+ * @param mount: vfs_mount pointer stored in node->mount (void * to avoid
+ * circular include), or NULL
  *
- * @return pointer to the new folder node, or NULL if the parent is not found or creation fails
+ * @return pointer to the new folder node, or NULL if the parent is not found or
+ * creation fails
  */
-struct fs_node *vfs_create_dir(char *path, char *name, uint16_t attrs, void *mount);
+struct fs_node *vfs_create_dir(char *path, char *name, uint16_t attrs,
+                               void *mount);
 
 /**
  * Resolves path via _vfs_get_node and creates a new file named name
  * inside it via fs_add_file_to_folder.
  *
- * @param path:      null-terminated absolute path of the parent folder (e.g. "/volumes/NO NAME")
+ * @param path:      null-terminated absolute path of the parent folder (e.g.
+ * "/volumes/NO NAME")
  * @param name:      null-terminated name for the new file
  * @param file_size: file size in bytes, stored in node->file_size
  * @param attrs:     attribute flags (FS_NODE_ATTRS_FLAG_*)
- * @param mount:     vfs_mount pointer stored in node->mount (void * to avoid circular include), or NULL
+ * @param mount:     vfs_mount pointer stored in node->mount (void * to avoid
+ * circular include), or NULL
  *
- * @return pointer to the new file node, or NULL if the parent is not found or creation fails
+ * @return pointer to the new file node, or NULL if the parent is not found or
+ * creation fails
  */
-struct fs_node *vfs_create_file(char *path, char *name, size_t file_size, uint16_t attrs, void *mount);
+struct fs_node *vfs_create_file(char *path, char *name, size_t file_size,
+                                uint16_t attrs, void *mount);
 
 /**
  * Resolves pathname via _vfs_get_node and returns node->file_size.
