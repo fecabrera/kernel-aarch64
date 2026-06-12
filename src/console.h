@@ -2,7 +2,10 @@
 
 /**
  * Runs an interactive console loop on pathname. Prompts with "> ", tokenizes each line into
- * argc/argv, and dispatches to console_parse_command. Does not return.
+ * argc/argv (whitespace-delimited; double-quoted strings are treated as single tokens; backslash
+ * escapes any character, including \" inside quotes), and dispatches to console_parse_command. Lines
+ * with an unterminated quote or trailing backslash are rejected with an error and not dispatched.
+ * Does not return.
  *
  * @param pathname: VFS path of the device to use for I/O (e.g. "/dev/serial")
  */
@@ -33,7 +36,8 @@ int console_getline(char *pathname, char *buffer);
 /**
  * Dispatches a parsed command by forking a child process. The parent waits via syscall_waitpid and
  * logs the exit status. The child runs the command and exits. Built-in commands: ls (vfs_dump_fs),
- * exit [status] (syscall_exit). Unknown commands exit silently with 0.
+ * cat <path> (vfs_read + print), echo [args...] (print first arg), exit [status] (syscall_exit),
+ * help (list commands). Unknown commands exit silently with 0.
  *
  * @param argc: number of arguments
  * @param argv: null-terminated argument strings; argv[0] is the command name

@@ -165,8 +165,8 @@ make run
 - `serial_init()` registers a `/dev/serial` I/O module backed by the PL011 UART. Must be called after `io_init()`.
 - `serial_read` blocks reading `count` bytes from the UART by calling `pl011_getc` in a loop, spinning on `wfi()` until each byte arrives; returns `count`.
 - `serial_write` writes `count` bytes to the UART one byte at a time via `pl011_putc`; returns `count`.
-- `console(pathname)` in `console.c` runs an interactive terminal loop on the given VFS device, prompting with `"> "`, tokenizing each input line into `argc/argv`, and dispatching to `console_parse_command`.
-- `console_parse_command(argc, argv)` forks a child process for each command; parent waits via `syscall_waitpid`. Built-ins: `ls` (`vfs_dump_fs`), `exit [status]` (`syscall_exit`); unknown commands exit silently.
+- `console(pathname)` in `console.c` runs an interactive terminal loop on the given VFS device, prompting with `"> "`, tokenizing each input line into `argc/argv` (whitespace-delimited; double-quoted strings are single tokens; backslash escapes any character, including `\"` inside quotes), and dispatching to `console_parse_command`. Lines with an unterminated quote or trailing backslash are rejected with an error.
+- `console_parse_command(argc, argv)` forks a child process for each command; parent waits via `syscall_waitpid`. Built-ins: `ls` (`vfs_dump_fs`), `cat <path>` (read and print file), `echo [args...]` (print first arg), `exit [status]` (`syscall_exit`), `help` (list commands); unknown commands exit silently.
 - `console_getc(pathname)` reads the next character from a VFS device, blocking and discarding ANSI escape sequences.
 - `console_getline(pathname, buffer)` reads one line via `console_getc`, echoing characters back and handling backspace and CR; returns character count.
 

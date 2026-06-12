@@ -20,6 +20,7 @@ void console(char *pathname) {
 
         char buffer[1024] = {0};
         int len = console_getline(pathname, buffer);
+        bool _quotes = false, _backslash = false;
 
         char *argv[256];
         int argc = 0;
@@ -29,9 +30,13 @@ void console(char *pathname) {
 
         for (int i = 0; i <= len; i++) {
             char c = buffer[i];
-
-            if (isspace(c) || c == '\0') {
-                if (vec.length > 0) {
+            if (_backslash) {
+                _backslash = false;
+                vector8_append(&vec, c);
+            } else if (_quotes) {
+                if (c == '\\') {
+                    _backslash = true;
+                } else if (c == '\"') {
                     argv[argc] = (char *)kmalloc(vec.length + 1);
 
                     strncpy(argv[argc], (char *)vec.data, vec.length);
@@ -39,13 +44,31 @@ void console(char *pathname) {
 
                     vector8_reset(&vec);
 
+                    _quotes = false;
                     argc++;
+                } else {
+                    vector8_append(&vec, c);
                 }
+            } else {
+                if (isspace(c) || c == '\0') {
+                    if (vec.length > 0) {
+                        argv[argc] = (char *)kmalloc(vec.length + 1);
 
-                continue;
+                        strncpy(argv[argc], (char *)vec.data, vec.length);
+                        argv[argc][vec.length] = '\0';
+
+                        vector8_reset(&vec);
+
+                        argc++;
+                    }
+                } else if (c == '\\') {
+                    _backslash = true;
+                } else if (c == '\"') {
+                    _quotes = true;
+                } else {
+                    vector8_append(&vec, c);
+                }
             }
-
-            vector8_append(&vec, c);
         }
 
         vector8_destroy(&vec);
@@ -55,7 +78,10 @@ void console(char *pathname) {
             printk(" \"%s\",", argv[i]);
         printk(" ]\r\n");
 
-        console_parse_command(argc, argv);
+        if (_quotes || _backslash)
+            printk("[console] invalid input!, _quotes=%d, _backslash=%d\r\n", _quotes, _backslash);
+        else
+            console_parse_command(argc, argv);
 
         for (int i = 0; i < argc; i++)
             kfree(argv[i]);
@@ -120,13 +146,60 @@ int console_getline(char *pathname, char *buffer) {
     return -1;
 }
 
-static void _command_exit(int argc, char *argv[]) {
+static int _command_exit(int argc, char *argv[]) {
     int64_t status = 0;
     if (argc > 1) {
         status = atoll(argv[1]);
     }
     printk("exiting with status %d\r\n", status);
-    syscall_exit(status);
+    return status;
+}
+
+static int _command_echo(int argc, char *argv[]) {
+    if (argc > 1)
+        printk("%s", argv[1]);
+    printk("\r\n");
+
+    return 0;
+}
+
+static int _command_help(__attribute__((unused)) int argc, __attribute__((unused)) char *argv[]) {
+    printk("available commands:\r\n");
+    printk("    ls              list the VFS tree\r\n");
+    printk("    cat <path>      print a file\r\n");
+    printk("    echo [args...]  print arguments\r\n");
+    printk("    exit [status]   exit with status code\r\n");
+    printk("    help            show this message\r\n");
+    return 0;
+}
+
+static int _command_cat(int argc, char *argv[]) {
+    if (argc < 2) {
+        printk("no file provided!\r\n");
+        return -5;
+    }
+
+    size_t f_size = vfs_get_file_size(argv[1]);
+    char *buffer = (char *)kmalloc(f_size + 1);
+
+    int status = vfs_read(argv[1], (uint8_t *)buffer, f_size, 0);
+    if (status == VFS_IO_ERROR_FILE_NOT_FOUND) {
+        printk("file not found!\r\n");
+        return status;
+    }
+    if (status == VFS_IO_ERROR_MOUNTPOINT_NOT_FOUND) {
+        printk("mountpoint not found!\r\n");
+        return status;
+    }
+    if (status == VFS_IO_ERROR_HANDLER_NOT_PROVIDED) {
+        printk("handler not provided!\r\n");
+        return status;
+    }
+
+    buffer[f_size] = '\0';
+    printk("%s\r\n", buffer);
+    kfree(buffer);
+    return 0;
 }
 
 void console_parse_command(int argc, char *argv[]) {
@@ -144,14 +217,21 @@ void console_parse_command(int argc, char *argv[]) {
         printk("[console] process %d returned %d!\r\n", pid, status);
         return;
     } else {
+        int64_t status = -1;
         if (strcmp(argv[0], "ls") == 0) {
             vfs_dump_fs();
         } else if (strcmp(argv[0], "exit") == 0) {
-            _command_exit(argc, argv);
+            status = _command_exit(argc, argv);
+        } else if (strcmp(argv[0], "echo") == 0) {
+            status = _command_echo(argc, argv);
+        } else if (strcmp(argv[0], "cat") == 0) {
+            status = _command_cat(argc, argv);
+        } else if (strcmp(argv[0], "help") == 0) {
+            status = _command_help(argc, argv);
         } else {
-            syscall_exit(0);
+            status = 0;
         }
 
-        syscall_exit(-1);
+        syscall_exit(status);
     }
 }

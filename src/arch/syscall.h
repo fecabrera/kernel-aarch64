@@ -1,8 +1,8 @@
 #pragma once
 
-#include <time.h>
-#include <sys/types.h>
 #include "irq.h"
+#include <sys/types.h>
+#include <time.h>
 
 #define NUM_SYSCALLS 256
 
@@ -18,8 +18,8 @@
 
 /**
  * Initializes the syscall subsystem.
- * Must be called before any syscall_register_handler or syscall_handler
- * invocations. Initializes the internal syscall dispatch table.
+ * Must be called before any syscall_register_handler or syscall_handler invocations. Initializes
+ * the internal syscall dispatch table.
  */
 void syscall_init();
 
@@ -29,8 +29,8 @@ void syscall_init();
  *
  * @param ctx: saved context of the calling process
  *
- * @return pointer to the saved cpu_context of the next task to run;
- *         may equal ctx if no context switch is needed.
+ * @return pointer to the saved cpu_context of the next task to run; may equal ctx if no context
+ *         switch is needed.
  */
 struct cpu_context *syscall_handler(struct cpu_context *ctx);
 
@@ -52,9 +52,9 @@ void syscall_unregister_handler(uint64_t syscall_id);
 
 /**
  * Voluntarily yields the CPU to the scheduler via SYSCALL_YIELD (svc #0).
- * Traps into EL1, where yield_handler sets the return value to 0 in ctx->x0
- * and calls scheduler_handler to pick the next runnable task. Execution
- * resumes in the calling task when it is next scheduled.
+ * Traps into EL1, where yield_handler sets the return value to 0 in ctx->x0 and calls
+ * scheduler_handler to pick the next runnable task. Execution resumes in the calling task when it
+ * is next scheduled.
  *
  * @return 0 on return from the scheduler.
  */
@@ -62,8 +62,8 @@ int64_t syscall_yield();
 
 /**
  * Terminates the calling process via SYSCALL_EXIT (svc #0).
- * Traps into EL1, where exit_handler marks the process PROC_DEAD, destroys
- * it, and calls scheduler_handler to run the next task. Does not return.
+ * Traps into EL1, where exit_handler marks the process PROC_DEAD, destroys it, and calls
+ * scheduler_handler to run the next task. Does not return.
  *
  * @param status: exit status passed in x1 (logged by exit_handler).
  */
@@ -79,10 +79,9 @@ void syscall_exit(int64_t status);
 pid_t syscall_getpid();
 
 /**
- * Blocks the calling process until the process with the given PID exits via
- * SYSCALL_WAITPID (svc #0). Traps into EL1, where waitpid_handler moves the
- * caller to the wait queue and performs a context switch. Execution resumes
- * when the target process calls syscall_exit.
+ * Blocks the calling process until the process with the given PID exits via SYSCALL_WAITPID (svc
+ * #0). Traps into EL1, where waitpid_handler moves the caller to the wait queue and performs a
+ * context switch. Execution resumes when the target process calls syscall_exit.
  *
  * @param pid: PID of the process to wait for
  *
@@ -92,21 +91,18 @@ pid_t syscall_getpid();
 int64_t syscall_waitpid(pid_t pid);
 
 /**
- * Forks the calling process via SYSCALL_FORK (svc #0). Traps into EL1, where
- * fork_handler duplicates the current process (stack and context) and enqueues
- * the child. The child resumes from the same point with a return value of 0;
- * the parent receives the child's PID.
+ * Forks the calling process via SYSCALL_FORK (svc #0). Traps into EL1, where fork_handler
+ * duplicates the current process (stack and context) and enqueues the child. The child resumes from
+ * the same point with a return value of 0; the parent receives the child's PID.
  *
  * @return child PID in the parent, 0 in the child, or -1 on failure.
  */
 pid_t syscall_fork();
 
 /**
- * Blocks the calling process for the given number of seconds via
- * SYSCALL_SLEEP (svc #0). Traps into EL1, where sleep_handler sets
- * process->sleep_for and moves the caller to the sleep queue. The timer
- * tick decrements sleep_for on each tick; process is enqueued when it reaches
- * zero.
+ * Blocks the calling process for the given number of seconds via SYSCALL_SLEEP (svc #0). Traps into
+ * EL1, where sleep_handler sets process->sleep_for and moves the caller to the sleep queue. The
+ * timer tick decrements sleep_for on each tick; process is enqueued when it reaches zero.
  *
  * @param seconds: number of seconds to sleep
  *
@@ -115,11 +111,10 @@ pid_t syscall_fork();
 int64_t syscall_sleep(time_t seconds);
 
 /**
- * Blocks the calling process for the given number of milliseconds via
- * SYSCALL_MSLEEP (svc #0). Traps into EL1, where msleep_handler sets
- * process->sleep_for directly to the given value and moves the caller
- * to the sleep queue. The timer tick decrements sleep_for on each tick;
- * process is enqueued when it reaches zero.
+ * Blocks the calling process for the given number of milliseconds via SYSCALL_MSLEEP (svc #0).
+ * Traps into EL1, where msleep_handler sets process->sleep_for directly to the given value and
+ * moves the caller to the sleep queue. The timer tick decrements sleep_for on each tick; process is
+ * enqueued when it reaches zero.
  *
  * @param ms: number of milliseconds to sleep
  *
@@ -129,8 +124,7 @@ int64_t syscall_msleep(mseconds_t ms);
 
 /**
  * Returns the current Unix timestamp via SYSCALL_TIME (svc #0).
- * Traps into EL1, where time_handler reads the RTC and writes the value
- * into ctx->x0.
+ * Traps into EL1, where time_handler reads the RTC and writes the value into ctx->x0.
  *
  * @return current Unix timestamp, or -1 on failure.
  */
@@ -138,8 +132,8 @@ time_t syscall_time();
 
 /**
  * Returns the system uptime in milliseconds via SYSCALL_UPTIME (svc #0).
- * Traps into EL1, where syscall_uptime_handler reads cntpct_el0 and computes
- * elapsed milliseconds since timer_init.
+ * Traps into EL1, where syscall_uptime_handler reads cntpct_el0 and computes elapsed milliseconds
+ * since timer_init.
  *
  * @return system uptime in milliseconds
  */
