@@ -252,27 +252,33 @@ uint32_t fat32_read_fat_table(struct fat32_bs_info *bs_info, uint8_t *buff, uint
 void fat32_build_cluster_chains(struct fat32_bs_info *bs_info, struct queue32 *cluster_chains);
 
 /**
- * Mounts a FAT32 volume accessible at the given VFS pathname. Reads the boot sector and FAT table
- * via vfs_read, validates the FAT32 signature, parses the BPB, builds the cluster chain queue, then
- * recursively traverses all directories via _fat32_read_cluster. Creates the volume as a subfolder
- * of "/volumes" and registers a mountpoint at "/volumes/<label>".
+ * Mounts a FAT32 volume accessible at device_path. Reads the boot sector via vfs_read, validates
+ * the FAT32 signature, parses the BPB, creates or resolves the VFS directory, registers a
+ * mountpoint, reads the full FAT table, then recursively traverses all directories via
+ * _fat32_read_cluster.
  *
- * @param pathname: VFS path to the block device (e.g. "/dev/sda")
+ * If mountpoint is NULL, the volume is mounted at "/volumes/<label>" (directory created
+ * automatically). If mountpoint is non-NULL, the existing VFS node at that path is used.
  *
- * @return 0 on success, -1 on I/O error, -2 if not a valid FAT32 volume
+ * @param device_path: VFS path to the block device (e.g. "/dev/sda")
+ * @param mountpoint:  VFS path to mount at, or NULL to auto-derive from the volume label
+ *
+ * @return 0 on success; -1 I/O error; -2 not a valid FAT32 volume; -3 vfs_create_dir failed;
+ *         -4 vfs_get_node_for_path failed; -5 vfs_create_mountpoint failed;
+ *         -6 FAT table read error; -7 fs tree build error
  */
-int fat32_mount(char *pathname);
+int fat32_mount(char *device_path, char *mountpoint);
 
 /**
  * Unmounts the FAT32 volume mounted at the VFS path derived from pathname.
  * Frees bs_info->fat_table, then destroys the mountpoint via vfs_destroy_mountpoint.
  * Not yet implemented.
  *
- * @param pathname: VFS path to the block device used when mounting (e.g. "/dev/sda")
+ * @param device_path: VFS path to the block device used when mounting (e.g. "/dev/sda")
  *
  * @return 0 on success, -1 on error
  */
-int fat32_unmount(char *pathname);
+int fat32_unmount(char *device_path);
 
 /**
  * vfs_handler_t read handler for FAT32 mountpoints.

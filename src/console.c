@@ -165,12 +165,12 @@ static int _command_echo(int argc, char *argv[]) {
 
 static int _command_help(__attribute__((unused)) int argc, __attribute__((unused)) char *argv[]) {
     printk("available commands:\r\n"
-           "    ls              list the VFS tree\r\n"
-           "    cat <path>      print a file\r\n"
-           "    echo [args...]  print arguments\r\n"
-           "    mount <device>  mount a FAT32 block device\r\n"
-           "    exit [status]   exit with status code\r\n"
-           "    help            show this message\r\n");
+           "    ls                           list the VFS tree\r\n"
+           "    cat <path>                   print a file\r\n"
+           "    echo [args...]               print arguments\r\n"
+           "    mount <device> [mountpoint]  mount a FAT32 block device\r\n"
+           "    exit [status]                exit with status code\r\n"
+           "    help                         show this message\r\n");
     return 0;
 }
 
@@ -209,7 +209,11 @@ static int _command_mount(int argc, char *argv[]) {
     if (argc < 2)
         return -1;
 
-    int status = fat32_mount(argv[1]);
+    char *moutpoint = NULL;
+    if (argc > 2)
+        moutpoint = argv[2];
+
+    int status = fat32_mount(argv[1], moutpoint);
     if (status < 0) {
         printk("[mount] fat32_mount() returned %d!\r\n", status);
         return -2;

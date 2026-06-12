@@ -36,7 +36,8 @@ int console_getline(char *pathname, char *buffer);
 /**
  * Dispatches a parsed command by forking a child process. The parent waits via syscall_waitpid and
  * logs the exit status. The child runs the command and exits. Built-in commands: ls (vfs_dump_fs),
- * cat <path> (vfs_read + print), echo [args...] (print first arg), mount <device> (fat32_mount),
+ * cat <path> (vfs_read + print), echo [args...] (print first arg),
+ * mount <device> [mountpoint] (fat32_mount; mountpoint defaults to /volumes/<label>),
  * exit [status] (syscall_exit), help (list commands). Unknown commands exit silently with 0.
  *
  * @param argc: number of arguments
