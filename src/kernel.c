@@ -1,6 +1,5 @@
-#include "init.h"
-#include <arch/cpu.h>
-#include <arch/irq.h>
+#include "kernel.h"
+#include "console.h"
 #include <arch/syscall.h>
 #include <debug.h>
 #include <devices/serial.h>
@@ -11,13 +10,10 @@
 #include <drivers/timer.h>
 #include <drivers/virtio_mmio.h>
 #include <dtb.h>
-#include <fs/fat32.h>
-#include <fs/filesystem.h>
 #include <fs/vfs.h>
 #include <io/module.h>
 #include <mm/heap.h>
 #include <mm/mem.h>
-#include <sched/process.h>
 #include <sched/scheduler.h>
 
 void kernel_init() {
@@ -50,7 +46,7 @@ void kernel_init() {
 
     // set up root process
     pid_t pid = scheduler_spawn(&init);
-    printk("[kernel] spawned init process with pid %i\r\n", pid);
+    dprintk("[kernel] spawned init process with pid %i\r\n", pid);
 
     // start scheduler
     timer_init();
@@ -58,3 +54,5 @@ void kernel_init() {
     // force context switch via syscall
     syscall_yield();
 }
+
+void init() { console("/dev/serial"); }

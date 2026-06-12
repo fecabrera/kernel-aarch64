@@ -573,7 +573,7 @@ int fat32_mount(char *pathname) {
     // create folder
     struct fs_node *root = vfs_create_dir("/volumes", bs_info->volume_label, 0, NULL);
     if (root == NULL) {
-        printk("[fat32] cannot create mountpoint \"%s\"!\r\n", pathname);
+        printk("[fat32] vfs_create_dir() returned NULL!\r\n");
         return NULL;
     }
 

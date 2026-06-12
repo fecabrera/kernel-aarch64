@@ -11,8 +11,7 @@ void heap_init() {
     heap_head->free = BLOCK_FREE;
     heap_head->next = NULL;
 
-    printk("[heap] heap initialized: start=0x%x, size=%d B\r\n", _heap,
-           heap_head->size);
+    dprintk("[heap] heap initialized: start=0x%x, size=%d B\r\n", _heap, heap_head->size);
 }
 
 // Merge adjacent free blocks (called after kfree, prevents fragmentation)
@@ -45,8 +44,7 @@ void *kmalloc(size_t size) {
             // Split block if remainder is large enough to be useful
             if (cur->size >= size + HEADER_SIZE + MIN_BLOCK_SIZE) {
                 struct block_header *new_block =
-                    (struct block_header *)((uint8_t *)cur + HEADER_SIZE +
-                                            size);
+                    (struct block_header *)((uint8_t *)cur + HEADER_SIZE + size);
                 new_block->size = cur->size - size - HEADER_SIZE;
                 new_block->free = BLOCK_FREE;
                 new_block->next = cur->next;
@@ -65,8 +63,8 @@ void *kmalloc(size_t size) {
 
     struct block_header *_head = heap_head;
     while (_head) {
-        printk("block at 0x%x: size=%d B %s\r\n", _head + HEADER_SIZE,
-               _head->size, _head->free ? "FREE" : "USED");
+        printk("block at 0x%x: size=%d B %s\r\n", _head + HEADER_SIZE, _head->size,
+               _head->free ? "FREE" : "USED");
         _head = _head->next;
     }
 
@@ -78,8 +76,7 @@ int kfree(void *ptr) {
         return -1;
     }
 
-    struct block_header *hdr =
-        (struct block_header *)((uint8_t *)ptr - HEADER_SIZE);
+    struct block_header *hdr = (struct block_header *)((uint8_t *)ptr - HEADER_SIZE);
 
     // Sanity check — ptr should be inside heap
     if ((uint8_t *)hdr < _heap || (uint8_t *)hdr >= _heap + HEAP_SIZE) {
@@ -107,8 +104,7 @@ void *krealloc(void *ptr, size_t new_size) {
         return 0;
     }
 
-    struct block_header *hdr =
-        (struct block_header *)((uint8_t *)ptr - HEADER_SIZE);
+    struct block_header *hdr = (struct block_header *)((uint8_t *)ptr - HEADER_SIZE);
 
     // Already big enough (and not wasteful to keep)
     if (hdr->size >= new_size && hdr->size <= new_size * 2)
@@ -144,8 +140,8 @@ void heap_dump() {
 
     int i = 0;
     while (cur) {
-        dprintk("  [%i] addr=0x%x size=%i %s\r\n", i++, cur + HEADER_SIZE,
-                cur->size, cur->free ? "FREE" : "USED");
+        dprintk("  [%i] addr=0x%x size=%i %s\r\n", i++, cur + HEADER_SIZE, cur->size,
+                cur->free ? "FREE" : "USED");
 
         if (cur->free)
             free += cur->size;

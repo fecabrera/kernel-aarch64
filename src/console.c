@@ -135,7 +135,7 @@ int console_getline(char *pathname, char *buffer) {
             }
             break;
         default:
-            if (c == ASCII_LF)
+            if (c == ASCII_HT)
                 c = '\t';
 
             vfs_write(pathname, (uint8_t *)&c, 1, 0);
@@ -164,41 +164,58 @@ static int _command_echo(int argc, char *argv[]) {
 }
 
 static int _command_help(__attribute__((unused)) int argc, __attribute__((unused)) char *argv[]) {
-    printk("available commands:\r\n");
-    printk("    ls              list the VFS tree\r\n");
-    printk("    cat <path>      print a file\r\n");
-    printk("    echo [args...]  print arguments\r\n");
-    printk("    exit [status]   exit with status code\r\n");
-    printk("    help            show this message\r\n");
+    printk("available commands:\r\n"
+           "    ls              list the VFS tree\r\n"
+           "    cat <path>      print a file\r\n"
+           "    echo [args...]  print arguments\r\n"
+           "    mount <device>  mount a FAT32 block device\r\n"
+           "    exit [status]   exit with status code\r\n"
+           "    help            show this message\r\n");
     return 0;
 }
 
 static int _command_cat(int argc, char *argv[]) {
     if (argc < 2) {
         printk("no file provided!\r\n");
-        return -5;
+        return -1;
     }
 
     size_t f_size = vfs_get_file_size(argv[1]);
     char *buffer = (char *)kmalloc(f_size + 1);
 
     int status = vfs_read(argv[1], (uint8_t *)buffer, f_size, 0);
-    if (status == VFS_IO_ERROR_FILE_NOT_FOUND) {
-        printk("file not found!\r\n");
-        return status;
-    }
-    if (status == VFS_IO_ERROR_MOUNTPOINT_NOT_FOUND) {
-        printk("mountpoint not found!\r\n");
-        return status;
-    }
-    if (status == VFS_IO_ERROR_HANDLER_NOT_PROVIDED) {
-        printk("handler not provided!\r\n");
-        return status;
+    if (status < 0) {
+        switch (status) {
+        case VFS_IO_ERROR_FILE_NOT_FOUND:
+            printk("file not found!\r\n");
+            break;
+        case VFS_IO_ERROR_MOUNTPOINT_NOT_FOUND:
+            printk("mountpoint not found!\r\n");
+            break;
+        case VFS_IO_ERROR_HANDLER_NOT_PROVIDED:
+            printk("handler not provided!\r\n");
+            break;
+        }
+        return -2;
     }
 
     buffer[f_size] = '\0';
     printk("%s\r\n", buffer);
     kfree(buffer);
+    return 0;
+}
+
+static int _command_mount(int argc, char *argv[]) {
+    if (argc < 2)
+        return -1;
+
+    int status = fat32_mount(argv[1]);
+    if (status < 0) {
+        printk("[mount] fat32_mount() returned %d!\r\n", status);
+        return -2;
+    }
+
+    printk("[mount] block device \"%s\" mounted!\r\n", argv[1]);
     return 0;
 }
 
@@ -226,6 +243,8 @@ void console_parse_command(int argc, char *argv[]) {
             status = _command_echo(argc, argv);
         } else if (strcmp(argv[0], "cat") == 0) {
             status = _command_cat(argc, argv);
+        } else if (strcmp(argv[0], "mount") == 0) {
+            status = _command_mount(argc, argv);
         } else if (strcmp(argv[0], "help") == 0) {
             status = _command_help(argc, argv);
         } else {

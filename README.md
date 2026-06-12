@@ -166,7 +166,7 @@ make run
 - `serial_read` blocks reading `count` bytes from the UART by calling `pl011_getc` in a loop, spinning on `wfi()` until each byte arrives; returns `count`.
 - `serial_write` writes `count` bytes to the UART one byte at a time via `pl011_putc`; returns `count`.
 - `console(pathname)` in `console.c` runs an interactive terminal loop on the given VFS device, prompting with `"> "`, tokenizing each input line into `argc/argv` (whitespace-delimited; double-quoted strings are single tokens; backslash escapes any character, including `\"` inside quotes), and dispatching to `console_parse_command`. Lines with an unterminated quote or trailing backslash are rejected with an error.
-- `console_parse_command(argc, argv)` forks a child process for each command; parent waits via `syscall_waitpid`. Built-ins: `ls` (`vfs_dump_fs`), `cat <path>` (read and print file), `echo [args...]` (print first arg), `exit [status]` (`syscall_exit`), `help` (list commands); unknown commands exit silently.
+- `console_parse_command(argc, argv)` forks a child process for each command; parent waits via `syscall_waitpid`. Built-ins: `ls` (`vfs_dump_fs`), `cat <path>` (read and print file), `echo [args...]` (print first arg), `mount <device>` (`fat32_mount`), `exit [status]` (`syscall_exit`), `help` (list commands); unknown commands exit silently.
 - `console_getc(pathname)` reads the next character from a VFS device, blocking and discarding ANSI escape sequences.
 - `console_getline(pathname, buffer)` reads one line via `console_getc`, echoing characters back and handling backspace and CR; returns character count.
 
@@ -196,9 +196,8 @@ make run
 init/               — files bundled into init.img at build time (FAT32 ramdisk)
 
 src/
-  kernel.c          — kernel_init: subsystem bring-up (DTB, memory, IRQ, VFS, I/O, serial, storage, scheduler, timer)
-  init.c/h          — init(): pid 1 entry point; mounts /dev/sda as FAT32, launches console("/dev/serial")
-  console.c/h       — console(pathname)/console_getc()/console_getline()/console_parse_command(): interactive terminal loop with argc/argv tokenization and fork-per-command dispatch; built-ins: ls, exit
+  kernel.c/h        — kernel_init: subsystem bring-up (DTB, memory, IRQ, VFS, I/O, serial, storage, scheduler, timer); init(): pid 1 entry point, runs console("/dev/serial") directly
+  console.c/h       — console(pathname)/console_getc()/console_getline()/console_parse_command(): interactive terminal loop with argc/argv tokenization (quoted strings, backslash escapes) and fork-per-command dispatch; built-ins: ls, cat, echo, mount, exit, help
   start.S           — AArch64 boot stub, saves DTB pointer, zeros BSS
   vectors.S         — exception vector table, save/restore_context macros
 
@@ -237,7 +236,7 @@ src/
     stdint.h        — stdint-style typedefs (uint8_t … uint64_t, intptr_t)
     stddef.h        — NULL and size_t (uint64_t)
     stdbool.h       — bool/true/false for pre-C23 (no-op under C23+)
-    ascii.h         — ASCII control character macros (ASCII_LF, ASCII_CR, ASCII_ESC, ASCII_DEL)
+    ascii.h         — ASCII control character macros (NUL, SOH, STX, ETX, EOT, ENQ, ACK, BS, HT, LF, VT, CR, ESC, DEL)
     uchar.c/h       — char8_t/16_t/32_t typedefs; utf16to8 conversion; utf16lencpy/utf16bencpy (UTF-16LE/BE to ASCII)
     limits.h        — integer limit macros (AArch64/LP64; unsigned char default)
     time.h          — time_t typedef (uint64_t)
