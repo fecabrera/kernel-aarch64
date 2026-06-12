@@ -1,6 +1,7 @@
 #include "stdio.h"
 #include "stdlib.h"
 #include <ctype.h>
+#include <stdbool.h>
 
 int vsprintf(char *str, const char *format, __builtin_va_list args) {
     char *out = str;
@@ -14,9 +15,14 @@ int vsprintf(char *str, const char *format, __builtin_va_list args) {
 
         format++;
 
-        // parse optional pad: %[0]<width><conv> e.g. %8x or %08x
+        // parse optional flags/width: %[-][0]<width><conv> e.g. %-8s, %08x
+        bool left_align = false;
         char pad_char = ' ';
         int pad_width = 0;
+        if (*format == '-') {
+            left_align = true;
+            format++;
+        }
         if (*format == '0') {
             pad_char = '0';
             format++;
@@ -65,8 +71,17 @@ int vsprintf(char *str, const char *format, __builtin_va_list args) {
         }
         case 's': {
             char *s = __builtin_va_arg(args, char *);
+            int len = 0;
+            for (char *p = s; *p; p++)
+                len++;
+            if (!left_align)
+                for (int i = len; i < pad_width; i++)
+                    *out++ = ' ';
             while (*s)
                 *out++ = *s++;
+            if (left_align)
+                for (int i = len; i < pad_width; i++)
+                    *out++ = ' ';
             break;
         }
         case 'c':

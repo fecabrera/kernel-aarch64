@@ -5,6 +5,7 @@
 #include <ctype.h>
 #include <debug.h>
 #include <dtb.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -33,8 +34,13 @@ void pl011_vprintf(const char *format, __builtin_va_list args) {
 
         format++;
 
+        bool left_align = false;
         char pad_char = ' ';
         int pad_width = 0;
+        if (*format == '-') {
+            left_align = true;
+            format++;
+        }
         if (*format == '0') {
             pad_char = '0';
             format++;
@@ -77,8 +83,15 @@ void pl011_vprintf(const char *format, __builtin_va_list args) {
         }
         case 's': {
             char *s = __builtin_va_arg(args, char *);
+            int len = strlen(s);
+            if (!left_align)
+                for (int i = len; i < pad_width; i++)
+                    pl011_putc(' ');
             while (*s)
                 pl011_putc(*s++);
+            if (left_align)
+                for (int i = len; i < pad_width; i++)
+                    pl011_putc(' ');
             break;
         }
         case 'c':

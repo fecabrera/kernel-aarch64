@@ -96,7 +96,9 @@ void pl011_putc(char c);
 
 /**
  * Formats a string and writes it to the UART.
- * Supports: %d/%i (signed int), %u (unsigned int), %x (hex), %s (string), %c (char), %%.
+ * Supports: %d/%i (signed int), %u (unsigned int), %x/%X (hex lower/upper), %s (string),
+ * %c (char), %%. Width modifier N supported for all specifiers (e.g. %8d, %08x). For strings,
+ * %-Ns left-aligns within width N (padding on the right); %Ns right-aligns (padding on the left).
  *
  * @param format: printf-style format string
  * @param ...: variadic arguments matching the format specifiers
@@ -105,7 +107,9 @@ void pl011_printf(const char *format, ...);
 
 /**
  * Formats a string and writes it to the UART using a pre-initialized va_list.
- * Supports: %d/%i (signed int), %u (unsigned int), %x (hex), %s (string), %c (char), %%.
+ * Supports: %d/%i (signed int), %u (unsigned int), %x/%X (hex lower/upper), %s (string),
+ * %c (char), %%. Width modifier N supported for all specifiers (e.g. %8d, %08x). For strings,
+ * %-Ns left-aligns within width N (padding on the right); %Ns right-aligns (padding on the left).
  *
  * @param format: printf-style format string
  * @param args:   variadic argument list (must be initialized by the caller)

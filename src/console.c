@@ -14,6 +14,15 @@
 #include <string.h>
 #include <sys/types.h>
 
+static const char *_available_commands[][2] = {
+    {"ls", "list the VFS tree"},
+    {"cat <path>", "print a file"},
+    {"echo [args...]", "print arguments"},
+    {"mount <device> [mountpoint]", "mount a FAT32 block device"},
+    {"exit [status]", "exit with status code"},
+    {"help", "show this message"},
+};
+
 void console(char *pathname) {
     while (true) {
         vfs_write(pathname, (uint8_t *)"> ", 2, 0);
@@ -164,13 +173,9 @@ static int _command_echo(int argc, char *argv[]) {
 }
 
 static int _command_help(__attribute__((unused)) int argc, __attribute__((unused)) char *argv[]) {
-    printk("available commands:\r\n"
-           "    ls                           list the VFS tree\r\n"
-           "    cat <path>                   print a file\r\n"
-           "    echo [args...]               print arguments\r\n"
-           "    mount <device> [mountpoint]  mount a FAT32 block device\r\n"
-           "    exit [status]                exit with status code\r\n"
-           "    help                         show this message\r\n");
+    printk("available commands:\r\n");
+    for (size_t i = 0; i < sizeof(_available_commands) / sizeof(_available_commands[0]); i++)
+        printk("    %-28s %s\r\n", _available_commands[i][0], _available_commands[i][1]);
     return 0;
 }
 
