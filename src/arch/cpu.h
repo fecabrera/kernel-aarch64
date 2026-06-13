@@ -31,11 +31,28 @@
 #define _le64(x) __builtin_bswap64(x)
 #endif
 
-static inline void wfe() { __asm__ volatile("wfe"); }
-static inline void wfi() { __asm__ volatile("wfi"); }
+/**
+ * Executes the WFE (Wait For Event) instruction, suspending the CPU until an
+ * event or interrupt is signalled. Less aggressive than WFI — wakes on SEV
+ * (send event) from another core as well as interrupts.
+ */
+void wfe();
 
-static inline void irq_enable() { __asm__ volatile("msr daifclr, #2"); }
-static inline void irq_disable() { __asm__ volatile("msr daifset, #2"); }
+/**
+ * Executes the WFI (Wait For Interrupt) instruction, suspending the CPU until
+ * an interrupt is pending. Used in spin loops to avoid busy-waiting.
+ */
+void wfi();
+
+/**
+ * Clears the DAIF I-bit, unmasking IRQ exceptions at the current EL.
+ */
+void irq_enable();
+
+/**
+ * Sets the DAIF I-bit, masking IRQ exceptions at the current EL.
+ */
+void irq_disable();
 
 /**
  * Halts the CPU in a low-power loop using wfi, waking only to service

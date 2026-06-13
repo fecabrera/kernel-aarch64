@@ -2,6 +2,12 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+void wfe() { __asm__ volatile("wfe"); }
+void wfi() { __asm__ volatile("wfi"); }
+
+void irq_enable() { __asm__ volatile("msr daifclr, #2"); }
+void irq_disable() { __asm__ volatile("msr daifset, #2"); }
+
 uint64_t get_cntpct_el0() {
     uint64_t count;
     __asm__ volatile("mrs %0, cntpct_el0" : "=r"(count));
