@@ -59,9 +59,15 @@ pid_t scheduler_spawn(proc_entry entry) {
     dprintk("[scheduler] spawn()\r\n");
 
     struct process *proc = (struct process *)kmalloc(sizeof(struct process));
+
+    dprintk("[scheduler] creating process\n");
     create_process(proc, DEFAULT_STACK_SIZE);
-    scheduler_enqueue(proc);
+
+    dprintk("[scheduler] configuring process\n");
     process_config(proc, entry);
+
+    dprintk("[scheduler] enqueueing process\n");
+    scheduler_enqueue(proc);
 
     return proc->pid;
 }

@@ -4,14 +4,14 @@
 #include <stdint.h>
 
 /**
- * Registers the serial device as an I/O module named "serial", creating a /dev/serial VFS node
- * backed by serial_read/serial_write. Must be called after io_init().
+ * Registers a "/dev/serial" I/O module backed by the PL011 UART.
+ * Must be called after io_init().
  */
 void serial_init();
 
 /**
- * io_handler_t read handler for /dev/serial. Reads count bytes from the PL011 UART by calling
- * pl011_getc in a blocking loop, spinning on wfi() until each byte is available.
+ * Reads count bytes from the PL011 RX FIFO into buffer, blocking on wfi() until each byte arrives.
+ * offset and drv_info are unused.
  *
  * @param buffer:   output buffer (must hold at least count bytes)
  * @param count:    number of bytes to read
@@ -23,8 +23,8 @@ void serial_init();
 int serial_read(uint8_t *buffer, size_t count, size_t offset, uint64_t drv_info);
 
 /**
- * io_handler_t write handler for /dev/serial. Writes count bytes from buffer to the PL011 UART one
- * byte at a time via pl011_putc.
+ * Writes count bytes from buffer to the PL011 TX FIFO via pl011_putc.
+ * offset and drv_info are unused.
  *
  * @param buffer:   input buffer
  * @param count:    number of bytes to write

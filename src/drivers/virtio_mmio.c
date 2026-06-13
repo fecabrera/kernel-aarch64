@@ -130,8 +130,8 @@ void virtio_mmio_init() {
         _virtio_mmio_probe_device(slot);
 }
 
-virtio_slot_t virtio_mmio_find_next_slot(uint32_t device_id, int start) {
-    for (int idx = start + 1; idx < 32; idx++)
+virtio_slot_t virtio_mmio_find_next_slot(uint32_t device_id, virtio_slot_t start) {
+    for (virtio_slot_t idx = start + 1; idx < 32; idx++)
         if (_devices[idx].device_id == device_id)
             return idx;
 

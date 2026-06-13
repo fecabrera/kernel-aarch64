@@ -9,7 +9,7 @@
  * @return CRC-32 of the buffer's contents
  */
 fn crc32(data: uint8*, length: uint64) -> uint32 {
-    let crc: uint32 = 4294967295;  // 0xffffffff
+    let crc: uint32 = 0xffffffff;
 
     let i: uint64 = 0;
     while (i < length) {
@@ -17,7 +17,7 @@ fn crc32(data: uint8*, length: uint64) -> uint32 {
         let bit: int32 = 0;
         while (bit < 8) {
             if (crc & 1)
-                crc = (crc >> 1) ^ 3988292384;  // 0xedb88320
+                crc = (crc >> 1) ^ 3988292384;
             else
                 crc = crc >> 1;
             bit = bit + 1;

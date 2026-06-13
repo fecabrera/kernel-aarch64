@@ -1,3 +1,5 @@
+import "filesystem/fs";
+
 /**
  * Initializes the I/O module registry. Creates the /dev folder in the VFS
  * tree and registers it as a mountpoint with io_read/io_write as handlers,

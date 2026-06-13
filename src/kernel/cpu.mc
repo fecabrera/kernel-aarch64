@@ -1,3 +1,17 @@
+// SPSR_EL1 — exception level and stack pointer selection (bits 3:0)
+const SPSR_EL0t = 0x00; // EL0, SP_EL0
+const SPSR_EL1t = 0x04; // EL1, SP_EL0
+const SPSR_EL1h = 0x05; // EL1, SP_EL1 (standard kernel mode)
+const SPSR_EL2t = 0x08; // EL2, SP_EL0
+const SPSR_EL2h = 0x09; // EL2, SP_EL2
+
+struct cpu_context {
+    x: uint64[30];
+    lr: uint64;
+    elr: uint64;
+    spsr: uint64;
+}
+
 /**
  * Executes the WFE (Wait For Event) instruction, suspending the CPU until an
  * event or interrupt is signalled. Less aggressive than WFI — wakes on SEV

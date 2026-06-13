@@ -4,6 +4,7 @@ LD      = aarch64-elf-ld
 OBJCOPY = aarch64-elf-objcopy
 
 MCFLAGS = --target aarch64-unknown-none-elf \
+          --general-regs-only \
 		  --naked \
 		  -O3 \
 		  -I src/kernel \
@@ -39,10 +40,13 @@ SRCS := $(wildcard \
 		  src/fs/*.c \
 		  src/io/*.c \
 		  src/devices/*.c \
+		  src/kernel/*.mc \
 		  src/kernel/arch/*.mc \
 		  src/kernel/devices/*.mc \
 		  src/kernel/drivers/*.mc \
-		  src/kernel/fs/*.mc)
+		  src/kernel/filesystem/*.mc \
+		  src/kernel/io/*.mc \
+		  src/kernel/mm/*.mc)
 OBJS := $(patsubst src/%, build/%, $(SRCS:.c=.o))
 OBJS := $(OBJS:.S=.o)
 OBJS := $(OBJS:.mc=.o)
@@ -71,6 +75,10 @@ build/lib/hashing/%.o: src/libmc/hashing/%.mc
 	@mkdir -p $(dir $@)
 	$(MCC) $(MCFLAGS) $< -o $@
 
+build/kernel/%.o: src/kernel/%.mc
+	@mkdir -p $(dir $@)
+	$(MCC) $(MCFLAGS) $< -o $@
+
 build/kernel/arch/%.o: src/kernel/arch/%.mc
 	@mkdir -p $(dir $@)
 	$(MCC) $(MCFLAGS) $< -o $@
@@ -83,7 +91,15 @@ build/kernel/drivers/%.o: src/kernel/drivers/%.mc
 	@mkdir -p $(dir $@)
 	$(MCC) $(MCFLAGS) $< -o $@
 
-build/kernel/fs/%.o: src/kernel/fs/%.mc
+build/kernel/filesystem/%.o: src/kernel/filesystem/%.mc
+	@mkdir -p $(dir $@)
+	$(MCC) $(MCFLAGS) $< -o $@
+
+build/kernel/io/%.o: src/kernel/io/%.mc
+	@mkdir -p $(dir $@)
+	$(MCC) $(MCFLAGS) $< -o $@
+
+build/kernel/mm/%.o: src/kernel/mm/%.mc
 	@mkdir -p $(dir $@)
 	$(MCC) $(MCFLAGS) $< -o $@
 

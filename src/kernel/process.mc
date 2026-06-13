@@ -1,22 +1,13 @@
-#pragma once
+import "cpu";
+import "memory";
 
-#include <arch/irq.h>
-#include <stdint.h>
-#include <string.h>
-#include <sys/types.h>
-#include <time.h>
+const DEFAULT_STACK_SIZE = (1 << 14); // 16 KiB
+const PROC_DEAD = -1;
+const PROC_CREATED = 0;
+const PROC_READY = 1;
+const PROC_BLOCKED = 2;
 
-#define DEFAULT_STACK_SIZE (1 << 14) // 16 KiB
-
-// @todo add support for return values and params
-typedef void (*proc_entry)();
-
-#define PROC_DEAD -1
-#define PROC_CREATED 0
-#define PROC_READY 1
-#define PROC_BLOCKED 2
-
-typedef int64_t proc_state_t;
+@static let next_pid: int64 = 1;
 
 /**
  * Represents a schedulable process. Created by create_process, configured by
@@ -35,14 +26,14 @@ typedef int64_t proc_state_t;
  *                     when not sleeping
  */
 struct process {
-    pid_t pid;
-    proc_state_t state;
-    uint8_t *stack;
-    struct cpu_context *ctx;
-    size_t stack_size;
-    pid_t wait_pid;
-    time_t sleep_until;
-};
+    pid: int64;
+    state: int64;
+    stack: uint8*;
+    ctx: struct cpu_context*;
+    stack_size: uint64;
+    wait_pid: int64;
+    sleep_until: uint64;
+}
 
 /**
  * Allocates a stack and initializes the process struct with a zeroed context
@@ -54,7 +45,30 @@ struct process {
  *
  * @return 0 on success, -1 if stack allocation fails
  */
-int create_process(struct process *proc, size_t stack_size);
+fn create_process(proc: struct process*, stack_size: uint64) -> int32 {
+    let stack: uint8* = alloc_aligned<uint8>(stack_size, 16);
+
+    if (stack == null) {
+        return -1;
+    }
+
+    // vectors.S save_context uses a 272-byte frame (sizeof(cpu_context)=264 + 8
+    // bytes padding for 16-byte SP alignment). Place ctx 272 bytes from the top
+    // so that after restore_context's "add sp, sp, #272", sp == stack + stack_size
+    // (16-byte aligned).
+    let ctx = (stack as uint64 + stack_size - 272) as struct cpu_context*;
+    set_bytes(ctx, 0, 1);
+
+    proc->pid = next_pid;
+    proc->state = PROC_CREATED;
+    proc->ctx = ctx;
+    proc->stack = stack;
+    proc->stack_size = stack_size;
+
+    next_pid = next_pid + 1;
+
+    return 0;
+}
 
 /**
  * Allocates a new stack for dest and copies src's stack contents and context
@@ -67,7 +81,27 @@ int create_process(struct process *proc, size_t stack_size);
  *
  * @return 0 on success, -1 if stack allocation fails
  */
-int duplicate_process(struct process *dest, struct process *src);
+fn duplicate_process(dest: struct process*, src: struct process*) -> int32 {
+    let stack_size = src->stack_size;
+    let stack: uint8* = alloc_aligned<uint8>(stack_size, 16);
+
+    if (stack == null)
+        return -1;
+
+    let ctx_offset: uint64 = (src->ctx as uint64) - (src->stack as uint64);
+    let ctx = (stack as uint64 + ctx_offset) as struct cpu_context*;
+    copy_bytes(ctx, src->ctx, 1);
+
+    dest->pid = next_pid;
+    dest->state = PROC_CREATED;
+    dest->ctx = ctx;
+    dest->stack = stack;
+    dest->stack_size = stack_size;
+
+    next_pid = next_pid + 1;
+
+    return 0;
+}
 
 /**
  * Configures the process entry point and initial SPSR.
@@ -76,7 +110,11 @@ int duplicate_process(struct process *dest, struct process *src);
  * @param proc:  process to configure
  * @param entry: function the process will execute after its first eret
  */
-void process_config(struct process *proc, proc_entry entry);
+fn process_config(proc: struct process*, entry: fn ()) {
+    let ctx: struct cpu_context* = proc->ctx;
+    ctx->elr = entry as uint64;
+    ctx->spsr = SPSR_EL1h;
+}
 
 /**
  * Frees the task stack and nulls out stack and ctx pointers.
@@ -86,4 +124,14 @@ void process_config(struct process *proc, proc_entry entry);
  *
  * @return 0 on success, -1 if proc->state != PROC_DEAD
  */
-int destroy_process(struct process *proc);
+fn destroy_process(proc: struct process*) -> int32 {
+    if (proc->state != PROC_DEAD)
+        return -1;
+
+    dealloc(proc->stack);
+
+    proc->stack = null;
+    proc->ctx = null;
+
+    return 0;
+}

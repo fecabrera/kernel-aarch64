@@ -5,18 +5,18 @@
 #include <mm/heap.h>
 #include <stdio.h>
 
-static char _next = 'a';
+// static char _next = 'a';
 
-void storage_init() {
-    virtio_slot_t slot = -1;
-    while ((slot = virtio_mmio_find_next_slot(VIRTIO_DEVICE_ID_BLOCK, slot)) != -1) {
-        char mod_name[50] = {0};
-        sprintf(mod_name, "sd%c", _next++);
+// void storage_init() {
+//     virtio_slot_t slot = -1;
+//     while ((slot = virtio_mmio_find_next_slot(VIRTIO_DEVICE_ID_BLOCK, slot)) != -1) {
+//         char mod_name[50] = {0};
+//         sprintf(mod_name, "sd%c", _next++);
 
-        dprintk("[storage] adding \"/dev/%s\"\r\n", mod_name);
-        io_register_module(mod_name, slot, &storage_read, &storage_write);
-    }
-}
+//         dprintk("[storage] adding \"/dev/%s\"\r\n", mod_name);
+//         io_register_module(mod_name, slot, &storage_read, &storage_write);
+//     }
+// }
 
 int storage_read(uint8_t *buffer, size_t count, size_t offset, uint64_t slot) {
     uint64_t first_sector = offset / VIRTIO_MMIO_BLK_SECTOR_SIZE;

@@ -1,13 +1,13 @@
 import "array";
 import "memory";
-import "arch/syscall";
-import "fs/vfs";
+import "syscall";
+import "filesystem/vfs";
+import "filesystem/fat32";
 
 @extern fn isspace(c: uint8) -> int32;
 @extern fn atoll(str: uint8*) -> int64;
 @extern fn strcmp(lhs: uint8*, rhs: uint8*) -> int32;
 @extern fn printk(fmt: uint8*, ...);
-@extern fn fat32_mount(pathname: uint8*, mountpoint: uint8*) -> int32;
 
 @static
 let available_commands: uint8*[][2] = [
@@ -84,11 +84,11 @@ fn _command_cat(argc: int64, argv: uint8**) -> int64 {
     let status: int32 = vfs_read(argv[1], buffer, f_size, 0);
     if (status < 0) {
         case (status) {
-        when -1: // VFS_IO_ERROR_FILE_NOT_FOUND
+        when VFS_IO_ERROR_FILE_NOT_FOUND:
             printk("file not found!\r\n");
-        when -2: // VFS_IO_ERROR_MOUNTPOINT_NOT_FOUND
+        when VFS_IO_ERROR_MOUNTPOINT_NOT_FOUND:
             printk("mountpoint not found!\r\n");
-        when -3: // VFS_IO_ERROR_HANDLER_NOT_PROVIDED
+        when VFS_IO_ERROR_HANDLER_NOT_PROVIDED:
             printk("handler not provided!\r\n");
         else:
             printk("unknown error %d!\r\n", status);

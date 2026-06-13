@@ -1,9 +1,34 @@
+import "memory";
+import "io/module";
+import "drivers/virtio_mmio";
+
+@extern fn dprintk(fmt: uint8*, ...);
+@extern fn sprintf(buffer: uint8*, fmt: uint8*, ...);
+
+@static
+let _next: uint8 = 'a';
+
 /**
  * Scans all virtio MMIO slots for block devices and registers each one as an I/O module named
  * "sda", "sdb", etc. (alphabetical, in slot order), creating a corresponding /dev/sd<letter> node.
  * Must be called after io_init().
  */
-@extern fn storage_init();
+fn storage_init() {
+    let slot: int8 = -1;
+    while (true) {
+        slot = virtio_mmio_find_next_slot(VIRTIO_DEVICE_ID_BLOCK, slot);
+        if(slot == -1)
+            break;
+
+        let mod_name: uint8[4];
+        set_bytes(mod_name, 0, 4);
+        sprintf(mod_name, "sd%c", _next);
+        _next = _next + 1;
+
+        dprintk("[storage] adding \"/dev/%s\"\r\n", mod_name);
+        io_register_module(mod_name, slot as uint64, storage_read, storage_write);
+    }
+}
 
 /**
  * I/O read handler for a virtio block device. Reads all sectors spanning [offset, offset+count) via

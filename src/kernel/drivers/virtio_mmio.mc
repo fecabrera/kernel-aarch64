@@ -1,3 +1,21 @@
+const DEFAULT_VIRTIO_QUEUE_NUM = 64;
+
+// ── Magic / version ──────────────────────────────────────────────────────────
+
+const VIRTIO_MMIO_MAGIC = 0x74726976;
+const VIRTIO_MMIO_VERSION_LEGACY = 1;
+const VIRTIO_MMIO_VERSION_MODERN = 2;
+
+// ── Device IDs ───────────────────────────────────────────────────────────────
+
+const VIRTIO_DEVICE_ID_INVALID = 0;
+const VIRTIO_DEVICE_ID_NET = 1;
+const VIRTIO_DEVICE_ID_BLOCK = 2;
+const VIRTIO_DEVICE_ID_CONSOLE = 3;
+const VIRTIO_DEVICE_ID_RNG = 4;
+const VIRTIO_DEVICE_ID_GPU = 16;
+const VIRTIO_DEVICE_ID_INPUT = 18;
+
 /**
  * Scans all 32 virtio MMIO slots, initializes each valid device found (modern version, non-zero
  * device ID), reads its feature words, and registers its IRQ handler with the GIC. Must be called
@@ -15,7 +33,7 @@
  *
  * @return slot index of the first matching device, or -1 if none found
  */
-@extern fn virtio_mmio_find_next_slot(device_id: uint32, start: int32) -> int8;
+@extern fn virtio_mmio_find_next_slot(device_id: uint32, start: int8) -> int8;
 
 /**
  * Submits a synchronous read request to the virtio-blk device at the given slot. Builds a
