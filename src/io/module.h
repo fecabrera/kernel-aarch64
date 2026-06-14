@@ -1,21 +1,19 @@
 #pragma once
 
-#include <string.h>
 #include <fs/filesystem.h>
 #include <sched/process.h>
+#include <string.h>
 
 typedef int (*io_handler_t)(uint8_t *, size_t, size_t, uint64_t);
 
-struct io_module
-{
+struct io_module {
     uint8_t attrs;
     io_handler_t read;
     io_handler_t write;
     uint64_t drv_info;
 };
 
-struct io_file
-{
+struct io_file {
     pid_t pid;
     struct io_module *module;
 };

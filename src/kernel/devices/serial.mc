@@ -1,8 +1,7 @@
+import "debug";
 import "cpu";
 import "drivers/pl011";
 import "io/module";
-
-@extern fn dprintk(format: uint8*, ...);
 
 /**
  * Registers a "/dev/serial" I/O module backed by the PL011 UART.

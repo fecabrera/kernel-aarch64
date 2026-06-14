@@ -1,13 +1,12 @@
+import "debug";
 import "array";
 import "memory";
 import "syscall";
 import "filesystem/vfs";
 import "filesystem/fat32";
-
-@extern fn isspace(c: uint8) -> int32;
-@extern fn atoll(str: uint8*) -> int64;
-@extern fn strcmp(lhs: uint8*, rhs: uint8*) -> int32;
-@extern fn printk(fmt: uint8*, ...);
+import "libc/ctype";
+import "libc/stdlib";
+import "libc/string";
 
 @static
 let available_commands: uint8*[][2] = [
@@ -287,7 +286,7 @@ fn console(pathname: uint8*) {
                 when '\"':
                     _quotes = true;
                 else:
-                    if (isspace(c) or c == '\0') {
+                    if (isspace(c as int32) or c == '\0') {
                         if (vec.length > 0) {
                             arg = alloc<uint8*>(vec.length + 1);
                             copy_bytes(arg, vec.data, vec.length);

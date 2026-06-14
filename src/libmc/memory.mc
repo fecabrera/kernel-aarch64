@@ -1,7 +1,5 @@
 import "mm/heap";
-
-@extern fn memcpy(dest: uint8*, source: uint8*, count: uint64) -> uint8*;
-@extern fn memset(dest: uint8*, ch: int32, count: uint64) -> uint8*;
+import "libc/string";
 
 /**
  * Allocates heap space for n elements of type T.

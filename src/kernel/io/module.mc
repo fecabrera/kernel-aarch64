@@ -1,5 +1,19 @@
 import "filesystem/fs";
 
+struct io_module
+{
+    attrs: uint8;
+    read: fn (uint8*, uint64, uint64, uint64) -> int32;
+    write: fn (uint8*, uint64, uint64, uint64) -> int32;
+    drv_info: uint64;
+}
+
+struct io_file
+{
+    pid: int64;
+    module: struct io_module*;
+}
+
 /**
  * Initializes the I/O module registry. Creates the /dev folder in the VFS
  * tree and registers it as a mountpoint with io_read/io_write as handlers,

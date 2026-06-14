@@ -1,3 +1,15 @@
+const NUM_SYSCALLS = 256;
+
+const SYSCALL_EXIT = 0;
+const SYSCALL_YIELD = 1;
+const SYSCALL_GETPID = 2;
+const SYSCALL_WAITPID = 3;
+const SYSCALL_FORK = 4;
+const SYSCALL_SLEEP = 5;
+const SYSCALL_MSLEEP = 6;
+const SYSCALL_TIME = 7;
+const SYSCALL_UPTIME = 8;
+
 /**
  * Voluntarily yields the CPU to the scheduler via SYSCALL_YIELD (svc #0).
  * Traps into EL1, where yield_handler sets the return value to 0 in ctx->x0 and calls

@@ -1,9 +1,8 @@
+import "debug";
 import "memory";
 import "io/module";
 import "drivers/virtio_mmio";
-
-@extern fn dprintk(fmt: uint8*, ...);
-@extern fn sprintf(buffer: uint8*, fmt: uint8*, ...);
+import "libc/stdio";
 
 @static
 let _next: uint8 = 'a';
@@ -42,7 +41,49 @@ fn storage_init() {
  *
  * @return count on success, negative error code from virtio_mmio_read on failure
  */
-@extern fn storage_read(buffer: uint8*, count: uint64, offset: uint64, slot: uint64) -> int32;
+fn storage_read(buffer: uint8*, count: uint64, offset: uint64, slot: uint64) -> int32 {
+    let first_sector: uint64 = offset / VIRTIO_MMIO_BLK_SECTOR_SIZE;
+    let last_sector: uint64 = (offset + count - 1) / VIRTIO_MMIO_BLK_SECTOR_SIZE;
+    let sectors_to_read: uint64 = last_sector - first_sector + 1;
+
+    dprintk("[/dev/sd%d] first_sector=%d, last_sector=%d, sectors_to_read=%d\r\n", slot,
+            first_sector, last_sector, sectors_to_read);
+
+    // allocate temporary buffer
+    let tmp: uint8* = alloc<uint8>(sectors_to_read * VIRTIO_MMIO_BLK_SECTOR_SIZE);
+
+    // read boot sectors
+    let i: uint64 = 0;
+    while (i < sectors_to_read) {
+        // calculate sector to read
+        let sector: uint64 = first_sector + i;
+
+        // calculate were in the temporary buffer we need to store
+        let buf_offset: uint64 = i * VIRTIO_MMIO_BLK_SECTOR_SIZE;
+
+        // read sector
+
+        let data = (tmp as uint64 + buf_offset) as uint8*;
+        let status: int32 = virtio_mmio_read(slot as int8, sector, data);
+        if (status < 0) {
+            // free temporary buffer
+            dealloc(tmp);
+
+            // pass error status to caller
+            return status;
+        }
+
+        i = i + 1;
+    }
+
+    // copy data requested to temporary buffer
+    copy_bytes(buffer, (tmp as uint64 + (offset % VIRTIO_MMIO_BLK_SECTOR_SIZE)) as uint8*, count);
+
+    // free temporary buffer
+    dealloc(tmp);
+
+    return count as int32;
+}
 
 /**
  * I/O write handler for a virtio block device.
@@ -54,4 +95,13 @@ fn storage_init() {
  *
  * @return 0 on success
  */
-@extern fn storage_write(buffer: uint8*, count: uint64, offset: uint64, slot: uint64) -> int32;
+fn storage_write(buffer: uint8*, count: uint64, offset: uint64, slot: uint64) -> int32 {
+    let first_sector: uint64 = offset / VIRTIO_MMIO_BLK_SECTOR_SIZE;
+    let last_sector: uint64 = (offset + count - 1) / VIRTIO_MMIO_BLK_SECTOR_SIZE;
+    let sectors_to_read: uint64 = last_sector - first_sector + 1;
+
+    dprintk("[/dev/sd%d] first_sector=%d, last_sector=%d, sectors_to_read=%d\r\n", slot,
+            first_sector, last_sector, sectors_to_read);
+
+    return 0;
+}

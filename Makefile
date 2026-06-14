@@ -25,6 +25,7 @@ SRCS := $(wildcard \
   		  src/lib/*.c \
   		  src/libmc/*.mc \
   		  src/libmc/hashing/*.mc \
+  		  src/libmc/libc/*.mc \
 		  src/dsa/*.c \
 		  src/dsa/deque/*.c \
 		  src/dsa/hashmap/*.c \
@@ -72,6 +73,10 @@ build/lib/%.o: src/libmc/%.mc
 	$(MCC) $(MCFLAGS) $< -o $@
 
 build/lib/hashing/%.o: src/libmc/hashing/%.mc
+	@mkdir -p $(dir $@)
+	$(MCC) $(MCFLAGS) $< -o $@
+
+build/lib/libc/%.o: src/libmc/libc/%.mc
 	@mkdir -p $(dir $@)
 	$(MCC) $(MCFLAGS) $< -o $@
 

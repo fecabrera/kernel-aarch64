@@ -1,5 +1,32 @@
 import "cpu.h";
 
+const ESR_EC_SHIFT = 26;
+const ESR_EC_MASK = 0x3F;
+
+// EC values (ARMv8-A Architecture Reference Manual, Table D17-2)
+const ESR_EC_UNKNOWN = 0x00;   // Unknown reason
+const ESR_EC_WFx = 0x01;       // Trapped WFI or WFE instruction
+const ESR_EC_FP_ACCESS = 0x07; // Trapped access to SVE/SIMD/FP
+const ESR_EC_ILL_STATE = 0x0E; // SP alignment fault (SP not 16-byte aligned)
+const ESR_EC_FP_EXC = 0x2C;    // Trapped floating-point exception
+const ESR_EC_SVC64 = 0x15;     // SVC executed in AArch64 (syscall entry)
+const ESR_EC_IABT_EL0 = 0x20;  // Instruction abort from EL0 (page fault)
+const ESR_EC_IABT_EL1 = 0x21;  // Instruction abort from EL1
+const ESR_EC_PC_ALIGN = 0x22;  // PC alignment fault (PC not 4-byte aligned)
+const ESR_EC_DABT_EL0 = 0x24;  // Data abort from EL0 (page fault / bus error)
+const ESR_EC_DABT_EL1 = 0x25;  // Data abort from EL1
+const ESR_EC_SERROR = 0x2F;    // SError interrupt (async system error)
+
+const IRQ_PPI_EL2_HYPERVISOR_TIMER = 27; // PPI: EL2 hypervisor physical timer
+const IRQ_PPI_EL1_VIRTUAL_TIMER = 28;    // PPI: EL1 virtual timer
+const IRQ_PPI_EL3_SECURE_TIMER = 29;     // PPI: EL3 secure physical timer
+const IRQ_PPI_EL1_PHYSICAL_TIMER = 30;   // PPI: EL1 physical timer
+const IRQ_SPI_PL011_UART0 = 32;          // SPI: PL011 UART0
+const IRQ_SPI_PL011_UART1 = 33;          // SPI: PL011 UART1
+const IRQ_SPI_PL031_RTC_ALARM = 34;      // SPI: PL011 RTC alarm
+
+const NUM_IRQS = 256;
+
 @extern let vector_table: uint8*;
 
 /**
