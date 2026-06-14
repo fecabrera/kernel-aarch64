@@ -254,12 +254,9 @@ fn console(pathname: uint8*) {
         let args: array<uint8*>;
         array_init(&args, 10);
         defer {
-            let i: uint64 = 0;
-            while (i < args.length) {
-                defer i = i + 1;
-                dealloc(args.data[i]);
+            for arg in &args {
+                dealloc(arg);
             }
-
             array_destroy(&args);
         }
 
@@ -319,10 +316,8 @@ fn console(pathname: uint8*) {
 
         printk("[console] argc=%d, argv=[", args.length);
         
-        i = 0;
-        while (i < args.length) {
-            defer i = i + 1;
-            printk(" \"%s\",", args.data[i]);
+        for arg in &args {
+            printk(" \"%s\",", arg);
         }
         printk(" ]\r\n");
 
