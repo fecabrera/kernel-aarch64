@@ -13,16 +13,16 @@ fn crc32(data: uint8*, length: uint64) -> uint32 {
 
     let i: uint64 = 0;
     while (i < length) {
+        defer i = i + 1;
         crc = crc ^ data[i] as uint32;
         let bit: int32 = 0;
         while (bit < 8) {
+            defer bit = bit + 1;
             if (crc & 1)
                 crc = (crc >> 1) ^ 3988292384;
             else
                 crc = crc >> 1;
-            bit = bit + 1;
         }
-        i = i + 1;
     }
 
     return crc ^ 4294967295;

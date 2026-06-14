@@ -28,11 +28,11 @@ fn serial_read(buffer: uint8*, count: uint64, offset: uint64, drv_info: uint64) 
     let c: uint8;
     let i: uint64 = 0;
     while (i < count) {
+        defer i = i + 1;
         // _wfi_while(pl011_getc(&c));
         while (pl011_getc(&c))
             wfi();
         buffer[i] = c;
-        i = i + 1;
     }
     return count as int32;
 }
@@ -51,8 +51,8 @@ fn serial_read(buffer: uint8*, count: uint64, offset: uint64, drv_info: uint64) 
 fn serial_write(buffer: uint8*, count: uint64, offset: uint64, drv_info: uint64) -> int32 {
     let i: uint64 = 0;
     while (i < count) {
+        defer i = i + 1;
         pl011_putc(buffer[i]);
-        i = i + 1;
     }
     return count as int32;
 }

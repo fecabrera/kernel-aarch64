@@ -50,9 +50,9 @@ struct dict<V> {
 fn str_eq(a: uint8*, b: uint8*) -> bool {
     let i: uint64 = 0;
     while (a[i] == b[i]) {
+        defer i = i + 1;
         if (a[i] == 0)
             return true;
-        i = i + 1;
     }
     return false;
 }
@@ -85,8 +85,8 @@ fn dict_init<V>(self: struct dict<V>*, capacity: uint64) {
 
     let i: uint64 = 0;
     while (i < capacity) {
+        defer i = i + 1;
         self->entries[i].state = DICT_ENTRY_STATE_EMPTY;
-        i = i + 1;
     }
 }
 
@@ -99,9 +99,9 @@ fn dict_init<V>(self: struct dict<V>*, capacity: uint64) {
 fn dict_destroy<V>(self: struct dict<V>*) {
     let i: uint64 = 0;
     while (i < self->capacity) {
+        defer i = i + 1;
         if (self->entries[i].state == DICT_ENTRY_STATE_OCCUPIED)
             dealloc(self->entries[i].key);
-        i = i + 1;
     }
     dealloc(self->entries);
 
@@ -210,18 +210,20 @@ fn dict_remove<V>(self: struct dict<V>*, key: uint8*) {
 fn dict_grow<V>(self: struct dict<V>*) {
     let old_capacity = self->capacity;
     let old_entries = self->entries;
+    defer dealloc(old_entries);
 
     let new_capacity: uint64 = old_capacity * 2;
     let new_entries = alloc<struct dict_entry<V>>(new_capacity);
 
     let i: uint64 = 0;
     while (i < new_capacity) {
+        defer i = i + 1;
         new_entries[i].state = DICT_ENTRY_STATE_EMPTY;
-        i = i + 1;
     }
 
     i = 0;
     while (i < old_capacity) {
+        defer i = i + 1;
         if (old_entries[i].state == DICT_ENTRY_STATE_OCCUPIED) {
             let slot = hash(old_entries[i].key) % new_capacity;
             while (new_entries[slot].state == DICT_ENTRY_STATE_OCCUPIED)
@@ -229,10 +231,8 @@ fn dict_grow<V>(self: struct dict<V>*) {
 
             new_entries[slot] = old_entries[i];
         }
-        i = i + 1;
     }
 
-    dealloc(old_entries);
     self->entries = new_entries;
     self->capacity = new_capacity;
 }

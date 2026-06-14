@@ -51,10 +51,13 @@ fn storage_read(buffer: uint8*, count: uint64, offset: uint64, slot: uint64) -> 
 
     // allocate temporary buffer
     let tmp: uint8* = alloc<uint8>(sectors_to_read * VIRTIO_MMIO_BLK_SECTOR_SIZE);
+    defer dealloc(tmp);
 
     // read boot sectors
     let i: uint64 = 0;
     while (i < sectors_to_read) {
+        defer i = i + 1;
+
         // calculate sector to read
         let sector: uint64 = first_sector + i;
 
@@ -66,21 +69,13 @@ fn storage_read(buffer: uint8*, count: uint64, offset: uint64, slot: uint64) -> 
         let data = (tmp as uint64 + buf_offset) as uint8*;
         let status: int32 = virtio_mmio_read(slot as int8, sector, data);
         if (status < 0) {
-            // free temporary buffer
-            dealloc(tmp);
-
             // pass error status to caller
             return status;
         }
-
-        i = i + 1;
     }
 
     // copy data requested to temporary buffer
     copy_bytes(buffer, (tmp as uint64 + (offset % VIRTIO_MMIO_BLK_SECTOR_SIZE)) as uint8*, count);
-
-    // free temporary buffer
-    dealloc(tmp);
 
     return count as int32;
 }

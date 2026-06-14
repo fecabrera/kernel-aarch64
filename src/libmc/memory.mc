@@ -71,8 +71,8 @@ fn set_bytes<T>(dst: T*, value: uint8, n: uint64) {
 fn copy_items<T>(dst: T*, src: T*, n: uint64) {
     let i: uint64 = 0;
     while (i < n) {
+        defer i = i + 1;
         dst[i] = src[i];
-        i = i + 1;
     }
 }
 
@@ -87,7 +87,7 @@ fn copy_items<T>(dst: T*, src: T*, n: uint64) {
 fn set_items<T>(dst: T*, value: T, n: uint64) {
     let i: uint64 = 0;
     while (i < n) {
+        defer i = i + 1;
         dst[i] = value;
-        i = i + 1;
     }
 }

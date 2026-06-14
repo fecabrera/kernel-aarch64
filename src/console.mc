@@ -24,9 +24,9 @@ fn _command_help(argc: int64, argv: uint8**) -> int64 {
 
     let i: uint64 = 0;
     while (i < len(available_commands)) {
+        defer i = i + 1;
         let command = available_commands[i];
         printk("    %-28s %s\r\n", command[0], command[1]);
-        i = i + 1;
     }
     
     return 0;
@@ -79,6 +79,7 @@ fn _command_cat(argc: int64, argv: uint8**) -> int64 {
 
     let f_size: uint64 = vfs_get_file_size(argv[1]);
     let buffer: uint8* = alloc<uint8>(f_size + 1);
+    defer dealloc(buffer);
 
     let status: int32 = vfs_read(argv[1], buffer, f_size, 0);
     if (status < 0) {
@@ -97,8 +98,6 @@ fn _command_cat(argc: int64, argv: uint8**) -> int64 {
 
     buffer[f_size] = '\0';
     printk("%s\r\n", buffer);
-
-    dealloc(buffer);
 
     return 0;
 }
@@ -239,9 +238,12 @@ fn console_parse_command(argc: int64, argv: uint8**) {
 fn console(pathname: uint8*) {
     while (true) {
         let i: uint64;
+
         vfs_write(pathname, "> ", 2, 0);
 
         let buffer: uint8* = alloc<uint8*>(1024);
+        defer dealloc(buffer);
+
         set_bytes(buffer, 0, 1024);
 
         let n: int32 = console_getline(pathname, buffer);
@@ -251,12 +253,24 @@ fn console(pathname: uint8*) {
 
         let args: array<uint8*>;
         array_init(&args, 10);
+        defer {
+            let i: uint64 = 0;
+            while (i < args.length) {
+                defer i = i + 1;
+                dealloc(args.data[i]);
+            }
+
+            array_destroy(&args);
+        }
 
         let vec: struct array<uint8>;
         array_init(&vec, 10);
+        defer array_destroy(&vec);
 
         i = 0;
         while (i <= n as uint64) {
+            defer i = i + 1;
+
             let c: uint8 = buffer[i];
             let arg: uint8*;
 
@@ -301,18 +315,14 @@ fn console(pathname: uint8*) {
                     }
                 }
             }
-            
-            i = i + 1;
         }
-
-        array_destroy(&vec);
 
         printk("[console] argc=%d, argv=[", args.length);
         
         i = 0;
         while (i < args.length) {
+            defer i = i + 1;
             printk(" \"%s\",", args.data[i]);
-            i = i + 1;
         }
         printk(" ]\r\n");
 
@@ -320,14 +330,5 @@ fn console(pathname: uint8*) {
             printk("[console] invalid input!, _quotes=%d, _backslash=%d\r\n", _quotes, _backslash);
         else
             console_parse_command(args.length as int64, args.data);
-
-        i = 0;
-        while (i < args.length) {
-            dealloc(args.data[i]);
-            i = i + 1;
-        }
-
-        array_destroy(&args);
-        dealloc(buffer);
     }
 }

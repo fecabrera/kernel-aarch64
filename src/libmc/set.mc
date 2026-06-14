@@ -41,8 +41,8 @@ fn set_init<K, V>(self: struct set<K, V>*, capacity: uint64) {
 
     let i: uint64 = 0;
     while (i < capacity) {
+        defer i = i + 1;
         self->entries[i].state = SET_ENTRY_STATE_EMPTY;
-        i = i + 1;
     }
 }
 
@@ -151,20 +151,23 @@ fn set_remove<K, V>(self: struct set<K, V>*, key: K) {
  */
 @private
 fn set_grow<K, V>(self: struct set<K, V>*) {
+    let i: uint64;
+
     let old_capacity = self->capacity;
     let old_entries = self->entries;
 
     let new_capacity: uint64 = old_capacity * 2;
     let new_entries = alloc<struct set_entry<K, V>>(new_capacity);
 
-    let i: uint64 = 0;
+    i = 0;
     while (i < new_capacity) {
+        defer i = i + 1;
         new_entries[i].state = SET_ENTRY_STATE_EMPTY;
-        i = i + 1;
     }
 
     i = 0;
     while (i < old_capacity) {
+        defer i = i + 1;
         if (old_entries[i].state == SET_ENTRY_STATE_OCCUPIED) {
             let slot = hash(old_entries[i].key) % new_capacity;
             while (new_entries[slot].state == SET_ENTRY_STATE_OCCUPIED)
@@ -172,7 +175,6 @@ fn set_grow<K, V>(self: struct set<K, V>*) {
 
             new_entries[slot] = old_entries[i];
         }
-        i = i + 1;
     }
 
     dealloc(old_entries);
