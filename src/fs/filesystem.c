@@ -160,6 +160,12 @@ static void _fs_dump_file(struct fs_node *node, char *prefix) {
 }
 
 void fs_dump_node(struct fs_node *node, char *prefix) {
+    if (!node)
+        return;
+
+    dprintk("[dump] node=0x%08X name=0x%08X first=0x%08X\n", node, node->name,
+            node->name ? (uint32_t *)node->name : 0);
+
     _fs_dump_file(node, prefix);
 
     uint16_t attrs = node->attrs & FS_NODE_ATTRS_TYPE_MASK;

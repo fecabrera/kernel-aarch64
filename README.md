@@ -98,7 +98,7 @@ make run
 - `struct vfs_mount` carries the mountpoint path, `device` (VFS path of the underlying block device, or NULL), `info` (filesystem-private superblock data, heap-allocated, freed by `vfs_destroy_mountpoint`), root node pointer, and `vfs_handler_t read`/`write` handlers.
 - `vfs_get_mountpoint(path)` looks up a mount entry by its exact path; `vfs_get_node_for_path(path)` resolves a path and returns the `fs_node` directly; `vfs_get_file_size(path)` returns `node->file_size` for the resolved node.
 - `vfs_create_dir(path, name, attrs, mount)` / `vfs_create_file(path, name, file_size, attrs, mount)` resolve path and append a new subfolder or file node, storing `mount` in `node->mount`.
-- `vfs_read` / `vfs_write` resolve the node and dispatch to `node->mount->read`/`write`; return `VFS_IO_ERROR_FILE_NOT_FOUND`, `VFS_IO_ERROR_MOUNTPOINT_NOT_FOUND`, or `VFS_IO_ERROR_HANDLER_NOT_PROVIDED` on failure.
+- `vfs_read` / `vfs_write` resolve the node and dispatch to `node->mount->read`/`write`; return `FS_IO_ERROR_FILE_NOT_FOUND`, `FS_IO_ERROR_MOUNTPOINT_NOT_FOUND`, or `FS_IO_ERROR_HANDLER_NOT_PROVIDED` on failure.
 - `vfs_dump_fs` prints the entire VFS tree from the global root.
 
 ### **FAT32**

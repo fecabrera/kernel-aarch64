@@ -536,26 +536,26 @@ int fat32_mount(char *device_path, char *mountpoint) {
 
     // read mbr
     if (vfs_read(device_path, bs, 512, 0) < 0) {
-        printk("[fat32] cannot read boot sector from \"%s\"!\r\n", device_path);
+        dprintk("[fat32] cannot read boot sector from \"%s\"!\r\n", device_path);
         return -1;
     }
 
     // check if it's a fat32 volume
     if (!fat32_is_boot_sector(bs)) {
-        printk("[fat32] \"%s\" is not a FAT32 volume!\r\n", device_path);
+        dprintk("[fat32] \"%s\" is not a FAT32 volume!\r\n", device_path);
         return -2;
     }
 
     // parse boot sector
-    printk("[fat32] parsing boot sector...\r\n");
+    dprintk("[fat32] parsing boot sector...\r\n");
     struct fat32_bs_info *bs_info = (struct fat32_bs_info *)kmalloc(sizeof(struct fat32_bs_info));
     fat32_parse_boot_sector(bs, bs_info);
 
-    printk("[fat32] found FAT32 volume \"%s\"!\r\n", bs_info->volume_label);
-    printk("[fat32] first_fat_sector=%d, total_sectors=%d, table_size_32=%d, "
-           "bs_info->total_clusters=%d\r\n",
-           bs_info->first_fat_sector, bs_info->total_sectors, bs_info->table_size_32,
-           bs_info->total_clusters);
+    dprintk("[fat32] found FAT32 volume \"%s\"!\r\n", bs_info->volume_label);
+    dprintk("[fat32] first_fat_sector=%d, total_sectors=%d, table_size_32=%d, "
+            "bs_info->total_clusters=%d\r\n",
+            bs_info->first_fat_sector, bs_info->total_sectors, bs_info->table_size_32,
+            bs_info->total_clusters);
 
     struct fs_node *root;
 
@@ -563,7 +563,7 @@ int fat32_mount(char *device_path, char *mountpoint) {
         // create folder
         root = vfs_create_dir("/volumes", bs_info->volume_label, 0, NULL);
         if (root == NULL) {
-            printk("[fat32] vfs_create_dir() returned NULL!\r\n");
+            dprintk("[fat32] vfs_create_dir() returned NULL!\r\n");
             kfree(bs_info);
             return -3;
         }
@@ -573,21 +573,21 @@ int fat32_mount(char *device_path, char *mountpoint) {
 
         mountpoint = _mountpoint;
     } else {
-        root = vfs_get_node_for_path(mountpoint);
+        root = vfs_get_node_for_path(mountpoint, NULL);
         if (root == NULL) {
-            printk("[fat32] vfs_get_node_for_path() returned NULL!\r\n");
+            dprintk("[fat32] vfs_get_node_for_path() returned NULL!\r\n");
             kfree(bs_info);
             return -4;
         }
     }
 
     // mount volume
-    printk("[fat32] creating mountpoint \"%s\"...\r\n", mountpoint);
+    dprintk("[fat32] creating mountpoint \"%s\"...\r\n", mountpoint);
 
     struct vfs_mount *vfs_mp =
         vfs_create_mountpoint(mountpoint, device_path, bs_info, &fat32_read, &fat32_write);
     if (vfs_mp == NULL) {
-        printk("[fat32] vfs_create_mountpoint() returned NULL!\r\n");
+        dprintk("[fat32] vfs_create_mountpoint() returned NULL!\r\n");
 
         fs_destroy_node(root);
         kfree(bs_info);
@@ -596,13 +596,13 @@ int fat32_mount(char *device_path, char *mountpoint) {
     }
 
     // read fat table
-    printk("[fat32] reading FAT table...\r\n");
+    dprintk("[fat32] reading FAT table...\r\n");
 
     size_t fat_table_size = bs_info->table_size_32 * bs_info->n_bytes_per_sector;
     fat_table_entry_t *fat_table = (fat_table_entry_t *)kmalloc(fat_table_size);
     status = _read_fat_table(device_path, bs_info, (uint8_t *)fat_table);
     if (status < 0) {
-        printk("[fat32] _read_fat_table() returned %d!\r\n", status);
+        dprintk("[fat32] _read_fat_table() returned %d!\r\n", status);
 
         kfree(fat_table);
         vfs_destroy_mountpoint(mountpoint);
@@ -614,10 +614,10 @@ int fat32_mount(char *device_path, char *mountpoint) {
     bs_info->n_fat_entries = fat_table_size / sizeof(fat_table_entry_t);
 
     // build fs tree
-    printk("[fat32] building fs tree\r\n");
+    dprintk("[fat32] building fs tree\r\n");
     status = _fat32_build_fs_tree(device_path, bs_info, root, vfs_mp);
     if (status < 0) {
-        printk("[fat32] _fat32_build_fs_tree() returned %i!\r\n", status);
+        dprintk("[fat32] _fat32_build_fs_tree() returned %i!\r\n", status);
 
         kfree(fat_table);
         vfs_destroy_mountpoint(mountpoint);

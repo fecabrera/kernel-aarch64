@@ -1,9 +1,11 @@
 #include "heap.h"
+#include <arch/cpu.h>
 #include <debug.h>
+#include <stdint.h>
 
 static struct block_header *heap_head = 0;
 
-static uint8_t _heap[HEAP_SIZE] = {0};
+uint8_t _heap[HEAP_SIZE] = {0};
 
 void heap_init() {
     heap_head = (struct block_header *)_heap;
@@ -11,7 +13,7 @@ void heap_init() {
     heap_head->free = BLOCK_FREE;
     heap_head->next = NULL;
 
-    dprintk("[heap] heap initialized: start=0x%x, size=%d B\r\n", _heap, heap_head->size);
+    dprintk("[heap] heap initialized: start=0x%08X, size=%d B\r\n", _heap, heap_head->size);
 }
 
 // Merge adjacent free blocks (called after kfree, prevents fragmentation)
@@ -54,7 +56,14 @@ void *kmalloc(size_t size) {
             }
 
             cur->free = BLOCK_USED;
-            return (void *)((uint8_t *)cur + HEADER_SIZE);
+            uint8_t *ptr = (uint8_t *)cur + HEADER_SIZE;
+
+            if (ptr >= _heap + HEAP_SIZE) {
+                printk("address=0x%016X\n", ptr);
+                halt();
+            }
+
+            return (void *)ptr;
         }
         cur = cur->next;
     }

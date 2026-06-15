@@ -9,8 +9,9 @@ import "io/module";
  */
 fn serial_init() {
     let mod_name: uint8* = "serial";
-    dprintk("[storage] adding \"/dev/%s\"\r\n", mod_name);
+    dprintk("[serial] adding \"/dev/%s\"\r\n", mod_name);
     io_register_module(mod_name, 0, serial_read, serial_write);
+    dprintk("[serial] \"/dev/%s\" added successfully!\n", mod_name);
 }
 
 /**

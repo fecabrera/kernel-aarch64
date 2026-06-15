@@ -16,7 +16,7 @@ fn storage_init() {
     let slot: int8 = -1;
     while (true) {
         slot = virtio_mmio_find_next_slot(VIRTIO_DEVICE_ID_BLOCK, slot);
-        if(slot == -1)
+        if (slot == -1)
             break;
 
         let mod_name: uint8[4];

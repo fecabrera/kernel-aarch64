@@ -2,6 +2,7 @@ import "debug";
 import "array";
 import "memory";
 import "syscall";
+import "filesystem/fs";
 import "filesystem/vfs";
 import "filesystem/fat32";
 import "libc/ctype";
@@ -84,11 +85,11 @@ fn _command_cat(argc: int64, argv: uint8**) -> int64 {
     let status: int32 = vfs_read(argv[1], buffer, f_size, 0);
     if (status < 0) {
         case (status) {
-        when VFS_IO_ERROR_FILE_NOT_FOUND:
+        when FS_IO_ERROR_FILE_NOT_FOUND:
             printk("file not found!\r\n");
-        when VFS_IO_ERROR_MOUNTPOINT_NOT_FOUND:
+        when FS_IO_ERROR_MOUNTPOINT_NOT_FOUND:
             printk("mountpoint not found!\r\n");
-        when VFS_IO_ERROR_HANDLER_NOT_PROVIDED:
+        when FS_IO_ERROR_HANDLER_NOT_PROVIDED:
             printk("handler not provided!\r\n");
         else:
             printk("unknown error %d!\r\n", status);
@@ -236,6 +237,7 @@ fn console_parse_command(argc: int64, argv: uint8**) {
  * @param pathname: VFS path of the device to use for I/O (e.g. "/dev/serial")
  */
 fn console(pathname: uint8*) {
+    printk("[console] starting console at \"%s\"...\n", pathname);
     while (true) {
         let i: uint64;
 

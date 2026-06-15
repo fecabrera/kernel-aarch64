@@ -1,20 +1,19 @@
-#include <string.h>
+#include "irq.h"
+#include "cpu.h"
+#include "syscall.h"
 #include <debug.h>
 #include <drivers/gic.h>
-#include <drivers/timer.h>
 #include <drivers/pl031.h>
-#include <sched/scheduler.h>
+#include <drivers/timer.h>
 #include <dsa/set.h>
-#include "cpu.h"
-#include "irq.h"
-#include "syscall.h"
+#include <sched/scheduler.h>
+#include <string.h>
 
 extern void vector_table();
 
 static struct set64 _irq_table;
 
-static void ctx_dump(struct cpu_context *ctx)
-{
+static void ctx_dump(struct cpu_context *ctx) {
     printk("\r\n=== ctx dump ===\r\n");
     printk("x0  = 0x%x\r\n", ctx->x0);
     printk("x1  = 0x%x\r\n", ctx->x1);
@@ -35,8 +34,7 @@ static void ctx_dump(struct cpu_context *ctx)
     printk("lr  = 0x%x\r\n", ctx->lr);
     printk("elr = 0x%x\r\n", ctx->elr);
     printk("spsr= 0b");
-    for (int i = sizeof(uint64_t) * 8 - 1; i >= 0; i--)
-    {
+    for (int i = sizeof(uint64_t) * 8 - 1; i >= 0; i--) {
         printk((ctx->spsr & (1UL << i)) ? "1" : "0");
     }
     printk("\r\n=================\r\n");
@@ -44,25 +42,22 @@ static void ctx_dump(struct cpu_context *ctx)
 
 // ── Install vector table ────────────────────────────
 
-void irq_init()
-{
+void irq_init() {
     // Point CPU to our vector table
-    __asm__ volatile(
-        "msr vbar_el1, %0\n"
-        "isb\n" // Instruction sync barrier
-        ::"r"(vector_table));
+    __asm__ volatile("msr vbar_el1, %0\n"
+                     "isb\n" // Instruction sync barrier
+                     ::"r"(vector_table));
 
     set64_init(&_irq_table, 10);
 }
 
 // ── ESR_EL1 — decode what caused a sync exception ──
 
-struct cpu_context *sync_handler(struct cpu_context *ctx, uint64_t esr, uint64_t elr, uint64_t far)
-{
+struct cpu_context *sync_handler(struct cpu_context *ctx, uint64_t esr, uint64_t elr,
+                                 uint64_t far) {
     uint32_t ec = (esr >> ESR_EC_SHIFT) & ESR_EC_MASK;
 
-    switch (ec)
-    {
+    switch (ec) {
     case ESR_EC_SVC64:
         dprintk("[sync] syscall(%d)\r\n", ctx->x0);
         ctx = syscall_handler(ctx);
@@ -85,19 +80,14 @@ struct cpu_context *sync_handler(struct cpu_context *ctx, uint64_t esr, uint64_t
     return ctx;
 }
 
-void serr_handler()
-{
+void serr_handler() {
     dprintk("[SError] System error!\r\n");
     hang();
 }
 
-void fiq_handler()
-{
-    dprintk("[FIQ]\r\n");
-}
+void fiq_handler() { dprintk("[FIQ]\r\n"); }
 
-static irq_handler_t _get_irq_handler(uint64_t irq)
-{
+static irq_handler_t _get_irq_handler(uint64_t irq) {
     uintptr_t irq_handler_ptr;
     if (set64_get(&_irq_table, irq, &irq_handler_ptr) == 1)
         return (irq_handler_t)irq_handler_ptr;
@@ -105,54 +95,41 @@ static irq_handler_t _get_irq_handler(uint64_t irq)
         return NULL;
 }
 
-static void _set_irq_handler(uint64_t irq, irq_handler_t fnc)
-{
+static void _set_irq_handler(uint64_t irq, irq_handler_t fnc) {
     set64_set(&_irq_table, irq, (uintptr_t)fnc);
 }
 
-static void _remove_irq_handler(uint64_t irq)
-{
-    set64_remove(&_irq_table, irq);
-}
+static void _remove_irq_handler(uint64_t irq) { set64_remove(&_irq_table, irq); }
 
-int irq_register_handler(uint32_t irq, irq_handler_t fnc)
-{
-    if (_get_irq_handler(irq) == NULL)
-    {
+int irq_register_handler(uint32_t irq, irq_handler_t fnc) {
+    if (_get_irq_handler(irq) == NULL) {
         _set_irq_handler(irq, fnc);
         dprintk("[irq] handler registered for IRQ %i, address = 0x%x\r\n", irq, fnc);
         return 0;
-    }
-    else
-    {
+    } else {
         dprintk("[irq] There's already a handler registered for IRQ %i!\r\n", irq);
         return -1;
     }
 }
 
-int irq_unregister_handler(uint32_t irq)
-{
-    if (_get_irq_handler(irq) == NULL)
-    {
+int irq_unregister_handler(uint32_t irq) {
+    if (_get_irq_handler(irq) == NULL) {
         dprintk("[irq] There's no handler registered for IRQ %i!\r\n", irq);
         return -1;
-    }
-    else
-    {
+    } else {
         _remove_irq_handler(irq);
         dprintk("[irq] Handler unregistered for IRQ %i!\r\n", irq);
         return 0;
     }
 }
 
-struct cpu_context *irq_handler(struct cpu_context *ctx)
-{
+struct cpu_context *irq_handler(struct cpu_context *ctx) {
     // Ask the GIC which interrupt fired (see below)
     uint32_t irq_id = gic_acknowledge();
     irq_handler_t fnc = _get_irq_handler(irq_id);
 
     if (fnc == NULL)
-        dprintk("[irq] Handler not found for IRQ %i!", irq_id);
+        dprintk("[irq] Handler not found for IRQ %i!\n", irq_id);
     else
         ctx = fnc(irq_id, ctx);
 

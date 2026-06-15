@@ -1,3 +1,5 @@
+import "debug";
+
 const FS_NODE_ATTRS_TYPE_MASK = (1 << 0);
 const FS_NODE_ATTRS_TYPE_FOLDER = 0;
 const FS_NODE_ATTRS_TYPE_FILE = 1;
@@ -8,12 +10,16 @@ const FS_NODE_ATTRS_FLAG_READONLY = (1 << 4);
 
 const FS_NODE_ATTRS_FLAG_MASK = (FS_NODE_ATTRS_FLAG_LINK | FS_NODE_ATTRS_FLAG_HIDDEN | FS_NODE_ATTRS_FLAG_READONLY);
 
+const FS_IO_ERROR_FILE_NOT_FOUND = -1;
+const FS_IO_ERROR_MOUNTPOINT_NOT_FOUND = -2;
+const FS_IO_ERROR_HANDLER_NOT_PROVIDED = -3;
+
 struct fs_node {
     name: uint8*;
     file_size: uint64;
     attrs: uint16;
-    info: uint8*;             // driver-private pointer (e.g. fat32_entry_reference *)
-    mount: struct fs_mount*; // vfs_mount * for this node's covering mountpoint, or NULL
+    info: uint8*;            // driver-private pointer (e.g. fat32_entry_reference *)
+    mount: struct fs_mount*; // fs_mount * for this node's covering mountpoint, or NULL
     next: struct fs_node*;
     child: struct fs_node*;
 }
@@ -176,3 +182,43 @@ struct fs_mount {
  * @param prefix: path prefix to prepend to each entry (may be empty string or NULL)
  */
 @extern fn fs_dump_node(node: struct fs_node*, prefix: uint8*);
+
+fn fs_read(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint64) -> int32 {
+    if (node == null) {
+        dprintk("[fs] node is null!\r\n");
+        return FS_IO_ERROR_FILE_NOT_FOUND;
+    }
+
+    let mp = node->mount;
+    if (mp == null) {
+        dprintk("[fs] mountpoint for \"%s\" not found!\r\n", node->name);
+        return FS_IO_ERROR_MOUNTPOINT_NOT_FOUND;
+    }
+
+    if (mp->read == null) {
+        dprintk("[fs] mountpoint \"%s\" didn't provide a `read` handler!\r\n", mp->mountpoint);
+        return FS_IO_ERROR_HANDLER_NOT_PROVIDED;
+    }
+
+    return mp->read(node, buffer, count, offset);
+}
+
+fn fs_write(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint64) -> int32 {
+    if (node == null) {
+        dprintk("[fs] node is null!\r\n");
+        return FS_IO_ERROR_FILE_NOT_FOUND;
+    }
+
+    let mp = node->mount;
+    if (mp == null) {
+        dprintk("[fs] mountpoint for file \"%s\" not found!\r\n", node->name);
+        return FS_IO_ERROR_MOUNTPOINT_NOT_FOUND;
+    }
+
+    if (mp->write == null) {
+        dprintk("[fs] mountpoint \"%s\" didn't provide a `write` handler!\r\n", mp->mountpoint);
+        return FS_IO_ERROR_HANDLER_NOT_PROVIDED;
+    }
+
+    return mp->write(node, buffer, count, offset);
+}

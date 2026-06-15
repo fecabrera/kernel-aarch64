@@ -1,77 +1,197 @@
+import "debug";
 import "fs";
+import "array";
+import "dict";
 
-const VFS_IO_ERROR_FILE_NOT_FOUND = -1;
-const VFS_IO_ERROR_MOUNTPOINT_NOT_FOUND = -2;
-const VFS_IO_ERROR_HANDLER_NOT_PROVIDED = -3;
+@static let _fs_root: struct fs_node*;
+@static let _fs_mp_table: struct dict<struct fs_mount*>;
 
 /**
  * Initializes the VFS subsystem. Initializes the mount table hashmap, creates the global root tree
  * node, and adds a "volumes" subfolder to it. Must be called before any other VFS operation.
  */
-@extern fn vfs_init();
+fn vfs_init() {
+    // initialize table
+    dict_init(&_fs_mp_table, 10);
+
+    // create root and volumes
+    _fs_root = fs_create_folder(null, 0, null, null);
+    fs_add_subfolder(_fs_root, "volumes", 0, null, null);
+}
 
 /**
- * Registers a mount entry for the given path. Resolves mountpoint via _vfs_get_node, validates it
- * is a folder, then allocates a vfs_mount struct (storing device path and read/write handlers) and
+ * Registers a mount entry for the given path. Resolves mountpoint via vfs_get_node_for_path, validates it
+ * is a folder, then allocates a fs_mount struct (storing device path and read/write handlers) and
  * inserts it into the mount table keyed by mountpoint. Does not insert any node into the VFS tree;
  * the caller is responsible for creating the node before mounting.
  *
  * @param mountpoint: null-terminated path of an existing VFS folder (e.g. "/volumes/NO NAME")
  * @param device:     VFS path of the underlying block device (e.g. "/dev/sd0"),
- *                    or NULL
+ *                    or null
  * @param info:       filesystem-private superblock data (heap-allocated; ownership transferred to
- *                    mount), or NULL
- * @param read:       read handler for this mount, or NULL
- * @param write:      write handler for this mount, or NULL
+ *                    mount), or null
+ * @param read:       read handler for this mount, or null
+ * @param write:      write handler for this mount, or null
  *
- * @return pointer to the new vfs_mount on success, NULL if the mountpoint is not found or not a
+ * @return pointer to the new fs_mount on success, null if the mountpoint is not found or not a
  *         folder
  */
-@extern
 fn vfs_create_mountpoint(mountpoint: uint8*, device: uint8*, info: uint8*,
                          read: fn (struct fs_node*, uint8*, uint64, uint64) -> int32,
-                         write: fn (struct fs_node*, uint8*, uint64, uint64) -> int32) -> struct fs_mount*;
+                         write: fn (struct fs_node*, uint8*, uint64, uint64) -> int32) -> struct fs_mount* {
+    let mp_node = vfs_get_node_for_path(mountpoint, null);
+    if (mp_node == null) {
+        printk("[vfs] mountpoint \"%s\" not found!\r\n", mountpoint);
+        return null;
+    }
+
+    if ((mp_node->attrs & FS_NODE_ATTRS_TYPE_MASK) != FS_NODE_ATTRS_TYPE_FOLDER) {
+        printk("[vfs] \"%s\" is not a folder!\r\n", mountpoint);
+        return null;
+    }
+
+    let fs_mp: struct fs_mount* = alloc<struct fs_mount>(1);
+
+    fs_mp->mountpoint = alloc<uint8>(strlen(mountpoint) + 1);
+    strcpy(fs_mp->mountpoint, mountpoint);
+
+    fs_mp->info = info;
+    fs_mp->root = mp_node;
+    fs_mp->read = read;
+    fs_mp->write = write;
+
+    if (device != null) {
+        fs_mp->device = alloc<uint8*>(strlen(device) + 1);
+        strcpy(fs_mp->device, device);
+    } else {
+        fs_mp->device = null;
+    }
+
+    dict_set(&_fs_mp_table, mountpoint, fs_mp);
+
+    dprintk("[vfs] \"%s\" mounted successfully\r\n", mountpoint);
+
+    return fs_mp;
+}
 
 /**
  * Looks up a mount entry by its exact mountpoint path.
  *
  * @param mountpoint: null-terminated mountpoint path (e.g. "/volumes/NO NAME")
  *
- * @return pointer to the matching vfs_mount, or NULL if not found
+ * @return pointer to the matching fs_mount, or null if not found
  */
-@extern fn vfs_get_mountpoint(mountpoint: uint8*) -> struct fs_mount*;
+fn vfs_get_mountpoint(mountpoint: uint8*) -> struct fs_mount* {
+    let value: struct fs_mount*;
+    if (!dict_get(&_fs_mp_table, mountpoint, &value))
+        return null;
 
-/**
- * Resolves pathname via _vfs_get_node and returns the matching fs_node.
- *
- * @param pathname: null-terminated absolute path to resolve
- *
- * @return pointer to the fs_node, or NULL if not found
- */
-@extern fn vfs_get_node_for_path(pathname: uint8*) -> struct fs_node*;
+    return value;
+}
 
 /**
  * Removes the mount entry for mountpoint from the mount table, unlinks the mount's root node from
  * its parent folder via fs_remove_child, destroys the root subtree via fs_destroy_node, and frees
- * the mountpoint, device, and info (if non-NULL) fields.
+ * the mountpoint, device, and info (if non-null) fields.
  *
  * @param mountpoint: null-terminated mountpoint path to unmount
  *
  * @return 0 on success, -1 if no matching mount entry is found
  */
-@extern fn vfs_destroy_mountpoint(mountpoint: uint8*) -> int32;
+fn vfs_destroy_mountpoint(mountpoint: uint8*) -> int32 {
+    let mp = vfs_get_mountpoint(mountpoint);
+    if (mp == null) {
+        printk("[vfs] mountpoint \"%s\" doesn't exist!\r\n", mountpoint);
+        return -1;
+    }
+
+    // get parent
+    let parent_ref = fs_get_child(mp->root, "..");
+    if (parent_ref != null)
+        fs_remove_child(parent_ref->child, mp->root->name);
+
+    fs_destroy_node(mp->root);
+    dealloc(mp->mountpoint);
+    if (mp->device != null)
+        dealloc(mp->device);
+    if (mp->info != null)
+        dealloc(mp->info);
+    dealloc(mp);
+
+    printk("[vfs] \"%s\" unmounted successfully\r\n", mountpoint);
+
+    return 0;
+}
 
 /**
- * Resolves pathname via _vfs_get_node and returns node->file_size.
+ * Resolves pathname via vfs_get_node_for_path and returns the matching fs_node.
+ *
+ * @param pathname: null-terminated absolute path to resolve
+ *
+ * @return pointer to the fs_node, or null if not found
+ */
+fn vfs_get_node_for_path(pathname: uint8*, root: struct fs_node*) -> struct fs_node* {
+    let current = root;
+    if (current == null)
+        current = _fs_root;
+
+    let str: uint8[256];
+    set_bytes(str, 0, 256);
+
+    let i: uint64 = 0;
+    let j: uint64 = 0;
+    until (current == null) {
+        // end of string
+        if (pathname[i] == '\0') {
+            if (j > 0)
+                // pathname is of type "/abc/def", `current` holds "/abc" so we
+                // need to find "def"
+                current = fs_get_child(current, str);
+
+            // pathname is of type "/abc/def/" which needs to be resolved to
+            // "/abc/def" `current` already holds "/abc/def" so return it
+            return current;
+        }
+
+        // dir separator
+        if (pathname[i] == '/') {
+            if (j > 0)
+                current = fs_get_child(current, str);
+
+            // reset buffer
+            set_bytes(str, 0, 256);
+            j = 0;
+        } else {
+            // store next character
+            str[j] = pathname[i];
+            j = j + 1;
+        }
+
+        i = i + 1;
+    }
+
+    // if current == null the node doesn't exist
+    return null;
+}
+
+/**
+ * Resolves pathname via vfs_get_node_for_path and returns node->file_size.
  *
  * @param pathname: null-terminated absolute path of the file
  *
  * @return file size in bytes, or 0 if the node is not found
  */
-@extern fn vfs_get_file_size(pathname: uint8*) -> uint64;
+fn vfs_get_file_size(pathname: uint8*) -> uint64 {
+    let node = vfs_get_node_for_path(pathname, null);
+
+    if (node == null)
+        return 0;
+
+    return fs_get_node_file_size(node);
+}
 
 /**
- * Resolves pathname via _vfs_get_node, reads node->mount for the covering mount, then dispatches to
+ * Resolves pathname via vfs_get_node_for_path, reads node->mount for the covering mount, then dispatches to
  * mount->read.
  *
  * @param pathname: null-terminated absolute path of the file to read
@@ -79,13 +199,20 @@ fn vfs_create_mountpoint(mountpoint: uint8*, device: uint8*, info: uint8*,
  * @param count:    number of bytes to read
  * @param offset:   byte offset into the file to read from
  *
- * @return return value of mount->read on success; VFS_IO_ERROR_FILE_NOT_FOUND,
- *         VFS_IO_ERROR_MOUNTPOINT_NOT_FOUND, or VFS_IO_ERROR_HANDLER_NOT_PROVIDED on failure
+ * @return return value of mount->read on success; FS_IO_ERROR_FILE_NOT_FOUND,
+ *         FS_IO_ERROR_MOUNTPOINT_NOT_FOUND, or FS_IO_ERROR_HANDLER_NOT_PROVIDED on failure
  */
-@extern fn vfs_read(pathname: uint8*, buffer: uint8*, count: uint64, offset: uint64) -> int32;
+fn vfs_read(pathname: uint8*, buffer: uint8*, count: uint64, offset: uint64) -> int32 {
+    dprintk("[vfs] read(): file=\"%s\", buff=0x%08x, count=%d, offset=%d\r\n",
+            pathname, buffer, count, offset);
+
+    let node = vfs_get_node_for_path(pathname, null);
+    // printk("[vfs] node=0x%08X\n", node);
+    return fs_read(node, buffer, count, offset);
+}
 
 /**
- * Resolves pathname via _vfs_get_node, reads node->mount for the covering mount, then dispatches to
+ * Resolves pathname via vfs_get_node_for_path, reads node->mount for the covering mount, then dispatches to
  * mount->write.
  *
  * @param pathname: null-terminated absolute path of the file to write
@@ -93,13 +220,69 @@ fn vfs_create_mountpoint(mountpoint: uint8*, device: uint8*, info: uint8*,
  * @param count:    number of bytes to write
  * @param offset:   byte offset into the file to write to
  *
- * @return return value of mount->write on success; VFS_IO_ERROR_FILE_NOT_FOUND,
- *         VFS_IO_ERROR_MOUNTPOINT_NOT_FOUND, or VFS_IO_ERROR_HANDLER_NOT_PROVIDED on failure
+ * @return return value of mount->write on success; FS_IO_ERROR_FILE_NOT_FOUND,
+ *         FS_IO_ERROR_MOUNTPOINT_NOT_FOUND, or FS_IO_ERROR_HANDLER_NOT_PROVIDED on failure
  */
-@extern fn vfs_write(pathname: uint8*, buffer: uint8*, count: uint64, offset: uint64) -> int32;
+fn vfs_write(pathname: uint8*, buffer: uint8*, count: uint64, offset: uint64) -> int32 {
+    dprintk("[vfs] write(): file=\"%s\", buff=0x%08x, count=%d, offset=%d\r\n",
+            pathname, buffer, count, offset);
+
+    let node = vfs_get_node_for_path(pathname, null);
+    // printk("[vfs] node=0x%08X\n", node);
+    return fs_write(node, buffer, count, offset);
+}
+
+/**
+ * Resolves path via vfs_get_node_for_path and creates a new subfolder named name inside it via
+ * fs_add_subfolder.
+ *
+ * @param path:  null-terminated absolute path of the parent folder (e.g. "/volumes")
+ * @param name:  null-terminated name for the new directory
+ * @param attrs: attribute flags (FS_NODE_ATTRS_FLAG_*)
+ * @param mount: fs_mount pointer stored in node->mount (void * to avoid circular include), or null
+ *
+ * @return pointer to the new folder node, or null if the parent is not found or creation fails
+ */
+fn vfs_create_dir(path: uint8*, name: uint8*, attrs: uint16, mount: struct fs_mount*) -> struct fs_node* {
+    let parent = vfs_get_node_for_path(path, null);
+    let node = fs_add_subfolder(parent, name, attrs, null, mount);
+    if (node == null) {
+        printk("[vfs] cannot create \"%s/%s\"!\r\n", path, name);
+        return null;
+    }
+
+    return node;
+}
+
+/**
+ * Resolves path via vfs_get_node_for_path and creates a new file named name inside it via
+ * fs_add_file_to_folder.
+ *
+ * @param path:      null-terminated absolute path of the parent folder (e.g. "/volumes/NO NAME")
+ * @param name:      null-terminated name for the new file
+ * @param file_size: file size in bytes, stored in node->file_size
+ * @param attrs:     attribute flags (FS_NODE_ATTRS_FLAG_*)
+ * @param mount:     fs_mount pointer stored in node->mount (void * to avoid circular include), or
+ *                   null
+ *
+ * @return pointer to the new file node, or null if the parent is not found or creation fails
+ */
+fn vfs_create_file(path: uint8*, name: uint8*, file_size: uint64, attrs: uint16, mount: struct fs_mount*) -> struct fs_node* {
+    let parent = vfs_get_node_for_path(path, null);
+    let node = fs_add_file_to_folder(parent, name, file_size, attrs, null, mount);
+    if (node == null) {
+        printk("[vfs] cannot create \"%s/%s\"!\r\n", path, name);
+        return null;
+    }
+
+    return node;
+}
 
 /**
  * Prints the entire VFS tree to the kernel log via printk, starting from the global root's
  * children. Skips entering "." and ".." nodes to avoid cycles.
  */
-@extern fn vfs_dump_fs();
+fn vfs_dump_fs() {
+    dprintk("[vfs] _fs_root=0x%08X &_fs_root=0x%08X\r\n", _fs_root, &_fs_root);
+    fs_dump_node(_fs_root->child, "");
+}
