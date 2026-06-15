@@ -24,6 +24,7 @@ SRCS := $(wildcard \
  		  src/*.S \
   		  src/lib/*.c \
   		  src/libmc/*.mc \
+  		  src/libmc/iteration/*.mc \
   		  src/libmc/hashing/*.mc \
   		  src/libmc/libc/*.mc \
 		  src/dsa/*.c \
@@ -69,6 +70,10 @@ build/%.o: src/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 build/lib/%.o: src/libmc/%.mc
+	@mkdir -p $(dir $@)
+	$(MCC) $(MCFLAGS) $< -o $@
+
+build/lib/iteration/%.o: src/libmc/iteration/%.mc
 	@mkdir -p $(dir $@)
 	$(MCC) $(MCFLAGS) $< -o $@
 

@@ -13,6 +13,43 @@ struct cpu_context {
 }
 
 /**
+ * Reverses the byte order of a 16-bit value, converting between big-endian
+ * and little-endian representations.
+ *
+ * @param x: value to byte-swap
+ *
+ * @return x with its two bytes reversed
+ */
+@extern fn bswap16(x: uint16) -> uint16;
+
+/**
+ * Reverses the byte order of a 32-bit value, converting between big-endian
+ * and little-endian representations.
+ *
+ * @param x: value to byte-swap
+ *
+ * @return x with its four bytes reversed
+ */
+@extern fn bswap32(x: uint32) -> uint32;
+
+/**
+ * Reverses the byte order of a 64-bit value, converting between big-endian
+ * and little-endian representations.
+ *
+ * @param x: value to byte-swap
+ *
+ * @return x with its eight bytes reversed
+ */
+@extern fn bswap64(x: uint64) -> uint64;
+
+fn be16(x: uint16) -> uint16 { return bswap16(x); }
+fn be32(x: uint32) -> uint32 { return bswap32(x); }
+fn be64(x: uint64) -> uint64 { return bswap64(x); }
+fn le16(x: uint16) -> uint16 { return x; }
+fn le32(x: uint32) -> uint32 { return x; }
+fn le64(x: uint64) -> uint64 { return x; }
+
+/**
  * Executes the WFE (Wait For Event) instruction, suspending the CPU until an
  * event or interrupt is signalled. Less aggressive than WFI — wakes on SEV
  * (send event) from another core as well as interrupts.

@@ -2,6 +2,10 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+uint16_t bswap16(uint16_t x) { return __builtin_bswap16(x); }
+uint32_t bswap32(uint32_t x) { return __builtin_bswap32(x); }
+uint64_t bswap64(uint64_t x) { return __builtin_bswap64(x); }
+
 void wfe() { __asm__ volatile("wfe"); }
 void wfi() { __asm__ volatile("wfi"); }
 

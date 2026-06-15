@@ -1,4 +1,8 @@
+import "debug";
+import "memory";
+import "cpu";
 import "fs";
+import "vfs";
 
 // Partition type byte
 const MBR_PARTITION_TYPE_EMPTY = 0;
@@ -271,7 +275,14 @@ struct fat32_entry_reference {
  *
  * @return 0 on success, -1 on error
  */
-@extern fn fat32_unmount(device_path: uint8*) -> int32;
+fn fat32_unmount(device_path: uint8*) -> int32 {
+    // steps:
+    //   1. get vfs_mount
+    //   2. get bs_info
+    //   3. kfree(bs_info->fat_table)
+    //   4. unmount fs_mount
+    return -1;
+}
 
 /**
  * vfs_handler_t read handler for FAT32 mountpoints.
@@ -285,7 +296,98 @@ struct fat32_entry_reference {
  *
  * @return number of bytes read on success, negative on error
  */
-@extern fn fat32_read(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint64) -> int32;
+fn fat32_read(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint64) -> int32 {
+    let entry_ref = node->info as struct fat32_entry_reference*;
+    let fs_mp = node->mount;
+    let bs_info = fs_mp->info as struct fat32_bs_info*;
+
+    dprintk("[fat32] node: entry_ref=0x%08X, fs_mp=0x%08X, bs_info=0x%08X\r\n", entry_ref, fs_mp,
+            bs_info);
+    dprintk("[fat32] fs_mp: mp=\"%s\", device=\"%s\"\r\n", fs_mp->mountpoint, fs_mp->device);
+    dprintk("[fat32] entry_ref: cluster=%d, offset=%d, n_lfn_entries=%d\r\n", entry_ref->cluster,
+            entry_ref->offset, entry_ref->n_lfn_entries);
+
+    // read fat32_dir_entry
+    let dir_entry_sector: uint32 = bs_info->first_data_sector + (entry_ref->cluster - bs_info->root_cluster);
+    let dir_entry_size: uint32 = sizeof(struct fat32_dir_entry) as uint32;
+    let dir_entry_offset: uint32 = dir_entry_sector * bs_info->n_bytes_per_sector as uint32 +
+                                (entry_ref->offset + entry_ref->n_lfn_entries) * dir_entry_size;
+    let dir_entry = alloc<uint8>(dir_entry_size as uint64) as struct fat32_dir_entry*;
+    defer dealloc(dir_entry);
+
+    dprintk("[fat32] count=%d, offset=0x%08X\r\n", dir_entry_size, dir_entry_offset);
+    let status = vfs_read(fs_mp->device, dir_entry as uint8*, dir_entry_size as uint64, dir_entry_offset as uint64);
+    if (status < 0) {
+        dprintk("[fat32] vfs_read() returned %d!\r\n", status);
+        return status;
+    }
+
+    // parse data_cluster and file_size
+    let cluster_low: uint16;
+    let cluster_high: uint16;
+    let file_size: uint32;
+    copy_bytes(&cluster_low, &dir_entry->cluster_low, 1);
+    copy_bytes(&cluster_high, &dir_entry->cluster_high, 1);
+    copy_bytes(&file_size, &dir_entry->file_size, 1);
+
+    let data_cluster: uint32 = (le16(cluster_high) as uint32 << 16) | (le16(cluster_low) as uint32);
+    dprintk("[fat32] cluster=%d, file_size=%d\r\n", data_cluster, file_size);
+
+    // validate offset
+    if (file_size as uint64 <= offset) {
+        dprintk("[fat32] offset must be less than the file size!\r\n");
+        return -1;
+    }
+
+    // calculate which and how many sectors to read
+    // total sectors used by the file contents
+    let total_data_sectors: uint32 = file_size / (bs_info->n_bytes_per_sector as uint32);
+    // first data sector of the file contents to read
+    let first_data_sector_to_read: uint64 = offset / (bs_info->n_bytes_per_sector as uint64);
+    // last data sector of the file contents to read
+    let last_data_sector_to_read: uint64 = (offset + count - 1) / (bs_info->n_bytes_per_sector as uint64);
+    let n_data_sectors_to_read: uint64 = last_data_sector_to_read - first_data_sector_to_read + 1;
+
+    dprintk("[fat32] total_data_sectors=%d, first_data_sector_to_read=%d, last_data_sector_to_read=%d, n_data_sectors_to_read=%d\r\n",
+            total_data_sectors, first_data_sector_to_read, last_data_sector_to_read, n_data_sectors_to_read);
+
+    // follow fat_table
+    let cluster_to_read: uint32 = data_cluster;
+    {
+        let i: uint64 = 0;
+        while (i < first_data_sector_to_read) {
+            cluster_to_read = bs_info->fat_table[cluster_to_read];
+            i = i + 1;
+        }
+    }
+
+    // read contents
+    let tmp: uint8* = alloc<uint8>(n_data_sectors_to_read * (bs_info->n_bytes_per_sector as uint64));
+    defer dealloc(tmp);
+    {
+        let i: uint64 = 0;
+        while (i < n_data_sectors_to_read) {
+            // first data sector of the file contents
+            let data_sector: uint32 = bs_info->first_data_sector + (cluster_to_read - bs_info->root_cluster);
+            let data_offset: uint32 = data_sector * (bs_info->n_bytes_per_sector as uint32);
+
+            dprintk("[fat32] cluster_to_read=%d, data_sector=%d, data_offset=0x%08X\r\n",
+                    cluster_to_read, data_sector, data_offset);
+            vfs_read(fs_mp->device, &tmp[i * (bs_info->n_bytes_per_sector as uint64)],
+                    bs_info->n_bytes_per_sector as uint64, data_offset as uint64);
+
+            // update cluster_to_read
+            cluster_to_read = bs_info->fat_table[cluster_to_read];
+
+            i = i + 1;
+        }
+    }
+
+    // copy data to buffer
+    copy_bytes(buffer, &tmp[offset % (bs_info->n_bytes_per_sector as uint64)], count);
+
+    return 0;
+}
 
 /**
  * vfs_handler_t write handler for FAT32 mountpoints. Not yet implemented.
@@ -297,4 +399,16 @@ struct fat32_entry_reference {
  *
  * @return number of bytes written on success, negative on error
  */
-@extern fn fat32_write(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint64) -> int32;
+fn fat32_write(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint64) -> int32 {
+    let entry_ref = node->info as struct fat32_entry_reference*;
+    let fs_mp = node->mount;
+    let bs_info = fs_mp->info as struct fat32_bs_info*;
+
+    dprintk("[fat32] node: entry_ref=0x%08X, fs_mp=0x%08X, bs_info=0x%08X\r\n", entry_ref, fs_mp,
+            bs_info);
+    dprintk("[fat32] fs_mp: mp=\"%s\", device=\"%s\"\r\n", fs_mp->mountpoint, fs_mp->device);
+    dprintk("[fat32] entry_ref: cluster=%d, offset=%d, n_lfn_entries=%d\r\n", entry_ref->cluster,
+            entry_ref->offset, entry_ref->n_lfn_entries);
+
+    return -1;
+}

@@ -1,5 +1,6 @@
 import "memory";
 import "hash";
+import "iteration/pair";
 
 // Slot states (internal to this file)
 @private const SET_ENTRY_STATE_EMPTY = 0;
@@ -41,8 +42,8 @@ fn set_init<K, V>(self: struct set<K, V>*, capacity: uint64) {
 
     let i: uint64 = 0;
     while (i < capacity) {
-        defer i = i + 1;
         self->entries[i].state = SET_ENTRY_STATE_EMPTY;
+        i = i + 1;
     }
 }
 
@@ -151,23 +152,20 @@ fn set_remove<K, V>(self: struct set<K, V>*, key: K) {
  */
 @private
 fn set_grow<K, V>(self: struct set<K, V>*) {
-    let i: uint64;
-
     let old_capacity = self->capacity;
     let old_entries = self->entries;
 
     let new_capacity: uint64 = old_capacity * 2;
     let new_entries = alloc<struct set_entry<K, V>>(new_capacity);
 
-    i = 0;
+    let i: uint64 = 0;
     while (i < new_capacity) {
-        defer i = i + 1;
         new_entries[i].state = SET_ENTRY_STATE_EMPTY;
+        i = i + 1;
     }
 
     i = 0;
     while (i < old_capacity) {
-        defer i = i + 1;
         if (old_entries[i].state == SET_ENTRY_STATE_OCCUPIED) {
             let slot = hash(old_entries[i].key) % new_capacity;
             while (new_entries[slot].state == SET_ENTRY_STATE_OCCUPIED)
@@ -175,9 +173,64 @@ fn set_grow<K, V>(self: struct set<K, V>*) {
 
             new_entries[slot] = old_entries[i];
         }
+        i = i + 1;
     }
 
     dealloc(old_entries);
     self->entries = new_entries;
     self->capacity = new_capacity;
+}
+
+/***************************************
+ * Iteration
+ ***************************************/
+
+/**
+ * A forward cursor over a set's occupied entries, produced by `iter`. It
+ * borrows the set (does not copy it), so the set must outlive the iterator and
+ * must not be modified or resized while iterating.
+ */
+struct set_iter<K, V> {
+    obj: struct set<K, V>*;   // the set being walked
+    idx: uint64;              // index of the next slot to examine
+}
+
+/**
+ * Begins an iteration over a set's key/value pairs, in unspecified
+ * (hash-table slot) order. Part of the `iter`/`next` protocol; pair it with
+ * `next`.
+ *
+ * @param self: set to iterate
+ *
+ * @return an iterator positioned before the first occupied entry
+ */
+fn iter<K, V>(self: struct set<K, V>*) -> struct set_iter<K, V> {
+    let it: struct set_iter<K, V>;
+    it.obj = self;
+    it.idx = 0;
+    return it;
+}
+
+/**
+ * Advances to the next occupied entry and writes its key/value into out.
+ *
+ * @param it:  iterator to advance
+ * @param out: pair the next entry is written to; untouched when the set is
+ *             exhausted
+ *
+ * @return true if a pair was produced, false once iteration is complete
+ */
+fn next<K, V>(it: struct set_iter<K, V>*, out: struct pair<K, V>*) -> bool {
+    while (it->idx < it->obj->capacity) {
+        let entry = it->obj->entries[it->idx];
+        defer it->idx = it->idx + 1;
+
+        if (entry.state == SET_ENTRY_STATE_OCCUPIED) {
+            out->key = entry.key;
+            out->value = entry.value;
+            return true;
+        }
+    }
+
+    return false;
 }

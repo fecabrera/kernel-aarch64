@@ -27,6 +27,21 @@ fn alloc_aligned<T>(n: uint64, align: uint64) -> T* {
 }
 
 /**
+ * Resizes a block previously returned by alloc<T> to hold n elements of type
+ * T, preserving its contents up to the smaller of the old and new sizes.
+ * Returns the (possibly relocated) pointer; the old pointer must not be used
+ * afterward. Passing null allocates a fresh block.
+ *
+ * @param p: pointer returned by alloc<T>, or null
+ * @param n: new number of elements
+ *
+ * @return pointer to the resized block
+ */
+fn resize<T>(p: T*, n: uint64) -> T* {
+    return krealloc(p, n * sizeof(T)) as T*;
+}
+
+/**
  * Releases memory previously returned by alloc.
  *
  * @param p: pointer returned by alloc<T>; null is allowed and does nothing
@@ -71,8 +86,8 @@ fn set_bytes<T>(dst: T*, value: uint8, n: uint64) {
 fn copy_items<T>(dst: T*, src: T*, n: uint64) {
     let i: uint64 = 0;
     while (i < n) {
-        defer i = i + 1;
         dst[i] = src[i];
+        i = i + 1;
     }
 }
 
@@ -87,7 +102,7 @@ fn copy_items<T>(dst: T*, src: T*, n: uint64) {
 fn set_items<T>(dst: T*, value: T, n: uint64) {
     let i: uint64 = 0;
     while (i < n) {
-        defer i = i + 1;
         dst[i] = value;
+        i = i + 1;
     }
 }
