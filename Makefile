@@ -70,50 +70,6 @@ build/%.o: src/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-build/lib/%.o: src/libmc/%.mc
-	@mkdir -p $(dir $@)
-	$(MCC) $(MCFLAGS) $< -o $@
-
-build/lib/iteration/%.o: src/libmc/iteration/%.mc
-	@mkdir -p $(dir $@)
-	$(MCC) $(MCFLAGS) $< -o $@
-
-build/lib/hashing/%.o: src/libmc/hashing/%.mc
-	@mkdir -p $(dir $@)
-	$(MCC) $(MCFLAGS) $< -o $@
-
-build/lib/libc/%.o: src/libmc/libc/%.mc
-	@mkdir -p $(dir $@)
-	$(MCC) $(MCFLAGS) $< -o $@
-
-build/kernel/%.o: src/kernel/%.mc
-	@mkdir -p $(dir $@)
-	$(MCC) $(MCFLAGS) $< -o $@
-
-build/kernel/arch/%.o: src/kernel/arch/%.mc
-	@mkdir -p $(dir $@)
-	$(MCC) $(MCFLAGS) $< -o $@
-
-build/kernel/devices/%.o: src/kernel/devices/%.mc
-	@mkdir -p $(dir $@)
-	$(MCC) $(MCFLAGS) $< -o $@
-
-build/kernel/drivers/%.o: src/kernel/drivers/%.mc
-	@mkdir -p $(dir $@)
-	$(MCC) $(MCFLAGS) $< -o $@
-
-build/kernel/filesystem/%.o: src/kernel/filesystem/%.mc
-	@mkdir -p $(dir $@)
-	$(MCC) $(MCFLAGS) $< -o $@
-
-build/kernel/io/%.o: src/kernel/io/%.mc
-	@mkdir -p $(dir $@)
-	$(MCC) $(MCFLAGS) $< -o $@
-
-build/kernel/mm/%.o: src/kernel/mm/%.mc
-	@mkdir -p $(dir $@)
-	$(MCC) $(MCFLAGS) $< -o $@
-
 build/lib/%.o: src/lib/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@

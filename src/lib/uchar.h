@@ -15,7 +15,7 @@ typedef int32_t char32_t;
  *
  * @return ASCII byte, or '?' if c is outside the Latin-1 range
  */
-static inline char utf16to8(char16_t c) { return c > 0xff ? '?' : (char)(c & 0xff); }
+char utf16to8(char16_t c);
 
 /**
  * Copies up to n little-endian UTF-16 code units from src into dst as ASCII
