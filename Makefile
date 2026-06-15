@@ -1,4 +1,5 @@
-MCC		= PYTHONPATH=~/Documents/lang python -m mcc
+MCCPATH = ~/Documents/lang
+MCC		= PYTHONPATH=$(MCCPATH) python -m mcc
 CC      = aarch64-elf-gcc
 LD      = aarch64-elf-ld
 OBJCOPY = aarch64-elf-objcopy

@@ -18,6 +18,14 @@ jobs:
           sudo apt-get update -q
           sudo apt-get install -y gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu
 
+      - name: Get mcc compiler
+        run: |
+          git clone https://github.com/fecabrera/mcc.git
+          cd mcc
+          pip install pipenv
+          pipenv install --dev --deploy --system
+          cd ..
+
       - name: Symlink cross-compiler to expected names
         run: |
           sudo ln -sf /usr/bin/aarch64-linux-gnu-gcc  /usr/local/bin/aarch64-elf-gcc
@@ -25,4 +33,4 @@ jobs:
           sudo ln -sf /usr/bin/aarch64-linux-gnu-objcopy /usr/local/bin/aarch64-elf-objcopy
 
       - name: Build
-        run: make
+        run: make MCC_PATH=mcc
