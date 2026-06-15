@@ -38,4 +38,4 @@ jobs:
           sudo ln -sf /usr/bin/aarch64-linux-gnu-objcopy /usr/local/bin/aarch64-elf-objcopy
 
       - name: Build
-        run: make MCC_PATH=mcc
+        run: make MCC_PATH=.
