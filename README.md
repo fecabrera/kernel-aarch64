@@ -47,6 +47,39 @@ Targets:
 make run
 ```
 
+## mcc port status
+
+The kernel is mid-migration from C to **mc**, a separate language built on LLVM
+and cross-compiled to AArch64 by `mcc`. mc buys generics (one `dict<V>` instead of N copies of
+`hashmap64`), `defer`-based scope cleanup, and a real module system with
+explicit linkage — so the port trades hand-rolled, per-type C boilerplate for
+type-safe, reusable code. mc code links against C through `@extern` bindings,
+so the migration proceeds subsystem by subsystem and uses `libmc` (mcc's
+standard library) in place of the in-tree C utilities.
+
+**Ported to `.mc`** (`src/kernel/`, `src/console.mc`):
+
+- VFS — node tree + mount system (`filesystem/fs.mc`, `filesystem/vfs.mc`)
+- I/O module registry (`io.mc`)
+- Process management (`process.mc`)
+- Device handlers — serial, storage (`devices/`)
+- Interactive console / shell (`console.mc`)
+- Endian + byte-swap helpers (`cpu.mc`)
+
+**Still C, wrapped via `@extern`** (port targets, low-level first):
+
+- Drivers — GIC, PL011, PL031, timer, virtio MMIO (`src/drivers/`)
+- Arch glue — exception vectors/IRQ dispatch, syscalls, system registers (`src/arch/`)
+- Memory — heap allocator, DTB memory probe (`src/mm/`)
+- Scheduler — context-switch core (`src/sched/`)
+- FAT32 driver (`src/fs/fat32.c`)
+- Boot entry / init sequence (`src/kernel.c`)
+
+**Not being ported** (retire with the C code that uses them):
+
+- `src/dsa/` — type-specialized C data structures, superseded by `libmc`'s generics.
+- `src/lib/` — freestanding C libc, superseded by `libmc`.
+
 ## Features
 
 ### **DTB parsing**
@@ -82,7 +115,7 @@ make run
 ### **Filesystem abstraction**
 
 - Generic in-memory tree of `fs_node` structs.
-- Each node carries a heap-allocated name, `file_size` (bytes, set from the FAT32 dir entry for files), `attrs` (type + flags), `info` (driver-private `void *`; e.g. `fat32_entry_reference *` for FAT32 nodes), `mount` (`void *` — the `vfs_mount *` of the node's covering mountpoint, or NULL), and `next`/`child` pointers.
+- Each node carries a heap-allocated name, `file_size` (bytes, set from the FAT32 dir entry for files), `attrs` (type + flags), `info` (driver-private pointer; e.g. `fat32_entry_reference *` for FAT32 nodes), `mount` (`struct fs_mount *` of the node's covering mountpoint, or null), and `next`/`child` pointers.
 - Node types: `FS_NODE_ATTRS_TYPE_FILE`, `FS_NODE_ATTRS_TYPE_FOLDER`.
 - Flag bits: `FS_NODE_ATTRS_FLAG_LINK`, `FS_NODE_ATTRS_FLAG_HIDDEN`, `FS_NODE_ATTRS_FLAG_READONLY`.
 - `fs_create_file(name, file_size, attrs, data, mount)` / `fs_create_folder` allocate nodes with an explicit `mount` pointer; folders are initialized with a "." self-reference.
@@ -94,11 +127,13 @@ make run
 - `fs_dump_node(node, prefix)` recursively prints a subtree to the kernel log with path prefixes; skips recursing into "." and ".." to avoid cycles.
 - `fs_get_child(node, name)` searches a node's direct children by name.
 - `fs_remove_child(node, name)` unlinks a named child from a folder's child list without freeing it.
-- VFS mount system (`vfs.h`): `vfs_init` initializes the mount table and creates a global root tree with a "volumes" subfolder; `vfs_create_mountpoint(path, device, info, read, write)` registers a mount entry in a `hashmap64`-backed table, storing `info` as filesystem-private superblock data, and returns a pointer to the new `vfs_mount` (caller creates the VFS node separately; ownership of `info` transferred to the mount); `vfs_destroy_mountpoint(path)` removes the entry, unlinks and destroys the root node.
-- `struct vfs_mount` carries the mountpoint path, `device` (VFS path of the underlying block device, or NULL), `info` (filesystem-private superblock data, heap-allocated, freed by `vfs_destroy_mountpoint`), root node pointer, and `vfs_handler_t read`/`write` handlers.
-- `vfs_get_mountpoint(path)` looks up a mount entry by its exact path; `vfs_get_node_for_path(path)` resolves a path and returns the `fs_node` directly; `vfs_get_file_size(path)` returns `node->file_size` for the resolved node.
+- `fs_read(node, buffer, count, offset)` / `fs_write(node, buffer, count, offset)` dispatch directly through the node's covering `mount` read/write handler. They validate the node is non-null and a file (folders are rejected), returning `FS_IO_ERROR_FILE_NOT_FOUND`, `FS_IO_ERROR_NOT_A_FILE`, `FS_IO_ERROR_MOUNTPOINT_NOT_FOUND`, or `FS_IO_ERROR_HANDLER_NOT_PROVIDED` on failure.
+- Folder `.` self-references and `..` parent-references are flagged `FS_NODE_ATTRS_FLAG_LINK | FS_NODE_ATTRS_FLAG_HIDDEN`, so directory listings skip them.
+- VFS mount system (`vfs.mc`): `vfs_init` initializes the mount table (a generic `dict`) and creates a global root tree with a "volumes" subfolder; `vfs_create_mountpoint(path, device, info, read, write)` registers a mount entry keyed by path, storing `info` as filesystem-private superblock data, and returns a pointer to the new `fs_mount` (caller creates the VFS node separately; ownership of `info` transferred to the mount); `vfs_destroy_mountpoint(path)` removes the entry, unlinks and destroys the root node.
+- `struct fs_mount` carries the mountpoint path, `device` (VFS path of the underlying block device, or null), `info` (filesystem-private superblock data, heap-allocated, freed by `vfs_destroy_mountpoint`), root node pointer, and read/write handlers.
+- `vfs_get_mountpoint(path)` looks up a mount entry by its exact path; `vfs_get_node_for_path(path, root)` resolves a path (relative to `root`, or the global root when `root` is null) and returns the `fs_node` directly; `vfs_get_file_size(path)` returns `node->file_size` for the resolved node.
 - `vfs_create_dir(path, name, attrs, mount)` / `vfs_create_file(path, name, file_size, attrs, mount)` resolve path and append a new subfolder or file node, storing `mount` in `node->mount`.
-- `vfs_read` / `vfs_write` resolve the node and dispatch to `node->mount->read`/`write`; return `FS_IO_ERROR_FILE_NOT_FOUND`, `FS_IO_ERROR_MOUNTPOINT_NOT_FOUND`, or `FS_IO_ERROR_HANDLER_NOT_PROVIDED` on failure.
+- `vfs_read` / `vfs_write` resolve the node and dispatch via `fs_read`/`fs_write` to `node->mount->read`/`write`; return `FS_IO_ERROR_FILE_NOT_FOUND`, `FS_IO_ERROR_NOT_A_FILE`, `FS_IO_ERROR_MOUNTPOINT_NOT_FOUND`, or `FS_IO_ERROR_HANDLER_NOT_PROVIDED` on failure.
 - `vfs_dump_fs` prints the entire VFS tree from the global root.
 
 ### **FAT32**
@@ -165,8 +200,8 @@ make run
 - `serial_init()` registers a `/dev/serial` I/O module backed by the PL011 UART. Must be called after `io_init()`.
 - `serial_read` blocks reading `count` bytes from the UART by calling `pl011_getc` in a loop, spinning on `wfi()` until each byte arrives; returns `count`.
 - `serial_write` writes `count` bytes to the UART one byte at a time via `pl011_putc`; returns `count`.
-- `console(pathname)` in `console.c` runs an interactive terminal loop on the given VFS device, prompting with `"> "`, tokenizing each input line into `argc/argv` (whitespace-delimited; double-quoted strings are single tokens; backslash escapes any character, including `\"` inside quotes), and dispatching to `console_parse_command`. Lines with an unterminated quote or trailing backslash are rejected with an error.
-- `console_parse_command(argc, argv)` forks a child process for each command; parent waits via `syscall_waitpid`. Built-ins: `ls` (`vfs_dump_fs`), `cat <path>` (read and print file), `echo [args...]` (print first arg), `mount <device> [mountpoint]` (`fat32_mount`; mountpoint defaults to `/volumes/<label>`), `exit [status]` (`syscall_exit`), `help` (list commands); unknown commands exit silently.
+- `console(pathname)` in `console.mc` runs an interactive terminal loop on the given VFS device, prompting with `"> "`, tokenizing each input line into `argc/argv` (whitespace-delimited; double-quoted strings are single tokens; backslash escapes any character, including `\"` inside quotes), and dispatching to `console_parse_command`. Lines with an unterminated quote or trailing backslash are rejected with an error.
+- `console_parse_command(argc, argv)` forks a child process for each command; parent waits via `syscall_waitpid`. Built-ins: `ls [path]` (lists a folder's entries, skipping hidden `.`/`..`; defaults to `/`), `cat <path>` (validates the node is a file, then reads and prints it), `echo [args...]` (print first arg), `mount <device> [mountpoint]` (`fat32_mount`; mountpoint defaults to `/volumes/<label>`), `exit [status]` (`syscall_exit`), `help` (list commands); unknown commands exit silently.
 - `console_getc(pathname)` reads the next character from a VFS device, blocking and discarding ANSI escape sequences.
 - `console_getline(pathname, buffer)` reads one line via `console_getc`, echoing characters back and handling backspace and CR; returns character count.
 
@@ -192,71 +227,87 @@ make run
 
 ## Source layout
 
+Implementations ported to `.mc` live under `src/kernel/`; the `.mc` module
+either implements the subsystem directly or `@extern`-binds the matching C in
+the parallel `src/<area>/` directory (which still holds the implementation and
+the shared `.h`). `src/libmc/` is mcc's standard library; `src/lib/` and
+`src/dsa/` are the legacy C utilities being retired.
+
 ```
 init/               — files bundled into init.img at build time (FAT32 ramdisk)
 
 src/
-  kernel.c/h        — kernel_init: subsystem bring-up (DTB, memory, IRQ, VFS, I/O, serial, storage, scheduler, timer); init(): pid 1 entry point, runs console("/dev/serial") directly
-  console.c/h       — console(pathname)/console_getc()/console_getline()/console_parse_command(): interactive terminal loop with argc/argv tokenization (quoted strings, backslash escapes) and fork-per-command dispatch; built-ins: ls, cat, echo, mount, exit, help
+  kernel.c/h        — kernel_init: subsystem bring-up (DTB, memory, IRQ, VFS, I/O, serial, storage, scheduler, timer); init(): pid 1 entry point, runs console("/dev/serial")
+  console.mc        — console()/console_getc()/console_getline()/console_parse_command(): interactive terminal loop with argc/argv tokenization (quoted strings, backslash escapes) and fork-per-command dispatch; built-ins: ls, cat, echo, mount, exit, help
   start.S           — AArch64 boot stub, saves DTB pointer, zeros BSS
   vectors.S         — exception vector table, save/restore_context macros
 
-  arch/             — AArch64-specific
+  kernel/           — mc kernel modules (logic + @extern bindings to the C below)
+    cpu.mc          — cpu_context, SPSR defines, wfe/wfi, irq_enable/disable, timer registers, bswap/be*/le* helpers
+    irq.mc          — IRQ dispatch table bindings, cpu_context, irq_register/unregister_handler
+    syscall.mc      — syscall_init/register/unregister/yield/exit/getpid/waitpid/fork/sleep/msleep/time/uptime bindings
+    process.mc      — process struct, create/duplicate/config/destroy_process
+    io.mc           — I/O module registry: io_init, io_register/unregister_module, io_read/io_write
+    debug.mc        — printk/dprintk bindings
+    uchar.mc        — utf16lencpy/utf16bencpy bindings
+    devices/
+      serial.mc     — /dev/serial driver: serial_init, serial_read (pl011_getc+wfi), serial_write (pl011_putc)
+      storage.mc    — block driver: storage_init scans virtio slots, registers /dev/sd<letter>; storage_read/write handlers
+    drivers/        — @extern bindings to src/drivers/
+      gic.mc, pl011.mc, pl031.mc, timer.mc, virtio_mmio.mc
+    filesystem/
+      fs.mc         — fs_node tree primitives + fs_read/fs_write dispatch; fs_node / fs_mount structs
+      vfs.mc        — VFS mount system: vfs_init, vfs_create/destroy_mountpoint, vfs_get_node_for_path, vfs_read/write, vfs_create_dir/file, vfs_dump_fs; owns the global _fs_root tree
+      fat32.mc      — fat32_mount/unmount/read/write bindings to src/fs/fat32.c
+    mm/
+      heap.mc       — kmalloc/kfree/krealloc/kmalloc_aligned bindings
+
+  libmc/            — mcc standard library (generic, type-parametric)
+    memory.mc       — alloc<T>/alloc_aligned<T>/resize<T>/dealloc<T>, copy_bytes/set_bytes/copy_items/set_items
+    array.mc        — dynamic array<T> with iter/next cursor (for-in)
+    dict.mc         — string-keyed dict<V> (open addressing)
+    set.mc, queue.mc, stack.mc — generic containers
+    hash.mc         — hash<T> dispatch (splitmix64 for values, fnv1a for pointers)
+    ascii.mc, uchar.mc
+    hashing/        — splitmix64, fnv1a, crc32, murmur3
+    iteration/      — pair
+    libc/           — freestanding ctype, stdio, stdlib, string, limits
+
+  arch/             — AArch64-specific (C)
     cpu.c/h         — system register accessors (cntpct, cntfrq, cntp, DAIF), SPSR defines, halt/hang, _wfi_while/_wfe_while spin macros
     irq.c/h         — exception handlers, IRQ dispatch table, cpu_context, irq_init
-    syscall.c/h     — syscall dispatch table (set64-backed), syscall_init, syscall_handler, syscall_register_handler, syscall_unregister_handler, syscall_yield, syscall_exit, syscall_getpid, syscall_waitpid, syscall_fork
+    syscall.c/h     — syscall dispatch table (set64-backed), syscall_init/handler/register/unregister/yield/exit/getpid/waitpid/fork
 
-  drivers/          — MMIO peripheral drivers
+  drivers/          — MMIO peripheral drivers (C)
     pl011.c/h       — PL011 UART
     gic.c/h         — GIC-400 distributor + CPU interface
     timer.c/h       — ARM generic timer
     pl031.c/h       — PL031 RTC
     virtio_mmio.c/h — virtio MMIO transport: slot scanning, feature negotiation, virtqueue setup (virtq_desc/virtq_avail/virtq_used), IRQ dispatch
 
-  mm/               — memory subsystem
+  mm/               — memory subsystem (C)
     mem.c/h         — reads RAM base/size from DTB at boot
     heap.c/h        — kmalloc/kfree/krealloc/kmalloc_aligned
 
-  dsa/              — generic data structures (top-level .h files are forwarding includes)
-    queue/queue64/32/16/8 — dynamic ring-buffer FIFO queue of uint64/32/16/8_t (queueN_init/push/pop/pop/at)
-    stack/stack64/32/16/8 — dynamic array-backed LIFO stack of uint64/32/16/8_t (stackN_init/destroy/push/pop/peek)
-    deque/deque64       — doubly-linked deque of uint64_t (deque64_add/remove/peek left/right, find, find_remove, remove, next)
-    hashmap/hashmap64   — open-addressing hash map: string key → uint64_t value (hashmap64_init/destroy/set/get/has/remove)
-    set/set64/32/16/8   — open-addressing hash map: uintN_t key → uintN_t value (setN_init/destroy/set/get/remove)
-    ordered_set/ordered_set64 — BST-based ordered set of uint64_t (ordered_set64_init/destroy/insert/remove/contains/min/max/foreach)
-    vector/vector64/32/16/8 — dynamic contiguous array of uintN_t values (vectorN_init/destroy/reset/get/set/append)
+  sched/            — scheduler (C)
+    process.h       — process struct (impl ported to kernel/process.mc)
+    scheduler.c/h   — FIFO ready queue (queue64), waitpid/sleep queues (set64 keyed by pid), scheduler_enqueue/dequeue/spawn, context switch via timer and yield/exit/waitpid/fork/sleep syscalls
 
-  lib/              — architecture-independent libraries
-    debug.c/h       — printk (always on) and dprintk (DEBUG=1 only), both backed by pl011_vprintf
-    dtb.c/h         — FDT parser (node/property walker); IRQ number lookup for timer, RTC, and virtio MMIO slots
-    string.c/h      — freestanding string library (memcpy, memset, strcmp, strntrimend, ...)
-    ctype.c/h       — freestanding character classification and conversion (isalpha, isdigit, isspace, tolower, toupper, ...)
-    stdlib.c/h      — itoa (integer-to-string); atoi/atol/atoll (string-to-integer, freestanding)
-    stdio.c/h       — vsprintf, sprintf (freestanding; uses __builtin_va_* instead of <stdarg.h>)
-    stdint.h        — stdint-style typedefs (uint8_t … uint64_t, intptr_t)
-    stddef.h        — NULL and size_t (uint64_t)
-    stdbool.h       — bool/true/false for pre-C23 (no-op under C23+)
-    ascii.h         — ASCII control character macros (NUL, SOH, STX, ETX, EOT, ENQ, ACK, BS, HT, LF, VT, CR, ESC, DEL)
-    uchar.c/h       — char8_t/16_t/32_t typedefs; utf16to8 conversion; utf16lencpy/utf16bencpy (UTF-16LE/BE to ASCII)
-    limits.h        — integer limit macros (AArch64/LP64; unsigned char default)
-    time.h          — time_t typedef (uint64_t)
-    sys/types.h     — pid_t typedef (int64_t)
-
-  sched/            — scheduler and process management
-    process.c/h     — process struct, create/duplicate/config/destroy
-    scheduler.c/h   — FIFO ready queue (dsa/queue64), waitpid/sleep queues (dsa/set64 keyed by pid), scheduler_enqueue/dequeue/spawn, context switch via timer and yield/exit/waitpid/fork/sleep syscalls
-
-  fs/               — filesystem drivers
-    filesystem.c/h  — fs_node tree primitives: fs_get_child, fs_remove_child, fs_create_node/file/folder, fs_add_file_to_folder, fs_add_subfolder, fs_add_to_folder, fs_node_rename, fs_destroy_node, fs_dump_node
-    vfs.c/h         — VFS mount system: vfs_init, vfs_create_mountpoint, vfs_destroy_mountpoint, vfs_get_node, vfs_dump_fs; owns the global _fs_root tree
+  fs/               — filesystem driver (C)
+    filesystem.h, vfs.h — shared fs_node / VFS interface headers (impls in kernel/filesystem/)
     fat32.c/h       — MBR/BPB structs (packed + aligned mirrors), fat32_bs_info, fat32_entry_reference, fat32_is_boot_sector, fat32_parse_boot_sector, fat32_read_fat_table, fat32_build_cluster_chains, fat32_mount, fat32_unmount, fat32_read, fat32_write, _fat32_read_cluster, _fat32_build_fs_tree; 8.3 and LFN dir entry structs, partition type/media descriptor/attribute/LFN defines, dump functions
 
-  io/               — I/O module registry
-    module.c/h      — hashmap64-backed named module registry: io_init, io_register_module, io_unregister_module, io_read, io_write; io_module carries drv_info + read/write handlers; io_file pairs a pid with a module
+  io/               — I/O module registry interface (C)
+    module.h        — io_module / io_file structs (impl ported to kernel/io.mc)
 
-  devices/          — device drivers built on the I/O module registry
-    storage.c/h     — block storage driver: storage_init scans virtio block slots and registers each as /dev/sda, /dev/sdb, etc.; storage_read/write are the io_handler_t callbacks
-    serial.c/h      — serial console driver: serial_init registers /dev/serial; serial_read blocks on pl011_getc+wfi(); serial_write writes via pl011_putc
+  lib/              — legacy freestanding C libraries (being replaced by libmc/libc)
+    debug.c/h       — printk (always on) and dprintk (DEBUG=1 only), both backed by pl011_vprintf
+    dtb.c/h         — FDT parser (node/property walker); IRQ number lookup for timer, RTC, and virtio MMIO slots
+    string.c/h, ctype.c/h, stdlib.c/h, stdio.c/h, uchar.c/h
+    stdint.h, stddef.h, stdbool.h, limits.h, time.h, ascii.h, sys/types.h
+
+  dsa/              — legacy type-specialized C data structures (superseded by libmc)
+    queue/, stack/, deque/, hashmap/, set/, ordered_set/, vector/ (uint64/32/16/8 variants)
 ```
 
 ## Memory map (QEMU virt)
