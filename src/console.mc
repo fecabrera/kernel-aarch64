@@ -37,7 +37,7 @@ fn command_help(argc: int64, argv: uint8**) -> int64 {
 fn command_ls(argc: int64, argv: uint8**) -> int64 {
     let filename: uint8*;
     let node: struct fs_node*;
-    if(argc > 1)
+    if (argc > 1)
         filename = argv[1];
     else
         filename = "/";
@@ -112,12 +112,23 @@ fn command_cat(argc: int64, argv: uint8**) -> int64 {
         printk("no file provided!\n");
         return -1;
     }
+    
+    let node = vfs_get_node_for_path(argv[1], null);
+    if (node == null) {
+        printk("\"%s\" not found!\n", argv[1]);
+        return -2;
+    }
 
-    let f_size: uint64 = vfs_get_file_size(argv[1]);
+    if ((node->attrs & FS_NODE_ATTRS_TYPE_MASK) != FS_NODE_ATTRS_TYPE_FILE) {
+        printk("\"%s\" is not a file!\n", argv[1]);
+        return -3;
+    }
+
+    let f_size: uint64 = fs_get_node_file_size(node);
     let buffer: uint8* = alloc<uint8>(f_size + 1);
     defer dealloc(buffer);
 
-    let status: int32 = vfs_read(argv[1], buffer, f_size, 0);
+    let status: int32 = fs_read(node, buffer, f_size, 0);
     if (status < 0) {
         case (status) {
         when FS_IO_ERROR_FILE_NOT_FOUND:
@@ -129,7 +140,7 @@ fn command_cat(argc: int64, argv: uint8**) -> int64 {
         else:
             printk("unknown error %d!\n", status);
         }
-        return -2;
+        return -4;
     }
 
     buffer[f_size] = '\0';
