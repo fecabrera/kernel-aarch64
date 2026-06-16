@@ -42,7 +42,6 @@ SRCS := $(wildcard \
 		  src/sched/*.c \
 		  src/fs/*.c \
 		  src/io/*.c \
-		  src/devices/*.c \
 		  src/kernel/*.mc \
 		  src/kernel/arch/*.mc \
 		  src/kernel/devices/*.mc \

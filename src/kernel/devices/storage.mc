@@ -1,6 +1,6 @@
 import "debug";
 import "memory";
-import "io/module";
+import "io";
 import "drivers/virtio_mmio";
 import "libc/stdio";
 
@@ -46,8 +46,8 @@ fn storage_read(buffer: uint8*, count: uint64, offset: uint64, slot: uint64) -> 
     let last_sector: uint64 = (offset + count - 1) / VIRTIO_MMIO_BLK_SECTOR_SIZE;
     let sectors_to_read: uint64 = last_sector - first_sector + 1;
 
-    dprintk("[/dev/sd%d] first_sector=%d, last_sector=%d, sectors_to_read=%d\r\n", slot,
-            first_sector, last_sector, sectors_to_read);
+    dprintk("[/dev/sd%d] first_sector=%d, last_sector=%d, sectors_to_read=%d\r\n",
+            slot, first_sector, last_sector, sectors_to_read);
 
     // allocate temporary buffer
     let tmp: uint8* = alloc<uint8>(sectors_to_read * VIRTIO_MMIO_BLK_SECTOR_SIZE);
