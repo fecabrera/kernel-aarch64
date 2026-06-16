@@ -14,8 +14,9 @@ const FS_NODE_ATTRS_FLAG_READONLY = (1 << 4);
 const FS_NODE_ATTRS_FLAG_MASK = (FS_NODE_ATTRS_FLAG_LINK | FS_NODE_ATTRS_FLAG_HIDDEN | FS_NODE_ATTRS_FLAG_READONLY);
 
 const FS_IO_ERROR_FILE_NOT_FOUND = -1;
-const FS_IO_ERROR_MOUNTPOINT_NOT_FOUND = -2;
-const FS_IO_ERROR_HANDLER_NOT_PROVIDED = -3;
+const FS_IO_ERROR_NOT_A_FILE = -2;
+const FS_IO_ERROR_MOUNTPOINT_NOT_FOUND = -3;
+const FS_IO_ERROR_HANDLER_NOT_PROVIDED = -4;
 
 /**
  * A single node in the VFS tree, representing a file or folder. Folders link
@@ -418,6 +419,11 @@ fn fs_read(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint64)
         return FS_IO_ERROR_FILE_NOT_FOUND;
     }
 
+    if ((node->attrs & FS_NODE_ATTRS_TYPE_MASK) != FS_NODE_ATTRS_TYPE_FILE) {
+        dprintk("[fs] \"%s\" is not a file!\n", node->name);
+        return FS_IO_ERROR_NOT_A_FILE;
+    }
+
     let mp = node->mount;
     if (mp == null) {
         dprintk("[fs] mountpoint for \"%s\" not found!\n", node->name);
@@ -449,6 +455,11 @@ fn fs_write(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint64
     if (node == null) {
         dprintk("[fs] node is null!\n");
         return FS_IO_ERROR_FILE_NOT_FOUND;
+    }
+
+    if ((node->attrs & FS_NODE_ATTRS_TYPE_MASK) != FS_NODE_ATTRS_TYPE_FILE) {
+        dprintk("[fs] \"%s\" is not a file!\n", node->name);
+        return FS_IO_ERROR_NOT_A_FILE;
     }
 
     let mp = node->mount;

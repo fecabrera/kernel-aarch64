@@ -89,11 +89,11 @@ fn command_mount(argc: int64, argv: uint8**) -> int64 {
 
     let status: int64 = fat32_mount(argv[1], moutpoint) as int64;
     if (status < 0) {
-        printk("[mount] fat32_mount() returned %d!\n", status);
+        printk("fat32_mount() returned %d!\n", status);
         return -2;
     }
 
-    printk("[mount] block device \"%s\" mounted!\n", argv[1]);
+    printk("block device \"%s\" mounted!\n", argv[1]);
     return 0;
 }
 
@@ -133,6 +133,8 @@ fn command_cat(argc: int64, argv: uint8**) -> int64 {
         case (status) {
         when FS_IO_ERROR_FILE_NOT_FOUND:
             printk("file not found!\n");
+        when FS_IO_ERROR_NOT_A_FILE:
+            printk("not a file!\n");
         when FS_IO_ERROR_MOUNTPOINT_NOT_FOUND:
             printk("mountpoint not found!\n");
         when FS_IO_ERROR_HANDLER_NOT_PROVIDED:
