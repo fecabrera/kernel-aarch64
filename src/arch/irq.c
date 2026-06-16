@@ -7,7 +7,6 @@
 #include <drivers/timer.h>
 #include <dsa/set.h>
 #include <sched/scheduler.h>
-#include <string.h>
 
 extern void vector_table();
 

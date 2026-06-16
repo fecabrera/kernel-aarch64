@@ -8,6 +8,7 @@ import "hashing/fnv1a";
  *
  * @return hashed key
  */
+@inline
 fn hash<T>(key: T) -> uint64 {
     return splitmix64(key);
 }
@@ -21,6 +22,7 @@ fn hash<T>(key: T) -> uint64 {
  *
  * @return hashed key
  */
+@inline
 fn hash<T>(key: T*) -> uint64 {
     return fnv1a(key);
 }

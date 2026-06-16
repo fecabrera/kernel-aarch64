@@ -7,7 +7,7 @@
 #include <dsa/set.h>
 #include <mm/heap.h>
 
-struct cpu_context *idle_ctx;
+static struct cpu_context *idle_ctx;
 static struct process *current = NULL;
 static struct queue64 ready_queue;
 static struct set64 waitpid_queue;

@@ -42,12 +42,12 @@ struct cpu_context {
  */
 @extern fn bswap64(x: uint64) -> uint64;
 
-fn be16(x: uint16) -> uint16 { return bswap16(x); }
-fn be32(x: uint32) -> uint32 { return bswap32(x); }
-fn be64(x: uint64) -> uint64 { return bswap64(x); }
-fn le16(x: uint16) -> uint16 { return x; }
-fn le32(x: uint32) -> uint32 { return x; }
-fn le64(x: uint64) -> uint64 { return x; }
+@inline fn be16(x: uint16) -> uint16 { return bswap16(x); }
+@inline fn be32(x: uint32) -> uint32 { return bswap32(x); }
+@inline fn be64(x: uint64) -> uint64 { return bswap64(x); }
+@inline fn le16(x: uint16) -> uint16 { return x; }
+@inline fn le32(x: uint32) -> uint32 { return x; }
+@inline fn le64(x: uint64) -> uint64 { return x; }
 
 /**
  * Executes the WFE (Wait For Event) instruction, suspending the CPU until an

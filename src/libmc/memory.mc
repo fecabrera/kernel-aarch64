@@ -37,6 +37,7 @@ fn alloc_aligned<T>(n: uint64, align: uint64) -> T* {
  *
  * @return pointer to the resized block
  */
+@inline
 fn resize<T>(p: T*, n: uint64) -> T* {
     return krealloc(p, n * sizeof(T)) as T*;
 }
@@ -46,6 +47,7 @@ fn resize<T>(p: T*, n: uint64) -> T* {
  *
  * @param p: pointer returned by alloc<T>; null is allowed and does nothing
  */
+@inline
 fn dealloc<T>(p: T*) {
     kfree(p);
 }
@@ -59,6 +61,7 @@ fn dealloc<T>(p: T*) {
  * @param src: source to read from
  * @param n:   number of elements to copy
  */
+@inline
 fn copy_bytes<T>(dst: T*, src: T*, n: uint64) {
     memcpy(dst, src, n * sizeof(T));
 }
@@ -72,6 +75,7 @@ fn copy_bytes<T>(dst: T*, src: T*, n: uint64) {
  * @param value: the byte written to every byte of the region
  * @param n:     number of elements to fill
  */
+@inline
 fn set_bytes<T>(dst: T*, value: uint8, n: uint64) {
     memset(dst, value as int32, n * sizeof(T));   // libc memset takes an int
 }
