@@ -38,7 +38,7 @@ int scheduler_enqueue(struct process *proc) {
         struct process *proc = (struct process *)queue64_at(&ready_queue, i);
         dprintk("%i ", proc->pid);
     }
-    dprintk("}, current = %i\r\n", current ? current->pid : 0);
+    dprintk("}, current = %i\n", current ? current->pid : 0);
 
     return 0;
 }
@@ -50,13 +50,13 @@ struct process *scheduler_dequeue() {
     struct process *proc = (struct process *)queue64_pop(&ready_queue);
     proc->state = PROC_DEAD;
 
-    dprintk("[scheduler] dequeue(%i)\r\n", proc->pid);
+    dprintk("[scheduler] dequeue(%i)\n", proc->pid);
 
     return proc;
 }
 
 pid_t scheduler_spawn(proc_entry entry) {
-    dprintk("[scheduler] spawn()\r\n");
+    dprintk("[scheduler] spawn()\n");
 
     struct process *proc = (struct process *)kmalloc(sizeof(struct process));
 
@@ -75,7 +75,7 @@ pid_t scheduler_spawn(proc_entry entry) {
 static void _notify_sleepers() {
     time_t uptime = timer_get_uptime();
 
-    dprintk("[scheduler] __notify_sleepers(), current=%i\r\n", current ? current->pid : 0);
+    dprintk("[scheduler] __notify_sleepers(), current=%i\n", current ? current->pid : 0);
 
     for (size_t i = 0; i < sleep_queue.capacity; i++) {
         struct set64_entry *entry = (struct set64_entry *)&sleep_queue.entries[i];
@@ -84,11 +84,11 @@ static void _notify_sleepers() {
 
         struct process *proc = (struct process *)entry->value;
 
-        dprintk("[scheduler] pid=%i, sleep_until=%i, uptime=%i\r\n", proc->pid, proc->sleep_until,
+        dprintk("[scheduler] pid=%i, sleep_until=%i, uptime=%i\n", proc->pid, proc->sleep_until,
                 uptime);
 
         if (proc->sleep_until <= uptime) {
-            dprintk("[scheduler] notifying pid %i\r\n", proc->pid);
+            dprintk("[scheduler] notifying pid %i\n", proc->pid);
 
             set64_remove(&sleep_queue, proc->pid);
 
@@ -112,7 +112,7 @@ struct cpu_context *scheduler_handler(struct cpu_context *ctx, time_t ms_elapsed
     }
 
     if (ready_queue.length == 0) {
-        dprintk("[scheduler] idle()\r\n");
+        dprintk("[scheduler] idle()\n");
         idle_ctx->elr = (uint64_t)&halt;
         return idle_ctx;
     }
@@ -131,7 +131,7 @@ struct cpu_context *scheduler_handler(struct cpu_context *ctx, time_t ms_elapsed
             dprintk("previous = %i, ", previous->pid);
         else
             dprintk("previous = <null>, ");
-        dprintk("current = %i, ms_elapsed = %d ms\r\n", current->pid, ms_elapsed);
+        dprintk("current = %i, ms_elapsed = %d ms\n", current->pid, ms_elapsed);
     }
 
     return current->ctx;
@@ -140,13 +140,13 @@ struct cpu_context *scheduler_handler(struct cpu_context *ctx, time_t ms_elapsed
 struct cpu_context *yield_handler(struct cpu_context *ctx) {
     ctx->x0 = 0;
 
-    dprintk("[scheduler] yield()\r\n");
+    dprintk("[scheduler] yield()\n");
 
     return scheduler_handler(ctx, 0);
 }
 
 static void _notify_waiter(struct process *proc, int64_t exit_status) {
-    dprintk("[scheduler] _notify_waiter(%i), exit_status=%i\r\n", proc->pid, exit_status);
+    dprintk("[scheduler] _notify_waiter(%i), exit_status=%i\n", proc->pid, exit_status);
 
     proc->state = PROC_READY;
     proc->wait_pid = 0;
@@ -156,20 +156,20 @@ static void _notify_waiter(struct process *proc, int64_t exit_status) {
 }
 
 static void _notify_waiters(pid_t wait_pid, int64_t exit_status) {
-    dprintk("[scheduler] _notify_waiters(%d), exit_status=%i, waitpid_queue->length=%d\r\n",
-            wait_pid, exit_status, waitpid_queue.length);
+    dprintk("[scheduler] _notify_waiters(%d), exit_status=%i, waitpid_queue->length=%d\n", wait_pid,
+            exit_status, waitpid_queue.length);
 
     for (size_t i = 0; i < waitpid_queue.capacity; i++) {
-        dprintk("[scheduler] i=%d, waitpid_queue->capacity=%d\r\n", i, waitpid_queue.capacity);
+        dprintk("[scheduler] i=%d, waitpid_queue->capacity=%d\n", i, waitpid_queue.capacity);
 
         struct set64_entry *entry = waitpid_queue.entries + i;
-        dprintk("entry->key=%d, entry->value=%d, entry->state=%d\r\n", entry->key, entry->value,
+        dprintk("entry->key=%d, entry->value=%d, entry->state=%d\n", entry->key, entry->value,
                 entry->state);
         if (entry->state != SET64_SLOT_OCCUPIED)
             continue;
 
         struct process *proc = (struct process *)entry->value;
-        dprintk("proc->pid=%i, proc->wait_pid=%i\r\n", proc->pid, proc->wait_pid);
+        dprintk("proc->pid=%i, proc->wait_pid=%i\n", proc->pid, proc->wait_pid);
 
         if (proc->wait_pid != wait_pid)
             continue;
@@ -181,11 +181,11 @@ static void _notify_waiters(pid_t wait_pid, int64_t exit_status) {
 
 struct cpu_context *exit_handler(struct cpu_context *ctx) {
     if (current == NULL) {
-        dprintk("[scheduler] no current process to exit!\r\n");
+        dprintk("[scheduler] no current process to exit!\n");
         return ctx;
     }
 
-    dprintk("[scheduler] exit(%i), ctx->x0 = %u, ctx->x1 = %u\r\n", current->pid, ctx->x0, ctx->x1);
+    dprintk("[scheduler] exit(%i), ctx->x0 = %u, ctx->x1 = %u\n", current->pid, ctx->x0, ctx->x1);
 
     current->state = PROC_DEAD;
 
@@ -194,7 +194,7 @@ struct cpu_context *exit_handler(struct cpu_context *ctx) {
 
     // destroy process resources
     if (destroy_process(current) < 0) {
-        dprintk("[scheduler] failed to destroy process, addr = 0x%x\r\n", current);
+        dprintk("[scheduler] failed to destroy process, addr = 0x%x\n", current);
     }
 
     // clear current entry
@@ -205,12 +205,12 @@ struct cpu_context *exit_handler(struct cpu_context *ctx) {
 
 struct cpu_context *getpid_handler(struct cpu_context *ctx) {
     if (current == NULL) {
-        dprintk("[scheduler] no current process for getpid!\r\n");
+        dprintk("[scheduler] no current process for getpid!\n");
         ctx->x0 = -1;
         return ctx;
     }
 
-    dprintk("[scheduler] getpid(%i)\r\n", current->pid);
+    dprintk("[scheduler] getpid(%i)\n", current->pid);
 
     ctx->x0 = current->pid;
     return ctx;
@@ -219,10 +219,10 @@ struct cpu_context *getpid_handler(struct cpu_context *ctx) {
 struct cpu_context *waitpid_handler(struct cpu_context *ctx) {
     pid_t pid = ctx->x1;
 
-    dprintk("[scheduler] waitpid(%i)\r\n", pid);
+    dprintk("[scheduler] waitpid(%i)\n", pid);
 
     if (current == NULL) {
-        dprintk("[scheduler] no current process for waitpid!\r\n");
+        dprintk("[scheduler] no current process for waitpid!\n");
         ctx->x0 = -1;
         return ctx;
     }
@@ -239,14 +239,14 @@ struct cpu_context *waitpid_handler(struct cpu_context *ctx) {
 
 struct cpu_context *fork_handler(struct cpu_context *ctx) {
     if (current == NULL) {
-        dprintk("[scheduler] no current process to fork!\r\n");
+        dprintk("[scheduler] no current process to fork!\n");
         ctx->x0 = -1;
         return ctx;
     }
 
     current->ctx = ctx;
 
-    dprintk("[scheduler] fork(%i)\r\n", current->pid);
+    dprintk("[scheduler] fork(%i)\n", current->pid);
 
     struct process *child = (struct process *)kmalloc(sizeof(struct process));
     duplicate_process(child, current);
@@ -262,12 +262,12 @@ struct cpu_context *sleep_handler(struct cpu_context *ctx) {
     time_t seconds = ctx->x1;
 
     if (current == NULL) {
-        dprintk("[scheduler] no current process for sleep!\r\n");
+        dprintk("[scheduler] no current process for sleep!\n");
         ctx->x0 = -1;
         return ctx;
     }
 
-    dprintk("[scheduler] sleep(%i)\r\n", seconds);
+    dprintk("[scheduler] sleep(%i)\n", seconds);
 
     time_t sleep_duration = seconds * 1000;
     current->state = PROC_BLOCKED;
@@ -284,12 +284,12 @@ struct cpu_context *msleep_handler(struct cpu_context *ctx) {
     mseconds_t mseconds = ctx->x1;
 
     if (current == NULL) {
-        dprintk("[scheduler] no current process for msleep!\r\n");
+        dprintk("[scheduler] no current process for msleep!\n");
         ctx->x0 = -1;
         return ctx;
     }
 
-    dprintk("[scheduler] msleep(%i)\r\n", mseconds);
+    dprintk("[scheduler] msleep(%i)\n", mseconds);
 
     current->state = PROC_BLOCKED;
     current->sleep_until = timer_get_uptime() + mseconds;

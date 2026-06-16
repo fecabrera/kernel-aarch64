@@ -24,7 +24,7 @@ fn storage_init() {
         sprintf(mod_name, "sd%c", _next);
         _next = _next + 1;
 
-        dprintk("[storage] adding \"/dev/%s\"\r\n", mod_name);
+        dprintk("[storage] adding \"/dev/%s\"\n", mod_name);
         io_register_module(mod_name, slot as uint64, storage_read, storage_write);
     }
 }
@@ -46,7 +46,7 @@ fn storage_read(buffer: uint8*, count: uint64, offset: uint64, slot: uint64) -> 
     let last_sector: uint64 = (offset + count - 1) / VIRTIO_MMIO_BLK_SECTOR_SIZE;
     let sectors_to_read: uint64 = last_sector - first_sector + 1;
 
-    dprintk("[/dev/sd%d] first_sector=%d, last_sector=%d, sectors_to_read=%d\r\n",
+    dprintk("[/dev/sd%d] first_sector=%d, last_sector=%d, sectors_to_read=%d\n",
             slot, first_sector, last_sector, sectors_to_read);
 
     // allocate temporary buffer
@@ -95,7 +95,7 @@ fn storage_write(buffer: uint8*, count: uint64, offset: uint64, slot: uint64) ->
     let last_sector: uint64 = (offset + count - 1) / VIRTIO_MMIO_BLK_SECTOR_SIZE;
     let sectors_to_read: uint64 = last_sector - first_sector + 1;
 
-    dprintk("[/dev/sd%d] first_sector=%d, last_sector=%d, sectors_to_read=%d\r\n", slot,
+    dprintk("[/dev/sd%d] first_sector=%d, last_sector=%d, sectors_to_read=%d\n", slot,
             first_sector, last_sector, sectors_to_read);
 
     return 0;

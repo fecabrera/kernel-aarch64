@@ -272,7 +272,7 @@ fn fs_create_parent_ref(parent: struct fs_node*, folder: struct fs_node*) -> str
 fn fs_add_file_to_folder(parent: struct fs_node*, name: uint8*, file_size: uint64,
                          attrs: uint16, data: uint8*, mount: struct fs_mount*) -> struct fs_node* {
     if ((parent->attrs & FS_NODE_ATTRS_TYPE_MASK) != FS_NODE_ATTRS_TYPE_FOLDER) {
-        dprintk("[filesystem] Node is not a folder!\r\n");
+        dprintk("[filesystem] Node is not a folder!\n");
         return null;
     }
 
@@ -298,7 +298,7 @@ fn fs_add_file_to_folder(parent: struct fs_node*, name: uint8*, file_size: uint6
 fn fs_add_subfolder(parent: struct fs_node *, name: uint8*, attrs: uint16, data: uint8*,
                     mount: struct fs_mount*) -> struct fs_node * {
     if ((parent->attrs & FS_NODE_ATTRS_TYPE_MASK) != FS_NODE_ATTRS_TYPE_FOLDER) {
-        dprintk("[filesystem] node is not a folder!\r\n");
+        dprintk("[filesystem] node is not a folder!\n");
         return null;
     }
 
@@ -353,7 +353,7 @@ fn fs_dump_file(node: struct fs_node*, prefix: uint8*) {
     if (prefix != null)
         printk("%s/", prefix);
 
-    printk("%s\r\n", node->name);
+    printk("%s\n", node->name);
 }
 
 /**
@@ -414,18 +414,18 @@ fn fs_dump_node(node: struct fs_node*, prefix: uint8*) {
  */
 fn fs_read(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint64) -> int32 {
     if (node == null) {
-        dprintk("[fs] node is null!\r\n");
+        dprintk("[fs] node is null!\n");
         return FS_IO_ERROR_FILE_NOT_FOUND;
     }
 
     let mp = node->mount;
     if (mp == null) {
-        dprintk("[fs] mountpoint for \"%s\" not found!\r\n", node->name);
+        dprintk("[fs] mountpoint for \"%s\" not found!\n", node->name);
         return FS_IO_ERROR_MOUNTPOINT_NOT_FOUND;
     }
 
     if (mp->read == null) {
-        dprintk("[fs] mountpoint \"%s\" didn't provide a `read` handler!\r\n", mp->mountpoint);
+        dprintk("[fs] mountpoint \"%s\" didn't provide a `read` handler!\n", mp->mountpoint);
         return FS_IO_ERROR_HANDLER_NOT_PROVIDED;
     }
 
@@ -447,18 +447,18 @@ fn fs_read(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint64)
  */
 fn fs_write(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint64) -> int32 {
     if (node == null) {
-        dprintk("[fs] node is null!\r\n");
+        dprintk("[fs] node is null!\n");
         return FS_IO_ERROR_FILE_NOT_FOUND;
     }
 
     let mp = node->mount;
     if (mp == null) {
-        dprintk("[fs] mountpoint for file \"%s\" not found!\r\n", node->name);
+        dprintk("[fs] mountpoint for file \"%s\" not found!\n", node->name);
         return FS_IO_ERROR_MOUNTPOINT_NOT_FOUND;
     }
 
     if (mp->write == null) {
-        dprintk("[fs] mountpoint \"%s\" didn't provide a `write` handler!\r\n", mp->mountpoint);
+        dprintk("[fs] mountpoint \"%s\" didn't provide a `write` handler!\n", mp->mountpoint);
         return FS_IO_ERROR_HANDLER_NOT_PROVIDED;
     }
 

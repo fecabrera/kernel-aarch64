@@ -31,7 +31,7 @@ struct io_file
 fn io_init() {
     _dev_root = vfs_create_dir("/", "dev", 0, null);
     if (_dev_root == null) {
-        dprintk("[virtio_mmio@%x] cannot creat mountpoint \"%s\"!\r\n");
+        dprintk("[virtio_mmio@%x] cannot creat mountpoint \"%s\"!\n");
         hang();
     }
     dev_mp = vfs_create_mountpoint("/dev", null, null, io_read, io_write);
@@ -72,7 +72,7 @@ fn io_register_module(name: uint8*, drv_info: uint64,
                       read: fn (uint8*, uint64, uint64, uint64) -> int32,
                       write: fn (uint8*, uint64, uint64, uint64) -> int32) -> int32 {
     if (io_get_module(name) != null) {
-        dprintk("[io] there's already a \"%s\" module!\r\n", name);
+        dprintk("[io] there's already a \"%s\" module!\n", name);
         return -1;
     }
 
@@ -82,7 +82,7 @@ fn io_register_module(name: uint8*, drv_info: uint64,
     mod->write = write;
 
     if (fs_add_file_to_folder(_dev_root, name, 0, 0, null, dev_mp) == null) {
-        dprintk("[io] cannot add \"%s\" to /dev!\r\n", name);
+        dprintk("[io] cannot add \"%s\" to /dev!\n", name);
         return -1;
     }
 
@@ -102,12 +102,12 @@ fn io_register_module(name: uint8*, drv_info: uint64,
 fn io_unregister_module(name: uint8*) -> int32 {
     let mod = io_get_module(name);
     if (mod == null) {
-        dprintk("[io] module \"%s\" not found!\r\n", name);
+        dprintk("[io] module \"%s\" not found!\n", name);
         return -1;
     }
 
     if (fs_remove_child(_dev_root, name) < 0) {
-        dprintk("[io] cannot remove \"%s\" from /dev!\r\n", name);
+        dprintk("[io] cannot remove \"%s\" from /dev!\n", name);
         return -1;
     }
 
@@ -129,12 +129,12 @@ fn io_unregister_module(name: uint8*) -> int32 {
  * @return return value of module->read, or -1 if the module is not found
  */
 fn io_read(node: struct fs_node*, buff: uint8*, count: uint64, offset: uint64) -> int32 {
-    dprintk("[io] read(): mod=\"%s\", buff=0x%08X, count=%d, offset=%d\r\n",
+    dprintk("[io] read(): mod=\"%s\", buff=0x%08X, count=%d, offset=%d\n",
             node->name, buff, count, offset);
 
     let module = io_get_module(node->name);
     if (module == null) {
-        dprintk("[io] module \"%s\" not found!\r\n", node->name);
+        dprintk("[io] module \"%s\" not found!\n", node->name);
         return -1;
     }
 
@@ -153,12 +153,12 @@ fn io_read(node: struct fs_node*, buff: uint8*, count: uint64, offset: uint64) -
  * @return return value of module->write, or -1 if the module is not found
  */
 fn io_write(node: struct fs_node*, buff: uint8*, count: uint64, offset: uint64) -> int32 {
-    dprintk("[io] write(): mod=\"%s\", buff=0x%08X, count=%d, offset=%d\r\n",
+    dprintk("[io] write(): mod=\"%s\", buff=0x%08X, count=%d, offset=%d\n",
             node->name, buff, count, offset);
 
     let module = io_get_module(node->name);
     if (module == null) {
-        dprintk("[io] module \"%s\" not found!\r\n", node->name);
+        dprintk("[io] module \"%s\" not found!\n", node->name);
         return -1;
     }
 

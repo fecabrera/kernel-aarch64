@@ -47,7 +47,7 @@ void kernel_init() {
 
     // set up root process
     pid_t pid = scheduler_spawn(&init);
-    dprintk("[kernel] spawned init process with pid %i\r\n", pid);
+    dprintk("[kernel] spawned init process with pid %i\n", pid);
 
     // start scheduler
     timer_init();

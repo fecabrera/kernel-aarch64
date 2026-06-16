@@ -29,11 +29,11 @@ void timer_init() {
     syscall_register_handler(SYSCALL_UPTIME, &syscall_uptime_handler);
 
     if (dtb_get_timer_irq_number(&timer_irq) == 0) {
-        dprintk("[timer] Initializing IRQ: %i\r\n", timer_irq);
+        dprintk("[timer] Initializing IRQ: %i\n", timer_irq);
         irq_register_handler(timer_irq, &timer_irq_handler);
         gic_enable_irq(timer_irq);
     } else {
-        dprintk("[timer] IRQ not found!!\r\n");
+        dprintk("[timer] IRQ not found!!\n");
     }
 }
 
@@ -51,7 +51,7 @@ struct cpu_context *timer_irq_handler(__attribute__((unused)) int irq, struct cp
     time_t interval = (tinfo.ticks - last_ticks) * 1000 / tinfo.frequency;
     time_t uptime = (tinfo.ticks - tinfo.initial_ticks) * 1000 / tinfo.frequency;
 
-    // dprintk("[scheduler] interval = %d ms, uptime = %d ms\r\n", interval, uptime);
+    // dprintk("[scheduler] interval = %d ms, uptime = %d ms\n", interval, uptime);
 
     struct cpu_context *next_ctx = scheduler_handler(ctx, interval);
 
@@ -64,7 +64,7 @@ struct cpu_context *timer_irq_handler(__attribute__((unused)) int irq, struct cp
 struct cpu_context *syscall_uptime_handler(struct cpu_context *ctx) {
     time_t uptime = timer_get_uptime();
 
-    dprintk("[timer] uptime = %d ms\r\n", uptime);
+    dprintk("[timer] uptime = %d ms\n", uptime);
 
     ctx->x0 = uptime;
 

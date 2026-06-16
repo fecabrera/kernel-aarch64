@@ -35,8 +35,8 @@ static int _virtio_mmio_probe_device(int slot) {
     if (device_id == VIRTIO_DEVICE_ID_INVALID)
         return VIRTIO_MMIO_INVALID_DEVICE;
 
-    dprintk("[virtio_mmio@%x] magic = 0x%x, version = %i, device_id = %i\r\n",
-            VIRTIO_MMIO_ADDR(slot), magic, version, VIRTIO_DEVICE_ID(slot));
+    dprintk("[virtio_mmio@%x] magic = 0x%x, version = %i, device_id = %i\n", VIRTIO_MMIO_ADDR(slot),
+            magic, version, VIRTIO_DEVICE_ID(slot));
 
     // acknowledge
     VIRTIO_STATUS(slot) = VIRTIO_STATUS_ACKNOWLEDGE | VIRTIO_STATUS_DRIVER;
@@ -50,11 +50,11 @@ static int _virtio_mmio_probe_device(int slot) {
     VIRTIO_DEVICE_FEATURES_SEL(slot) = VIRTIO_FEATURES_HIGH;
     features_hi = VIRTIO_DEVICE_FEATURES(slot);
 
-    dprintk("[virtio_mmio@%x] features: low=0x%x, high=0x%x\r\n", VIRTIO_MMIO_ADDR(slot),
-            features_lo, features_hi);
+    dprintk("[virtio_mmio@%x] features: low=0x%x, high=0x%x\n", VIRTIO_MMIO_ADDR(slot), features_lo,
+            features_hi);
 
     // negociate features
-    dprintk("[virtio_mmio@%x] negociating features\r\n", VIRTIO_MMIO_ADDR(slot));
+    dprintk("[virtio_mmio@%x] negociating features\n", VIRTIO_MMIO_ADDR(slot));
 
     VIRTIO_DRIVER_FEATURES_SEL(slot) = VIRTIO_FEATURES_LOW;
     VIRTIO_DRIVER_FEATURES(slot) = features_lo & (VIRTIO_BLK_F_BLK_SIZE | VIRTIO_BLK_F_SIZE_MAX);
@@ -66,24 +66,24 @@ static int _virtio_mmio_probe_device(int slot) {
 
     // check response
     if (!(VIRTIO_STATUS(slot) & VIRTIO_STATUS_FEATURES_OK)) {
-        dprintk("[virtio_mmio@%x] features rejected\r\n", VIRTIO_MMIO_ADDR(slot));
+        dprintk("[virtio_mmio@%x] features rejected\n", VIRTIO_MMIO_ADDR(slot));
         VIRTIO_STATUS(slot) |= VIRTIO_STATUS_FAILED;
 
         return VIRTIO_MMIO_NEGOTIATION_FAILED; // negotiation failed
     }
 
     // negotiation accepted
-    dprintk("[virtio_mmio@%x] features accepted\r\n", VIRTIO_MMIO_ADDR(slot));
+    dprintk("[virtio_mmio@%x] features accepted\n", VIRTIO_MMIO_ADDR(slot));
 
     // set up virtqueue
     VIRTIO_QUEUE_SEL(slot) = 0;
 
     uint32_t virtio_queue_num_max = VIRTIO_QUEUE_NUM_MAX(slot);
-    dprintk("[virtio_mmio@%x] virtio_queue_num_max=%i\r\n", VIRTIO_MMIO_ADDR(slot),
+    dprintk("[virtio_mmio@%x] virtio_queue_num_max=%i\n", VIRTIO_MMIO_ADDR(slot),
             virtio_queue_num_max);
 
     if (virtio_queue_num_max < DEFAULT_VIRTIO_QUEUE_NUM) {
-        dprintk("[virtio_mmio@%x] device doesn't support queue_num=%i\r\n", VIRTIO_MMIO_ADDR(slot),
+        dprintk("[virtio_mmio@%x] device doesn't support queue_num=%i\n", VIRTIO_MMIO_ADDR(slot),
                 DEFAULT_VIRTIO_QUEUE_NUM);
         return VIRTIO_MMIO_QUEUE_NUM_ERROR;
     }
@@ -108,13 +108,13 @@ static int _virtio_mmio_probe_device(int slot) {
     // initialize IRQ
     uint32_t virtio_mmio_irq;
     if (dtb_get_virtio_mmio_irq_number(slot, &virtio_mmio_irq) != 0) {
-        dprintk("[virtio_mmio] IRQ not found!!\r\n");
+        dprintk("[virtio_mmio] IRQ not found!!\n");
         return VIRTIO_MMIO_IRQ_NOT_FOUND;
     }
 
     _irq_to_slot[virtio_mmio_irq] = slot;
 
-    dprintk("[virtio_mmio@%x] Initializing IRQ: %i\r\n", VIRTIO_MMIO_ADDR(slot), virtio_mmio_irq);
+    dprintk("[virtio_mmio@%x] Initializing IRQ: %i\n", VIRTIO_MMIO_ADDR(slot), virtio_mmio_irq);
     irq_register_handler(virtio_mmio_irq, &virtio_mmio_irq_handler);
     gic_enable_irq(virtio_mmio_irq);
 
@@ -142,7 +142,7 @@ int virtio_mmio_read(virtio_slot_t slot, uint64_t sector_number, uint8_t *data) 
     struct virtio_mmio_device *device = &_devices[slot];
 
     if (device->device_id == VIRTIO_DEVICE_ID_INVALID) {
-        dprintk("[virtio_mmio] Device slot %i is invalid!\r\n", slot);
+        dprintk("[virtio_mmio] Device slot %i is invalid!\n", slot);
         return VIRTIO_MMIO_INVALID_DEVICE;
     }
 
@@ -182,7 +182,7 @@ int virtio_mmio_read(virtio_slot_t slot, uint64_t sector_number, uint8_t *data) 
     // In the IRQ handler, check used.idx advanced and read status byte
     _wfi_while(status == VIRTIO_BLK_S_NONE);
 
-    dprintk("[virtio_mmio@%x] status = %u\r\n", VIRTIO_MMIO_ADDR(slot), status);
+    dprintk("[virtio_mmio@%x] status = %u\n", VIRTIO_MMIO_ADDR(slot), status);
 
     return status;
 }
@@ -194,11 +194,10 @@ struct cpu_context *virtio_mmio_irq_handler(int irq, struct cpu_context *ctx) {
     uint32_t status = VIRTIO_INTERRUPT_STATUS(slot);
     VIRTIO_INTERRUPT_ACK(slot) = status;
 
-    dprintk("[virtio_mmio@%x] IRQ handler, status = %u\r\n", VIRTIO_MMIO_ADDR(slot), status);
+    dprintk("[virtio_mmio@%x] IRQ handler, status = %u\n", VIRTIO_MMIO_ADDR(slot), status);
 
     if (fnc == NULL) {
-        dprintk("[virtio_mmio@%x] Handler not found for slot %i!\r\n", VIRTIO_MMIO_ADDR(slot),
-                slot);
+        dprintk("[virtio_mmio@%x] Handler not found for slot %i!\n", VIRTIO_MMIO_ADDR(slot), slot);
         return ctx;
     }
 

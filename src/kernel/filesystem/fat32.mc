@@ -301,10 +301,10 @@ fn fat32_read(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint
     let fs_mp = node->mount;
     let bs_info = fs_mp->info as struct fat32_bs_info*;
 
-    dprintk("[fat32] node: entry_ref=0x%08X, fs_mp=0x%08X, bs_info=0x%08X\r\n", entry_ref, fs_mp,
+    dprintk("[fat32] node: entry_ref=0x%08X, fs_mp=0x%08X, bs_info=0x%08X\n", entry_ref, fs_mp,
             bs_info);
-    dprintk("[fat32] fs_mp: mp=\"%s\", device=\"%s\"\r\n", fs_mp->mountpoint, fs_mp->device);
-    dprintk("[fat32] entry_ref: cluster=%d, offset=%d, n_lfn_entries=%d\r\n", entry_ref->cluster,
+    dprintk("[fat32] fs_mp: mp=\"%s\", device=\"%s\"\n", fs_mp->mountpoint, fs_mp->device);
+    dprintk("[fat32] entry_ref: cluster=%d, offset=%d, n_lfn_entries=%d\n", entry_ref->cluster,
             entry_ref->offset, entry_ref->n_lfn_entries);
 
     // read fat32_dir_entry
@@ -315,10 +315,10 @@ fn fat32_read(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint
     let dir_entry = alloc<uint8>(dir_entry_size as uint64) as struct fat32_dir_entry*;
     defer dealloc(dir_entry);
 
-    dprintk("[fat32] count=%d, offset=0x%08X\r\n", dir_entry_size, dir_entry_offset);
+    dprintk("[fat32] count=%d, offset=0x%08X\n", dir_entry_size, dir_entry_offset);
     let status = vfs_read(fs_mp->device, dir_entry as uint8*, dir_entry_size as uint64, dir_entry_offset as uint64);
     if (status < 0) {
-        dprintk("[fat32] vfs_read() returned %d!\r\n", status);
+        dprintk("[fat32] vfs_read() returned %d!\n", status);
         return status;
     }
 
@@ -331,11 +331,11 @@ fn fat32_read(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint
     copy_bytes(&file_size, &dir_entry->file_size, 1);
 
     let data_cluster: uint32 = (le16(cluster_high) as uint32 << 16) | (le16(cluster_low) as uint32);
-    dprintk("[fat32] cluster=%d, file_size=%d\r\n", data_cluster, file_size);
+    dprintk("[fat32] cluster=%d, file_size=%d\n", data_cluster, file_size);
 
     // validate offset
     if (file_size as uint64 <= offset) {
-        dprintk("[fat32] offset must be less than the file size!\r\n");
+        dprintk("[fat32] offset must be less than the file size!\n");
         return -1;
     }
 
@@ -348,7 +348,7 @@ fn fat32_read(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint
     let last_data_sector_to_read: uint64 = (offset + count - 1) / (bs_info->n_bytes_per_sector as uint64);
     let n_data_sectors_to_read: uint64 = last_data_sector_to_read - first_data_sector_to_read + 1;
 
-    dprintk("[fat32] total_data_sectors=%d, first_data_sector_to_read=%d, last_data_sector_to_read=%d, n_data_sectors_to_read=%d\r\n",
+    dprintk("[fat32] total_data_sectors=%d, first_data_sector_to_read=%d, last_data_sector_to_read=%d, n_data_sectors_to_read=%d\n",
             total_data_sectors, first_data_sector_to_read, last_data_sector_to_read, n_data_sectors_to_read);
 
     // follow fat_table
@@ -371,7 +371,7 @@ fn fat32_read(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint
             let data_sector: uint32 = bs_info->first_data_sector + (cluster_to_read - bs_info->root_cluster);
             let data_offset: uint32 = data_sector * (bs_info->n_bytes_per_sector as uint32);
 
-            dprintk("[fat32] cluster_to_read=%d, data_sector=%d, data_offset=0x%08X\r\n",
+            dprintk("[fat32] cluster_to_read=%d, data_sector=%d, data_offset=0x%08X\n",
                     cluster_to_read, data_sector, data_offset);
             vfs_read(fs_mp->device, &tmp[i * (bs_info->n_bytes_per_sector as uint64)],
                     bs_info->n_bytes_per_sector as uint64, data_offset as uint64);
@@ -404,10 +404,10 @@ fn fat32_write(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uin
     let fs_mp = node->mount;
     let bs_info = fs_mp->info as struct fat32_bs_info*;
 
-    dprintk("[fat32] node: entry_ref=0x%08X, fs_mp=0x%08X, bs_info=0x%08X\r\n", entry_ref, fs_mp,
+    dprintk("[fat32] node: entry_ref=0x%08X, fs_mp=0x%08X, bs_info=0x%08X\n", entry_ref, fs_mp,
             bs_info);
-    dprintk("[fat32] fs_mp: mp=\"%s\", device=\"%s\"\r\n", fs_mp->mountpoint, fs_mp->device);
-    dprintk("[fat32] entry_ref: cluster=%d, offset=%d, n_lfn_entries=%d\r\n", entry_ref->cluster,
+    dprintk("[fat32] fs_mp: mp=\"%s\", device=\"%s\"\n", fs_mp->mountpoint, fs_mp->device);
+    dprintk("[fat32] entry_ref: cluster=%d, offset=%d, n_lfn_entries=%d\n", entry_ref->cluster,
             entry_ref->offset, entry_ref->n_lfn_entries);
 
     return -1;

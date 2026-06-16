@@ -21,13 +21,13 @@ let available_commands: uint8*[][2] = [
 
 @private
 fn command_help(argc: int64, argv: uint8**) -> int64 {
-    printk("available commands:\r\n");
+    printk("available commands:\n");
 
     let i: uint64 = 0;
     while (i < len(available_commands)) {
         defer i = i + 1;
         let command = available_commands[i];
-        printk("    %-28s %s\r\n", command[0], command[1]);
+        printk("    %-28s %s\n", command[0], command[1]);
     }
     
     return 0;
@@ -74,7 +74,7 @@ fn command_exit(argc: int64, argv: uint8**) -> int64 {
     if (argc > 1) {
         status = atoll(argv[1]);
     }
-    printk("exiting with status %d\r\n", status);
+    printk("exiting with status %d\n", status);
     return status;
 }
 
@@ -89,11 +89,11 @@ fn command_mount(argc: int64, argv: uint8**) -> int64 {
 
     let status: int64 = fat32_mount(argv[1], moutpoint) as int64;
     if (status < 0) {
-        printk("[mount] fat32_mount() returned %d!\r\n", status);
+        printk("[mount] fat32_mount() returned %d!\n", status);
         return -2;
     }
 
-    printk("[mount] block device \"%s\" mounted!\r\n", argv[1]);
+    printk("[mount] block device \"%s\" mounted!\n", argv[1]);
     return 0;
 }
 
@@ -101,7 +101,7 @@ fn command_mount(argc: int64, argv: uint8**) -> int64 {
 fn command_echo(argc: int64, argv: uint8**) -> int64 {
     if (argc > 1)
         printk("%s", argv[1]);
-    printk("\r\n");
+    printk("\n");
 
     return 0;
 }
@@ -109,7 +109,7 @@ fn command_echo(argc: int64, argv: uint8**) -> int64 {
 @private
 fn command_cat(argc: int64, argv: uint8**) -> int64 {
     if (argc < 2) {
-        printk("no file provided!\r\n");
+        printk("no file provided!\n");
         return -1;
     }
 
@@ -121,19 +121,19 @@ fn command_cat(argc: int64, argv: uint8**) -> int64 {
     if (status < 0) {
         case (status) {
         when FS_IO_ERROR_FILE_NOT_FOUND:
-            printk("file not found!\r\n");
+            printk("file not found!\n");
         when FS_IO_ERROR_MOUNTPOINT_NOT_FOUND:
-            printk("mountpoint not found!\r\n");
+            printk("mountpoint not found!\n");
         when FS_IO_ERROR_HANDLER_NOT_PROVIDED:
-            printk("handler not provided!\r\n");
+            printk("handler not provided!\n");
         else:
-            printk("unknown error %d!\r\n", status);
+            printk("unknown error %d!\n", status);
         }
         return -2;
     }
 
     buffer[f_size] = '\0';
-    printk("%s\r\n", buffer);
+    printk("%s\n", buffer);
 
     return 0;
 }
@@ -231,14 +231,14 @@ fn console_parse_command(argc: int64, argv: uint8**) {
 
     let pid: int64 = syscall_fork();
     if (pid < 0) {
-        printk("[console] fork() returned %d!\r\n", pid);
+        printk("[console] fork() returned %d!\n", pid);
         return;
     }
 
     let status: int64;
     if (pid > 0) {
         status = syscall_waitpid(pid);
-        printk("[console] process %d returned %d!\r\n", pid, status);
+        printk("[console] process %d returned %d!\n", pid, status);
         return;
     } else {
         status = -1;
@@ -356,10 +356,10 @@ fn console(pathname: uint8*) {
         for arg in &args {
             printk(" \"%s\",", arg);
         }
-        printk(" ]\r\n");
+        printk(" ]\n");
 
         if (_quotes or _backslash)
-            printk("[console] invalid input!, _quotes=%d, _backslash=%d\r\n", _quotes, _backslash);
+            printk("[console] invalid input!, _quotes=%d, _backslash=%d\n", _quotes, _backslash);
         else
             console_parse_command(args.length as int64, args.data);
     }
