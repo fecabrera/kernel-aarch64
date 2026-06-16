@@ -174,6 +174,7 @@ standard library) in place of the in-tree C utilities.
 - Tracks the running process via a `current` pointer.
 - Dedicated 4KB IRQ stack.
 - `create_process`/`duplicate_process`/`destroy_process` with 16-byte aligned task stacks.
+- Each process tracks a current working directory (`fs_node *`), seeded to the VFS root by `create_process` and inherited from the parent on `duplicate_process` (fork).
 - Idles via `halt` when the ready queue is empty.
 - waitpid and sleep queues backed by `set64` (keyed by pid), replacing the prior `deque64` lists.
 - Context-switch logging (`dprintk`) is silent unless `DEBUG=1`.
@@ -201,7 +202,7 @@ standard library) in place of the in-tree C utilities.
 - `serial_read` blocks reading `count` bytes from the UART by calling `pl011_getc` in a loop, spinning on `wfi()` until each byte arrives; returns `count`.
 - `serial_write` writes `count` bytes to the UART one byte at a time via `pl011_putc`; returns `count`.
 - `console(pathname)` in `console.mc` runs an interactive terminal loop on the given VFS device, prompting with `"> "`, tokenizing each input line into `argc/argv` (whitespace-delimited; double-quoted strings are single tokens; backslash escapes any character, including `\"` inside quotes), and dispatching to `console_parse_command`. Lines with an unterminated quote or trailing backslash are rejected with an error.
-- `console_parse_command(argc, argv)` forks a child process for each command; parent waits via `syscall_waitpid`. Built-ins: `ls [path]` (lists a folder's entries, skipping hidden `.`/`..`; defaults to `/`), `cat <path>` (validates the node is a file, then reads and prints it), `echo [args...]` (print first arg), `mount <device> [mountpoint]` (`fat32_mount`; mountpoint defaults to `/volumes/<label>`), `exit [status]` (`syscall_exit`), `help` (list commands); unknown commands exit silently.
+- `console_parse_command(argc, argv)` forks a child process for each command; parent waits via `syscall_waitpid`. Built-ins: `ls [path]` (lists a folder's entries, skipping hidden `.`/`..`; defaults to `/`), `cat <path>` (validates the node is a file, then reads and prints it), `echo [args...]` (print first arg), `mount <device> [mountpoint]` (`fat32_mount`; mountpoint defaults to `/volumes/<label>`), `exit [status]` (`syscall_exit`), `help` (list commands); unknown commands print a "not found!" message.
 - `console_getc(pathname)` reads the next character from a VFS device, blocking and discarding ANSI escape sequences.
 - `console_getline(pathname, buffer)` reads one line via `console_getc`, echoing characters back and handling backspace and CR; returns character count.
 

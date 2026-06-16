@@ -3,8 +3,8 @@ import "fs";
 import "array";
 import "dict";
 
-@static let _fs_root: struct fs_node*;
-@static let _fs_mp_table: struct dict<struct fs_mount*>;
+@static let _vfs_root: struct fs_node*;
+@static let _vfs_mp_table: struct dict<struct fs_mount*>;
 
 /**
  * Initializes the VFS subsystem. Initializes the mount table hashmap, creates the global root tree
@@ -12,11 +12,20 @@ import "dict";
  */
 fn vfs_init() {
     // initialize table
-    dict_init(&_fs_mp_table, 10);
+    dict_init(&_vfs_mp_table, 10);
 
     // create root and volumes
-    _fs_root = fs_create_folder(null, 0, null, null);
-    fs_add_subfolder(_fs_root, "volumes", 0, null, null);
+    _vfs_root = fs_create_folder(null, 0, null, null);
+    fs_add_subfolder(_vfs_root, "volumes", 0, null, null);
+}
+
+/**
+ * Returns the global VFS root node. Valid only after vfs_init().
+ *
+ * @return the root fs_node of the VFS tree
+ */
+fn vfs_root() -> struct fs_node* {
+    return _vfs_root;
 }
 
 /**
@@ -67,7 +76,7 @@ fn vfs_create_mountpoint(mountpoint: uint8*, device: uint8*, info: uint8*,
         fs_mp->device = null;
     }
 
-    dict_set(&_fs_mp_table, mountpoint, fs_mp);
+    dict_set(&_vfs_mp_table, mountpoint, fs_mp);
 
     dprintk("[vfs] \"%s\" mounted successfully\n", mountpoint);
 
@@ -83,7 +92,7 @@ fn vfs_create_mountpoint(mountpoint: uint8*, device: uint8*, info: uint8*,
  */
 fn vfs_get_mountpoint(mountpoint: uint8*) -> struct fs_mount* {
     let value: struct fs_mount*;
-    if (!dict_get(&_fs_mp_table, mountpoint, &value))
+    if (!dict_get(&_vfs_mp_table, mountpoint, &value))
         return null;
 
     return value;
@@ -133,7 +142,7 @@ fn vfs_destroy_mountpoint(mountpoint: uint8*) -> int32 {
 fn vfs_get_node_for_path(pathname: uint8*, root: struct fs_node*) -> struct fs_node* {
     let current = root;
     if (current == null)
-        current = _fs_root;
+        current = _vfs_root;
 
     let str: uint8[256];
     set_bytes(str, 0, 256);
@@ -283,6 +292,6 @@ fn vfs_create_file(path: uint8*, name: uint8*, file_size: uint64, attrs: uint16,
  * children. Skips entering "." and ".." nodes to avoid cycles.
  */
 fn vfs_dump_fs() {
-    dprintk("[vfs] _fs_root=0x%08X &_fs_root=0x%08X\n", _fs_root, &_fs_root);
-    fs_dump_node(_fs_root->child, "");
+    dprintk("[vfs] _vfs_root=0x%08X &_vfs_root=0x%08X\n", _vfs_root, &_vfs_root);
+    fs_dump_node(_vfs_root->child, "");
 }

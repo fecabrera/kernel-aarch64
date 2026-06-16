@@ -1,6 +1,7 @@
 #pragma once
 
 #include <arch/irq.h>
+#include <fs/filesystem.h>
 #include <stdint.h>
 #include <string.h>
 #include <sys/types.h>
@@ -33,6 +34,7 @@ typedef int64_t proc_state_t;
  *                     waiting
  * @field sleep_until: (time_t) absolute uptime in milliseconds at which the process should wake; 0
  *                     when not sleeping
+ * @field cwd:         current working directory node; inherited from the parent on fork
  */
 struct process {
     pid_t pid;
@@ -42,12 +44,13 @@ struct process {
     size_t stack_size;
     pid_t wait_pid;
     time_t sleep_until;
+    struct fs_node *cwd;
 };
 
 /**
  * Allocates a stack and initializes the process struct with a zeroed context
- * frame. The process is left in PROC_CREATED state; call process_config
- * before enqueueing.
+ * frame. The current working directory defaults to the VFS root. The process
+ * is left in PROC_CREATED state; call process_config before enqueueing.
  *
  * @param proc: caller-allocated process struct to initialize
  * @param stack_size: size in bytes of the task stack to allocate
@@ -59,8 +62,8 @@ int create_process(struct process *proc, size_t stack_size);
 /**
  * Allocates a new stack for dest and copies src's stack contents and context
  * frame into it, preserving the ctx offset within the stack. Assigns dest a
- * new PID and sets its state to PROC_CREATED. Call process_config or adjust
- * dest->ctx->x0 before enqueueing.
+ * new PID, sets its state to PROC_CREATED, and inherits src's current working
+ * directory. Call process_config or adjust dest->ctx->x0 before enqueueing.
  *
  * @param dest: caller-allocated process struct to initialize
  * @param src:  process to copy from

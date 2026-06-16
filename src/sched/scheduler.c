@@ -1,4 +1,5 @@
 #include "scheduler.h"
+#include "fs/vfs.h"
 #include <arch/syscall.h>
 #include <debug.h>
 #include <drivers/gic.h>

@@ -159,6 +159,7 @@ fn command_cat(argc: int64, argv: uint8**) -> int64 {
  *
  * @return the next non-escape character read
  */
+@private
 fn console_getc(pathname: uint8*) -> uint8 {
     let _escape = false;
     let _arrow = false;
@@ -202,6 +203,7 @@ fn console_getc(pathname: uint8*) -> uint8 {
  *
  * @return number of characters read, excluding the CR terminator
  */
+@private
 fn console_getline(pathname: uint8*, buffer: uint8*) -> int32 {
     let n: int32 = 0;
 
@@ -229,49 +231,58 @@ fn console_getline(pathname: uint8*, buffer: uint8*) -> int32 {
 }
 
 /**
- * Dispatches a parsed command by forking a child process. The parent waits via syscall_waitpid and
- * logs the exit status. The child runs the command and exits. Built-in commands: ls (vfs_dump_fs),
- * cat <path> (vfs_read + print), echo [args...] (print first arg),
- * mount <device> [mountpoint] (fat32_mount; mountpoint defaults to /volumes/<label>),
- * exit [status] (syscall_exit), help (list commands). Unknown commands exit silently with 0.
+ * Forks a child process to run a command handler. The child invokes fnc and
+ * exits with its return value; the parent blocks via syscall_waitpid and logs
+ * the child's exit status. On fork failure the command is not run.
+ *
+ * @param fnc:  command handler to run in the child
+ * @param argc: number of arguments
+ * @param argv: null-terminated argument strings; argv[0] is the command name
+ */
+@private
+fn console_run_command(fnc: fn (int64, uint8**) -> int64, argc: int64, argv: uint8**) {
+    let pid: int64 = syscall_fork();
+    if (pid < 0) {
+        printk("[console] fork() returned %d!\n", pid);
+    } else if (pid > 0) {
+        let status: int64 = syscall_waitpid(pid);
+        printk("[console] process %d returned %d!\n", pid, status);
+    } else {
+        let status: int64 = fnc(argc, argv);
+        syscall_exit(status);
+    }
+}
+
+/**
+ * Dispatches a parsed command to its built-in handler, each run in a forked
+ * child via console_run_command. Built-in commands: ls [path] (list a folder's
+ * entries), cat <path> (print a file), echo [args...] (print first arg),
+ * mount <device> [mountpoint] (fat32_mount; mountpoint defaults to
+ * /volumes/<label>), exit [status] (syscall_exit), help (list commands).
+ * Unknown commands print a "not found!" message. Empty input is ignored.
  *
  * @param argc: number of arguments
  * @param argv: null-terminated argument strings; argv[0] is the command name
  */
+@private
 fn console_parse_command(argc: int64, argv: uint8**) {
     if (argc == 0)
         return;
-
-    let pid: int64 = syscall_fork();
-    if (pid < 0) {
-        printk("[console] fork() returned %d!\n", pid);
-        return;
-    }
-
-    let status: int64;
-    if (pid > 0) {
-        status = syscall_waitpid(pid);
-        printk("[console] process %d returned %d!\n", pid, status);
-        return;
+    
+    if (strcmp(argv[0], "ls") == 0) {
+        console_run_command(command_ls, argc, argv);
+    } else if (strcmp(argv[0], "exit") == 0) {
+        console_run_command(command_exit, argc, argv);
+    } else if (strcmp(argv[0], "echo") == 0) {
+        console_run_command(command_echo, argc, argv);
+    } else if (strcmp(argv[0], "cat") == 0) {
+        console_run_command(command_cat, argc, argv);
+    } else if (strcmp(argv[0], "mount") == 0) {
+        console_run_command(command_mount, argc, argv);
+    } else if (strcmp(argv[0], "help") == 0) {
+        console_run_command(command_help, argc, argv);
     } else {
-        status = -1;
-        if (strcmp(argv[0], "ls") == 0) {
-            status = command_ls(argc, argv);
-        } else if (strcmp(argv[0], "exit") == 0) {
-            status = command_exit(argc, argv);
-        } else if (strcmp(argv[0], "echo") == 0) {
-            status = command_echo(argc, argv);
-        } else if (strcmp(argv[0], "cat") == 0) {
-            status = command_cat(argc, argv);
-        } else if (strcmp(argv[0], "mount") == 0) {
-            status = command_mount(argc, argv);
-        } else if (strcmp(argv[0], "help") == 0) {
-            status = command_help(argc, argv);
-        } else {
-            status = 0;
-        }
-
-        syscall_exit(status);
+        printk("command \"%s\" not found!\n", argv[0]);
     }
 }
 

@@ -25,6 +25,11 @@ struct vfs_mount {
 void vfs_init();
 
 /**
+ * Returns the global VFS root node. Valid only after vfs_init().
+ */
+struct fs_node *vfs_root();
+
+/**
  * Registers a mount entry for the given path. Resolves mountpoint via _vfs_get_node, validates it
  * is a folder, then allocates a vfs_mount struct (storing device path and read/write handlers) and
  * inserts it into the mount table keyed by mountpoint. Does not insert any node into the VFS tree;

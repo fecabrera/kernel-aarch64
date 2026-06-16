@@ -1,5 +1,7 @@
 import "cpu";
 import "memory";
+import "filesystem/fs";
+import "filesystem/vfs";
 
 const DEFAULT_STACK_SIZE = (1 << 14); // 16 KiB
 const PROC_DEAD = -1;
@@ -24,6 +26,7 @@ const PROC_BLOCKED = 2;
  *                     waiting
  * @field sleep_until: (time_t) absolute uptime in milliseconds at which the process should wake; 0
  *                     when not sleeping
+ * @field cwd:         current working directory node; inherited from the parent on fork
  */
 struct process {
     pid: int64;
@@ -33,12 +36,13 @@ struct process {
     stack_size: uint64;
     wait_pid: int64;
     sleep_until: uint64;
+    cwd: struct fs_node*;
 }
 
 /**
  * Allocates a stack and initializes the process struct with a zeroed context
- * frame. The process is left in PROC_CREATED state; call process_config
- * before enqueueing.
+ * frame. The current working directory defaults to the VFS root. The process
+ * is left in PROC_CREATED state; call process_config before enqueueing.
  *
  * @param proc: caller-allocated process struct to initialize
  * @param stack_size: size in bytes of the task stack to allocate
@@ -64,6 +68,7 @@ fn create_process(proc: struct process*, stack_size: uint64) -> int32 {
     proc->ctx = ctx;
     proc->stack = stack;
     proc->stack_size = stack_size;
+    proc->cwd = vfs_root();
 
     next_pid = next_pid + 1;
 
@@ -73,8 +78,8 @@ fn create_process(proc: struct process*, stack_size: uint64) -> int32 {
 /**
  * Allocates a new stack for dest and copies src's stack contents and context
  * frame into it, preserving the ctx offset within the stack. Assigns dest a
- * new PID and sets its state to PROC_CREATED. Call process_config or adjust
- * dest->ctx->x0 before enqueueing.
+ * new PID, sets its state to PROC_CREATED, and inherits src's current working
+ * directory. Call process_config or adjust dest->ctx->x0 before enqueueing.
  *
  * @param dest: caller-allocated process struct to initialize
  * @param src:  process to copy from
@@ -97,6 +102,7 @@ fn duplicate_process(dest: struct process*, src: struct process*) -> int32 {
     dest->ctx = ctx;
     dest->stack = stack;
     dest->stack_size = stack_size;
+    dest->cwd = src->cwd;
 
     next_pid = next_pid + 1;
 
@@ -132,6 +138,7 @@ fn destroy_process(proc: struct process*) -> int32 {
 
     proc->stack = null;
     proc->ctx = null;
+    proc->cwd = null;
 
     return 0;
 }
