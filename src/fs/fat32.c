@@ -7,6 +7,7 @@
 #include <fs/vfs.h>
 #include <mm/heap.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include <uchar.h>
@@ -529,7 +530,7 @@ static int _read_fat_table(char *pathname, struct fat32_bs_info *bs_info, uint8_
     return bs_info->table_size_32;
 }
 
-int fat32_mount(char *device_path, char *mountpoint) {
+int64_t fat32_mount(char *device_path, char *mountpoint) {
     int status;
     uint8_t bs[512];
     char _mountpoint[50] = {0};

@@ -1,8 +1,9 @@
 import "debug";
 import "array";
+import "string";
 import "memory";
 import "syscall";
-import "filesystem/fs";
+import "scheduler";
 import "filesystem/vfs";
 import "filesystem/fat32";
 import "libc/ctype";
@@ -11,7 +12,8 @@ import "libc/string";
 
 @static
 let available_commands: uint8*[][2] = [
-    ["ls", "list the VFS tree"],
+    ["ls [path]", "list a folder's entries"],
+    ["cd <path>", "change the working directory"],
     ["cat <path>", "print a file"],
     ["echo [args...]", "print arguments"],
     ["mount <device> [mountpoint]", "mount a FAT32 block device"],
@@ -34,41 +36,6 @@ fn command_help(argc: int64, argv: uint8**) -> int64 {
 }
 
 @private
-fn command_ls(argc: int64, argv: uint8**) -> int64 {
-    let filename: uint8*;
-    let node: struct fs_node*;
-    if (argc > 1)
-        filename = argv[1];
-    else
-        filename = "/";
-    
-    node = vfs_get_node_for_path(filename, null);
-    if (node == null) {
-        printk("\"%s\" not found!\n", filename);
-        return -1;
-    }
-
-    if ((node->attrs & FS_NODE_ATTRS_TYPE_MASK) != FS_NODE_ATTRS_TYPE_FOLDER) {
-        printk("\"%s\" is not a folder!\n", filename);
-        return -2;
-    }
-
-    until((node->attrs & FS_NODE_ATTRS_FLAG_LINK) == 0)
-        node = node->child;
-
-    let current = node->child;
-    until(current == null) {
-        defer current = current->next;
-        if ((current->attrs & FS_NODE_ATTRS_FLAG_HIDDEN) != 0)
-            continue;
-        
-        printk("%s\n", current->name);
-    }
-
-    return 0;
-}
-
-@private
 fn command_exit(argc: int64, argv: uint8**) -> int64 {
     let status: int64 = 0;
     if (argc > 1) {
@@ -80,14 +47,16 @@ fn command_exit(argc: int64, argv: uint8**) -> int64 {
 
 @private
 fn command_mount(argc: int64, argv: uint8**) -> int64 {
-    if (argc < 2)
+    if (argc < 2) {
+        printk("usage: %s <device> [mountpoint]\n", argv[0]);
         return -1;
+    }
 
     let moutpoint: uint8* = null;
     if (argc > 2)
         moutpoint = argv[2];
 
-    let status: int64 = fat32_mount(argv[1], moutpoint) as int64;
+    let status: int64 = fat32_mount(argv[1], moutpoint);
     if (status < 0) {
         printk("fat32_mount() returned %d!\n", status);
         return -2;
@@ -109,11 +78,12 @@ fn command_echo(argc: int64, argv: uint8**) -> int64 {
 @private
 fn command_cat(argc: int64, argv: uint8**) -> int64 {
     if (argc < 2) {
-        printk("no file provided!\n");
+        printk("usage: %s <path>\n", argv[0]);
         return -1;
     }
     
-    let node = vfs_get_node_for_path(argv[1], null);
+    let proc = scheduler_get_current_process();
+    let node = vfs_get_node_for_path(argv[1], proc->cwd);
     if (node == null) {
         printk("\"%s\" not found!\n", argv[1]);
         return -2;
@@ -148,6 +118,81 @@ fn command_cat(argc: int64, argv: uint8**) -> int64 {
     buffer[f_size] = '\0';
     printk("%s\n", buffer);
 
+    return 0;
+}
+
+@private
+fn command_ls(argc: int64, argv: uint8**) -> int64 {
+    let filename: uint8*;
+    if (argc > 1)
+        filename = argv[1];
+    else
+        filename = "/";
+    
+    let proc = scheduler_get_current_process();
+    let node = vfs_get_node_for_path(filename, proc->cwd);
+    if (node == null) {
+        printk("\"%s\" not found!\n", filename);
+        return -1;
+    }
+
+    if ((node->attrs & FS_NODE_ATTRS_TYPE_MASK) != FS_NODE_ATTRS_TYPE_FOLDER) {
+        printk("\"%s\" is not a folder!\n", filename);
+        return -2;
+    }
+
+    until((node->attrs & FS_NODE_ATTRS_FLAG_LINK) == 0)
+        node = node->child;
+
+    let current = node->child;
+    until(current == null) {
+        defer current = current->next;
+        if ((current->attrs & FS_NODE_ATTRS_FLAG_HIDDEN) != 0)
+            continue;
+        
+        printk("%s\n", current->name);
+    }
+
+    return 0;
+}
+
+/**
+ * Changes the calling process's current working directory to the named child
+ * of its cwd. Unlike the other built-ins, cd is dispatched directly (not via
+ * console_run_command) so the cwd update lands in the console process itself
+ * rather than a short-lived forked child. The target must be an immediate child
+ * folder of the current directory; LINK nodes (e.g. "." / "..") are followed to
+ * their target.
+ *
+ * @param argc: number of arguments
+ * @param argv: argv[0] is the command name; argv[1] is the destination folder
+ *
+ * @return 0 on success, -1 if no path was given, -2 if the path is not found or
+ *         is not a folder
+ */
+@private
+fn console_cd(argc: int64, argv: uint8**) -> int64 {
+    if (argc < 2) {
+        printk("usage: %s <path>\n", argv[0]);
+        return -1;
+    }
+    
+    let proc = scheduler_get_current_process();
+    let node = vfs_get_node_for_path(argv[1], proc->cwd);
+    if (node == null) {
+        printk("\"%s\" not found!\n", argv[1]);
+        return -2;
+    }
+
+    if ((node->attrs & FS_NODE_ATTRS_TYPE_MASK) != FS_NODE_ATTRS_TYPE_FOLDER) {
+        printk("\"%s\" is not a folder!\n", argv[1]);
+        return -2;
+    }
+
+    until((node->attrs & FS_NODE_ATTRS_FLAG_LINK) == 0)
+        node = node->child;
+
+    proc->cwd = node;
     return 0;
 }
 
@@ -254,9 +299,11 @@ fn console_run_command(fnc: fn (int64, uint8**) -> int64, argc: int64, argv: uin
 }
 
 /**
- * Dispatches a parsed command to its built-in handler, each run in a forked
- * child via console_run_command. Built-in commands: ls [path] (list a folder's
- * entries), cat <path> (print a file), echo [args...] (print first arg),
+ * Dispatches a parsed command to its built-in handler. Most built-ins run in a
+ * forked child via console_run_command; cd is the exception, dispatched
+ * directly so it can mutate the console process's own cwd. Built-in commands:
+ * ls [path] (list a folder's entries), cd <path> (change the working
+ * directory), cat <path> (print a file), echo [args...] (print first arg),
  * mount <device> [mountpoint] (fat32_mount; mountpoint defaults to
  * /volumes/<label>), exit [status] (syscall_exit), help (list commands).
  * Unknown commands print a "not found!" message. Empty input is ignored.
@@ -269,7 +316,9 @@ fn console_parse_command(argc: int64, argv: uint8**) {
     if (argc == 0)
         return;
     
-    if (strcmp(argv[0], "ls") == 0) {
+    if (strcmp(argv[0], "cd") == 0) {
+        console_cd(argc, argv);
+    } else if (strcmp(argv[0], "ls") == 0) {
         console_run_command(command_ls, argc, argv);
     } else if (strcmp(argv[0], "exit") == 0) {
         console_run_command(command_exit, argc, argv);
@@ -287,9 +336,10 @@ fn console_parse_command(argc: int64, argv: uint8**) {
 }
 
 /**
- * Runs an interactive console loop on pathname. Prompts with "> ", tokenizes each line into
- * argc/argv (whitespace-delimited; double-quoted strings are treated as single tokens; backslash
- * escapes any character, including \" inside quotes), and dispatches to console_parse_command. Lines
+ * Runs an interactive console loop on pathname. Prompts with the current working directory's name
+ * (or "/" at the root) followed by " > ", tokenizes each line into argc/argv (whitespace-delimited;
+ * double-quoted strings are treated as single tokens; backslash escapes any character, including \"
+ * inside quotes), and dispatches to console_parse_command. Lines
  * with an unterminated quote or trailing backslash are rejected with an error and not dispatched.
  * Does not return.
  *
@@ -298,9 +348,16 @@ fn console_parse_command(argc: int64, argv: uint8**) {
 fn console(pathname: uint8*) {
     printk("[console] starting console at \"%s\"...\n", pathname);
     while (true) {
+        let proc = scheduler_get_current_process();
+        let cwd = proc->cwd;
         let i: uint64;
 
-        vfs_write(pathname, "> ", 2, 0);
+        if (cwd == vfs_root())
+            vfs_write(pathname, "/", 1, 0);
+        else
+            vfs_write(pathname, cwd->name, strlen(cwd->name), 0);
+
+        vfs_write(pathname, " > ", 3, 0);
 
         let buffer: uint8* = alloc<uint8*>(1024);
         defer dealloc(buffer);
@@ -312,7 +369,7 @@ fn console(pathname: uint8*) {
         let _quotes = false;
         let _backslash = false;
 
-        let args: array<uint8*>;
+        let args: struct array<uint8*>;
         array_init(&args, 10);
         defer {
             for arg in &args {
@@ -321,9 +378,9 @@ fn console(pathname: uint8*) {
             array_destroy(&args);
         }
 
-        let vec: struct array<uint8>;
-        array_init(&vec, 10);
-        defer array_destroy(&vec);
+        let vec: struct string;
+        string_init(&vec);
+        defer string_destroy(&vec);
 
         i = 0;
         while (i <= n as uint64) {
@@ -334,7 +391,7 @@ fn console(pathname: uint8*) {
 
             if (_backslash) {
                 _backslash = false;
-                array_append(&vec, c);
+                string_append(&vec, c);
             } else if (_quotes) {
                 case (c) {
                 when '\\':
@@ -345,11 +402,11 @@ fn console(pathname: uint8*) {
                     arg[vec.length] = '\0';
 
                     array_append(&args, arg);
-                    array_reset(&vec);
+                    string_reset(&vec);
 
                     _quotes = false;
                 else:
-                    array_append(&vec, c);
+                    string_append(&vec, c);
                 }
             } else {
                 case (c) {
@@ -365,18 +422,17 @@ fn console(pathname: uint8*) {
                             arg[vec.length] = '\0';
 
                             array_append(&args, arg);
-                            array_reset(&vec);
+                            string_reset(&vec);
                         }
                     }
                     else {
-                        array_append(&vec, c);
+                        string_append(&vec, c);
                     }
                 }
             }
         }
 
         printk("[console] argc=%d, argv=[", args.length);
-        
         for arg in &args {
             printk(" \"%s\",", arg);
         }

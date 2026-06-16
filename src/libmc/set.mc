@@ -8,21 +8,28 @@ import "iteration/pair";
 @private const SET_ENTRY_STATE_TOMBSTONE = 2;
 
 /**
- * Open-addressing hash table with linear probing; maps K keys to V values.
- * Integer keys hash by value (splitmix64); pointer keys hash by content
- * as NUL-terminated buffers (fnv1a) but still compare by address. Grows
- * automatically when the load factor reaches 70%.
+ * One slot in a set's backing array. Extends `pair<K, V>` with a slot state,
+ * so it inherits the entry's key/value and upcasts to a `struct pair<K, V>*`
+ * when yielded during iteration.
  *
  * @field key:   the entry's key; valid only when state == OCCUPIED
  * @field value: associated value; valid only when state == OCCUPIED
  * @field state: slot lifecycle — EMPTY (0), OCCUPIED (1), or TOMBSTONE (2)
  */
-struct set_entry<K, V> {
-    key: K;
-    value: V;
+struct set_entry<K, V> extends pair<K, V> {
     state: uint8;
 }
 
+/**
+ * Open-addressing hash table with linear probing; maps K keys to V values.
+ * Integer keys hash by value (splitmix64); pointer keys hash by content as
+ * NUL-terminated buffers (fnv1a) but still compare by address. Grows
+ * automatically when the load factor reaches 70%.
+ *
+ * @field entries:  heap-allocated slot array
+ * @field length:   number of live entries
+ * @field capacity: total allocated slots
+ */
 struct set<K, V> {
     entries: struct set_entry<K, V>*;  // heap-allocated slot array
     length: uint64;                    // number of live entries
@@ -186,7 +193,7 @@ fn set_grow<K, V>(self: struct set<K, V>*) {
  ***************************************/
 
 /**
- * A forward cursor over a set's occupied entries, produced by `iter`. It
+ * A forward cursor over a set's occupied entries, produced by `set_it`. It
  * borrows the set (does not copy it), so the set must outlive the iterator and
  * must not be modified or resized while iterating.
  */
@@ -197,14 +204,14 @@ struct set_iter<K, V> {
 
 /**
  * Begins an iteration over a set's key/value pairs, in unspecified
- * (hash-table slot) order. Part of the `iter`/`next` protocol; pair it with
- * `next`.
+ * (hash-table slot) order. Part of the `set_it`/`set_next` protocol (used by
+ * `for ... in`); pair it with `set_next`.
  *
  * @param self: set to iterate
  *
  * @return an iterator positioned before the first occupied entry
  */
-fn iter<K, V>(self: struct set<K, V>*) -> struct set_iter<K, V> {
+fn set_it<K, V>(self: struct set<K, V>*) -> struct set_iter<K, V> {
     let it: struct set_iter<K, V>;
     it.obj = self;
     it.idx = 0;
@@ -220,14 +227,13 @@ fn iter<K, V>(self: struct set<K, V>*) -> struct set_iter<K, V> {
  *
  * @return true if a pair was produced, false once iteration is complete
  */
-fn next<K, V>(it: struct set_iter<K, V>*, out: struct pair<K, V>*) -> bool {
+fn set_next<K, V>(it: struct set_iter<K, V>*, out: struct pair<K, V>*) -> bool {
     while (it->idx < it->obj->capacity) {
         let entry = it->obj->entries[it->idx];
         defer it->idx = it->idx + 1;
 
         if (entry.state == SET_ENTRY_STATE_OCCUPIED) {
-            out->key = entry.key;
-            out->value = entry.value;
+            *out = entry as struct pair<K, V>;
             return true;
         }
     }

@@ -71,7 +71,7 @@ standard library) in place of the in-tree C utilities.
 - Drivers — GIC, PL011, PL031, timer, virtio MMIO (`src/drivers/`)
 - Arch glue — exception vectors/IRQ dispatch, syscalls, system registers (`src/arch/`)
 - Memory — heap allocator, DTB memory probe (`src/mm/`)
-- Scheduler — context-switch core (`src/sched/`)
+- Scheduler — context-switch core (`src/sched/`); `@extern`-bound from `kernel/scheduler.mc`, which also implements the `scheduler_get/set_current_process` accessors in mc
 - FAT32 driver (`src/fs/fat32.c`)
 - Boot entry / init sequence (`src/kernel.c`)
 
@@ -201,8 +201,8 @@ standard library) in place of the in-tree C utilities.
 - `serial_init()` registers a `/dev/serial` I/O module backed by the PL011 UART. Must be called after `io_init()`.
 - `serial_read` blocks reading `count` bytes from the UART by calling `pl011_getc` in a loop, spinning on `wfi()` until each byte arrives; returns `count`.
 - `serial_write` writes `count` bytes to the UART one byte at a time via `pl011_putc`; returns `count`.
-- `console(pathname)` in `console.mc` runs an interactive terminal loop on the given VFS device, prompting with `"> "`, tokenizing each input line into `argc/argv` (whitespace-delimited; double-quoted strings are single tokens; backslash escapes any character, including `\"` inside quotes), and dispatching to `console_parse_command`. Lines with an unterminated quote or trailing backslash are rejected with an error.
-- `console_parse_command(argc, argv)` forks a child process for each command; parent waits via `syscall_waitpid`. Built-ins: `ls [path]` (lists a folder's entries, skipping hidden `.`/`..`; defaults to `/`), `cat <path>` (validates the node is a file, then reads and prints it), `echo [args...]` (print first arg), `mount <device> [mountpoint]` (`fat32_mount`; mountpoint defaults to `/volumes/<label>`), `exit [status]` (`syscall_exit`), `help` (list commands); unknown commands print a "not found!" message.
+- `console(pathname)` in `console.mc` runs an interactive terminal loop on the given VFS device, prompting with the current working directory's name (or `/` at the root) followed by `" > "`, tokenizing each input line into `argc/argv` (whitespace-delimited; double-quoted strings are single tokens; backslash escapes any character, including `\"` inside quotes), and dispatching to `console_parse_command`. Lines with an unterminated quote or trailing backslash are rejected with an error.
+- `console_parse_command(argc, argv)` forks a child process for each command (parent waits via `syscall_waitpid`), except `cd`, which is dispatched directly so it can mutate the console process's own cwd. Built-ins: `ls [path]` (lists a folder's entries relative to the cwd, skipping hidden `.`/`..`; defaults to `/`), `cd <path>` (changes the cwd to a child folder, following `.`/`..` links), `cat <path>` (resolves relative to the cwd, validates the node is a file, then reads and prints it), `echo [args...]` (print first arg), `mount <device> [mountpoint]` (`fat32_mount`; mountpoint defaults to `/volumes/<label>`), `exit [status]` (`syscall_exit`), `help` (list commands); unknown commands print a "not found!" message.
 - `console_getc(pathname)` reads the next character from a VFS device, blocking and discarding ANSI escape sequences.
 - `console_getline(pathname, buffer)` reads one line via `console_getc`, echoing characters back and handling backspace and CR; returns character count.
 
@@ -239,7 +239,7 @@ init/               — files bundled into init.img at build time (FAT32 ramdisk
 
 src/
   kernel.c/h        — kernel_init: subsystem bring-up (DTB, memory, IRQ, VFS, I/O, serial, storage, scheduler, timer); init(): pid 1 entry point, runs console("/dev/serial")
-  console.mc        — console()/console_getc()/console_getline()/console_parse_command(): interactive terminal loop with argc/argv tokenization (quoted strings, backslash escapes) and fork-per-command dispatch; built-ins: ls, cat, echo, mount, exit, help
+  console.mc        — console()/console_getc()/console_getline()/console_parse_command(): interactive terminal loop with cwd-aware prompt and argc/argv tokenization (quoted strings, backslash escapes), fork-per-command dispatch (cd dispatched directly); built-ins: ls, cd, cat, echo, mount, exit, help
   start.S           — AArch64 boot stub, saves DTB pointer, zeros BSS
   vectors.S         — exception vector table, save/restore_context macros
 
@@ -248,6 +248,7 @@ src/
     irq.mc          — IRQ dispatch table bindings, cpu_context, irq_register/unregister_handler
     syscall.mc      — syscall_init/register/unregister/yield/exit/getpid/waitpid/fork/sleep/msleep/time/uptime bindings
     process.mc      — process struct, create/duplicate/config/destroy_process
+    scheduler.mc    — @extern scheduler bindings + scheduler_get/set_current_process (implemented in mc)
     io.mc           — I/O module registry: io_init, io_register/unregister_module, io_read/io_write
     debug.mc        — printk/dprintk bindings
     uchar.mc        — utf16lencpy/utf16bencpy bindings
@@ -265,9 +266,10 @@ src/
 
   libmc/            — mcc standard library (generic, type-parametric)
     memory.mc       — alloc<T>/alloc_aligned<T>/resize<T>/dealloc<T>, copy_bytes/set_bytes/copy_items/set_items
-    array.mc        — dynamic array<T> with iter/next cursor (for-in)
-    dict.mc         — string-keyed dict<V> (open addressing)
-    set.mc, queue.mc, stack.mc — generic containers
+    array.mc        — dynamic array<T> with array_it/array_next cursor (for-in)
+    string.mc       — growable byte string (array<uint8> specialization, @inline wrappers)
+    dict.mc         — string-keyed dict<V> (open addressing, dict_it/dict_next cursor)
+    set.mc, queue.mc, stack.mc — generic containers (set_entry extends pair; set_it/set_next cursor)
     hash.mc         — hash<T> dispatch (splitmix64 for values, fnv1a for pointers)
     ascii.mc, uchar.mc
     hashing/        — splitmix64, fnv1a, crc32, murmur3

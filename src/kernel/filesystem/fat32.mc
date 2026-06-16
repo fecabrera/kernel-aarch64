@@ -264,7 +264,7 @@ struct fat32_entry_reference {
  *         -4 vfs_get_node_for_path failed; -5 vfs_create_mountpoint failed;
  *         -6 FAT table read error; -7 fs tree build error
  */
-@extern fn fat32_mount(device_path: uint8*, mountpoint: uint8*) -> int32;
+@extern fn fat32_mount(device_path: uint8*, mountpoint: uint8*) -> int64;
 
 /**
  * Unmounts the FAT32 volume mounted at the VFS path derived from pathname.
@@ -275,7 +275,7 @@ struct fat32_entry_reference {
  *
  * @return 0 on success, -1 on error
  */
-fn fat32_unmount(device_path: uint8*) -> int32 {
+fn fat32_unmount(device_path: uint8*) -> int64 {
     // steps:
     //   1. get vfs_mount
     //   2. get bs_info

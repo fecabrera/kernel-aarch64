@@ -1,6 +1,8 @@
 import "memory";
 import "hash";
+import "set";
 import "libc/string";
+import "iteration/pair";
 
 // Slot states
 @private const DICT_ENTRY_STATE_EMPTY = 0;
@@ -8,18 +10,16 @@ import "libc/string";
 @private const DICT_ENTRY_STATE_TOMBSTONE = 2;
 
 /**
- * One slot in a dict's backing array.
+ * One slot in a dict's backing array. A specialization of
+ * `set_entry<uint8*, V>` (string keys), so it inherits the pair's key/value and
+ * the slot state field.
  *
  * @field key:   owned, heap-allocated copy of the NUL-terminated key string;
  *               null when state != OCCUPIED
  * @field value: associated value; valid only when state == OCCUPIED
  * @field state: slot lifecycle — EMPTY (0), OCCUPIED (1), or TOMBSTONE (2)
  */
-struct dict_entry<V> {
-    key: uint8*;
-    value: V;
-    state: uint8;
-}
+struct dict_entry<V> extends set_entry<uint8*, V>;
 
 /**
  * Open-addressing hash map from NUL-terminated string keys to V values.
@@ -50,9 +50,9 @@ struct dict<V> {
 fn str_eq(a: uint8*, b: uint8*) -> bool {
     let i: uint64 = 0;
     while (a[i] == b[i]) {
-        defer i = i + 1;
         if (a[i] == 0)
             return true;
+        i = i + 1;
     }
     return false;
 }
@@ -85,8 +85,8 @@ fn dict_init<V>(self: struct dict<V>*, capacity: uint64) {
 
     let i: uint64 = 0;
     while (i < capacity) {
-        defer i = i + 1;
         self->entries[i].state = DICT_ENTRY_STATE_EMPTY;
+        i = i + 1;
     }
 }
 
@@ -99,9 +99,9 @@ fn dict_init<V>(self: struct dict<V>*, capacity: uint64) {
 fn dict_destroy<V>(self: struct dict<V>*) {
     let i: uint64 = 0;
     while (i < self->capacity) {
-        defer i = i + 1;
         if (self->entries[i].state == DICT_ENTRY_STATE_OCCUPIED)
             dealloc(self->entries[i].key);
+        i = i + 1;
     }
     dealloc(self->entries);
 
@@ -210,20 +210,18 @@ fn dict_remove<V>(self: struct dict<V>*, key: uint8*) {
 fn dict_grow<V>(self: struct dict<V>*) {
     let old_capacity = self->capacity;
     let old_entries = self->entries;
-    defer dealloc(old_entries);
 
     let new_capacity: uint64 = old_capacity * 2;
     let new_entries = alloc<struct dict_entry<V>>(new_capacity);
 
     let i: uint64 = 0;
     while (i < new_capacity) {
-        defer i = i + 1;
         new_entries[i].state = DICT_ENTRY_STATE_EMPTY;
+        i = i + 1;
     }
 
     i = 0;
     while (i < old_capacity) {
-        defer i = i + 1;
         if (old_entries[i].state == DICT_ENTRY_STATE_OCCUPIED) {
             let slot = hash(old_entries[i].key) % new_capacity;
             while (new_entries[slot].state == DICT_ENTRY_STATE_OCCUPIED)
@@ -231,8 +229,65 @@ fn dict_grow<V>(self: struct dict<V>*) {
 
             new_entries[slot] = old_entries[i];
         }
+        i = i + 1;
     }
 
+    dealloc(old_entries);
     self->entries = new_entries;
     self->capacity = new_capacity;
+}
+
+/***************************************
+ * Iteration
+ ***************************************/
+
+/**
+ * A forward cursor over a dict's occupied entries, produced by `iter`. It
+ * borrows the dict (does not copy it), so the dict must outlive the iterator
+ * and must not be modified or resized while iterating.
+ */
+struct dict_iter<V> {
+    obj: struct dict<V>*;   // the dict being walked
+    idx: uint64;            // index of the next slot to examine
+}
+
+/**
+ * Begins an iteration over a dict's string-keyed entries, in unspecified
+ * (hash-table slot) order. Part of the `dict_it`/`dict_next` protocol (used by
+ * `for ... in`); pair it with `dict_next`.
+ *
+ * @param self: dict to iterate
+ *
+ * @return an iterator positioned before the first occupied entry
+ */
+fn dict_it<V>(self: struct dict<V>*) -> struct dict_iter<V> {
+    let it: struct dict_iter<V>;
+    it.obj = self;
+    it.idx = 0;
+    return it;
+}
+
+/**
+ * Advances to the next occupied entry and writes its key/value into out. The
+ * written `key` borrows the dict's own storage and stays valid only while the
+ * dict is unmodified.
+ *
+ * @param it:  iterator to advance
+ * @param out: pair the next entry is written to; untouched when the dict is
+ *             exhausted
+ *
+ * @return true if a pair was produced, false once iteration is complete
+ */
+fn dict_next<V>(it: struct dict_iter<V>*, out: struct pair<uint8*, V>*) -> bool {
+    while (it->idx < it->obj->capacity) {
+        let entry = it->obj->entries[it->idx];
+        defer it->idx = it->idx + 1;
+
+        if (entry.state == DICT_ENTRY_STATE_OCCUPIED) {
+            *out = entry as struct pair<uint8*, V>;
+            return true;
+        }
+    }
+
+    return false;
 }
