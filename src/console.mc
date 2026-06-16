@@ -20,7 +20,7 @@ let available_commands: uint8*[][2] = [
 ];
 
 @private
-fn _command_help(argc: int64, argv: uint8**) -> int64 {
+fn command_help(argc: int64, argv: uint8**) -> int64 {
     printk("available commands:\r\n");
 
     let i: uint64 = 0;
@@ -34,7 +34,42 @@ fn _command_help(argc: int64, argv: uint8**) -> int64 {
 }
 
 @private
-fn _command_exit(argc: int64, argv: uint8**) -> int64 {
+fn command_ls(argc: int64, argv: uint8**) -> int64 {
+    let filename: uint8*;
+    let node: struct fs_node*;
+    if(argc > 1)
+        filename = argv[1];
+    else
+        filename = "/";
+    
+    node = vfs_get_node_for_path(filename, null);
+    if (node == null) {
+        printk("\"%s\" not found!\n", filename);
+        return -1;
+    }
+
+    if ((node->attrs & FS_NODE_ATTRS_TYPE_MASK) != FS_NODE_ATTRS_TYPE_FOLDER) {
+        printk("\"%s\" is not a folder!\n", filename);
+        return -2;
+    }
+
+    until((node->attrs & FS_NODE_ATTRS_FLAG_LINK) == 0)
+        node = node->child;
+
+    let current = node->child;
+    until(current == null) {
+        defer current = current->next;
+        if ((current->attrs & FS_NODE_ATTRS_FLAG_HIDDEN) != 0)
+            continue;
+        
+        printk("%s\n", current->name);
+    }
+
+    return 0;
+}
+
+@private
+fn command_exit(argc: int64, argv: uint8**) -> int64 {
     let status: int64 = 0;
     if (argc > 1) {
         status = atoll(argv[1]);
@@ -44,7 +79,7 @@ fn _command_exit(argc: int64, argv: uint8**) -> int64 {
 }
 
 @private
-fn _command_mount(argc: int64, argv: uint8**) -> int64 {
+fn command_mount(argc: int64, argv: uint8**) -> int64 {
     if (argc < 2)
         return -1;
 
@@ -63,7 +98,7 @@ fn _command_mount(argc: int64, argv: uint8**) -> int64 {
 }
 
 @private
-fn _command_echo(argc: int64, argv: uint8**) -> int64 {
+fn command_echo(argc: int64, argv: uint8**) -> int64 {
     if (argc > 1)
         printk("%s", argv[1]);
     printk("\r\n");
@@ -72,7 +107,7 @@ fn _command_echo(argc: int64, argv: uint8**) -> int64 {
 }
 
 @private
-fn _command_cat(argc: int64, argv: uint8**) -> int64 {
+fn command_cat(argc: int64, argv: uint8**) -> int64 {
     if (argc < 2) {
         printk("no file provided!\r\n");
         return -1;
@@ -208,17 +243,17 @@ fn console_parse_command(argc: int64, argv: uint8**) {
     } else {
         status = -1;
         if (strcmp(argv[0], "ls") == 0) {
-            vfs_dump_fs();
+            status = command_ls(argc, argv);
         } else if (strcmp(argv[0], "exit") == 0) {
-            status = _command_exit(argc, argv);
+            status = command_exit(argc, argv);
         } else if (strcmp(argv[0], "echo") == 0) {
-            status = _command_echo(argc, argv);
+            status = command_echo(argc, argv);
         } else if (strcmp(argv[0], "cat") == 0) {
-            status = _command_cat(argc, argv);
+            status = command_cat(argc, argv);
         } else if (strcmp(argv[0], "mount") == 0) {
-            status = _command_mount(argc, argv);
+            status = command_mount(argc, argv);
         } else if (strcmp(argv[0], "help") == 0) {
-            status = _command_help(argc, argv);
+            status = command_help(argc, argv);
         } else {
             status = 0;
         }

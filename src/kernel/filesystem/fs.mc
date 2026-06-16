@@ -230,7 +230,8 @@ fn fs_add_to_folder(parent: struct fs_node*, node: struct fs_node*) {
  */
 @private
 fn fs_create_self_ref(folder: struct fs_node*) -> struct fs_node* {
-    let self_ref = fs_create_node(".", 0, FS_NODE_ATTRS_TYPE_FOLDER, null, folder->mount, null, null);
+    let attrs: uint16 = FS_NODE_ATTRS_TYPE_FOLDER | FS_NODE_ATTRS_FLAG_LINK | FS_NODE_ATTRS_FLAG_HIDDEN;
+    let self_ref = fs_create_node(".", 0, attrs, null, folder->mount, null, null);
     self_ref->child = folder;
     fs_add_to_folder(folder, self_ref);
     return self_ref;
@@ -247,7 +248,8 @@ fn fs_create_self_ref(folder: struct fs_node*) -> struct fs_node* {
  */
 @private
 fn fs_create_parent_ref(parent: struct fs_node*, folder: struct fs_node*) -> struct fs_node* {
-    let parent_ref = fs_create_node("..", 0, FS_NODE_ATTRS_TYPE_FOLDER, null, folder->mount, null, null);
+    let attrs: uint16 = FS_NODE_ATTRS_TYPE_FOLDER | FS_NODE_ATTRS_FLAG_LINK | FS_NODE_ATTRS_FLAG_HIDDEN;
+    let parent_ref = fs_create_node("..", 0, attrs, null, folder->mount, null, null);
     parent_ref->child = parent;
     fs_add_to_folder(folder, parent_ref);
     return parent_ref;
