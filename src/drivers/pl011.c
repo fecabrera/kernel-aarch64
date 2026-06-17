@@ -131,11 +131,11 @@ void pl011_init() {
     PL011_CR = PL011_CR_UARTEN | PL011_CR_TXE | PL011_CR_RXE;
 
     if (dtb_get_pl011_irq_number(&pl011_irq) == 0) {
-        dprintk("[pl011] Initializing IRQ: %i\r\n", pl011_irq);
+        dprintk("[pl011] Initializing IRQ: %i\n", pl011_irq);
         irq_register_handler(pl011_irq, &pl011_irq_handler);
         gic_enable_irq(pl011_irq);
     } else {
-        dprintk("[pl011] IRQ not found!!\r\n");
+        dprintk("[pl011] IRQ not found!!\n");
     }
 }
 

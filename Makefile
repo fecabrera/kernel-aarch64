@@ -1,6 +1,15 @@
+MCCPATH = ~/Documents/lang
+MCC		= PYTHONPATH=$(MCCPATH) python -m mcc
 CC      = aarch64-elf-gcc
 LD      = aarch64-elf-ld
 OBJCOPY = aarch64-elf-objcopy
+
+MCFLAGS = --target aarch64-unknown-none-elf \
+          --general-regs-only \
+		  --naked \
+		  -O3 \
+		  -I src/kernel \
+		  -I src/libmc
 
 CFLAGS  = -ffreestanding -nostdlib -nostdinc \
           -mgeneral-regs-only \
@@ -12,8 +21,13 @@ CFLAGS  = -ffreestanding -nostdlib -nostdinc \
 
 SRCS := $(wildcard \
 		  src/*.c \
+		  src/*.mc \
  		  src/*.S \
   		  src/lib/*.c \
+  		  src/libmc/*.mc \
+  		  src/libmc/iteration/*.mc \
+  		  src/libmc/hashing/*.mc \
+  		  src/libmc/libc/*.mc \
 		  src/dsa/*.c \
 		  src/dsa/deque/*.c \
 		  src/dsa/hashmap/*.c \
@@ -28,13 +42,24 @@ SRCS := $(wildcard \
 		  src/sched/*.c \
 		  src/fs/*.c \
 		  src/io/*.c \
-		  src/devices/*.c)
+		  src/kernel/*.mc \
+		  src/kernel/arch/*.mc \
+		  src/kernel/devices/*.mc \
+		  src/kernel/drivers/*.mc \
+		  src/kernel/filesystem/*.mc \
+		  src/kernel/io/*.mc \
+		  src/kernel/mm/*.mc)
 OBJS := $(patsubst src/%, build/%, $(SRCS:.c=.o))
 OBJS := $(OBJS:.S=.o)
+OBJS := $(OBJS:.mc=.o)
 
 build: kernel.elf kernel.img
 
 all: build init.img
+
+build/%.o: src/%.mc
+	@mkdir -p $(dir $@)
+	$(MCC) $(MCFLAGS) $< -o $@
 
 build/%.o: src/%.S
 	@mkdir -p $(dir $@)

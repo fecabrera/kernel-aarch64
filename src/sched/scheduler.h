@@ -19,6 +19,22 @@
 void scheduler_init();
 
 /**
+ * Returns the process currently scheduled on this CPU, or NULL when none is
+ * running (e.g. while the idle context executes).
+ *
+ * @return pointer to the running process, or NULL
+ */
+struct process *scheduler_get_current_process();
+
+/**
+ * Sets the process considered currently scheduled. Pass NULL to clear it (done
+ * by the scheduler when a process blocks or exits).
+ *
+ * @param proc: process to mark as running, or NULL to clear
+ */
+void scheduler_set_current_process(struct process *proc);
+
+/**
  * Sets proc->state to PROC_READY and pushes it onto the tail of the ready queue.
  *
  * @param proc: process to enqueue; must be fully initialized (create_process

@@ -1,9 +1,11 @@
 #include "heap.h"
+#include <arch/cpu.h>
 #include <debug.h>
+#include <stdint.h>
 
 static struct block_header *heap_head = 0;
 
-static uint8_t _heap[HEAP_SIZE] = {0};
+uint8_t _heap[HEAP_SIZE] = {0};
 
 void heap_init() {
     heap_head = (struct block_header *)_heap;
@@ -11,7 +13,7 @@ void heap_init() {
     heap_head->free = BLOCK_FREE;
     heap_head->next = NULL;
 
-    dprintk("[heap] heap initialized: start=0x%x, size=%d B\r\n", _heap, heap_head->size);
+    dprintk("[heap] heap initialized: start=0x%08X, size=%d B\n", _heap, heap_head->size);
 }
 
 // Merge adjacent free blocks (called after kfree, prevents fragmentation)
@@ -54,16 +56,23 @@ void *kmalloc(size_t size) {
             }
 
             cur->free = BLOCK_USED;
-            return (void *)((uint8_t *)cur + HEADER_SIZE);
+            uint8_t *ptr = (uint8_t *)cur + HEADER_SIZE;
+
+            if (ptr >= _heap + HEAP_SIZE) {
+                printk("address=0x%016X\n", ptr);
+                halt();
+            }
+
+            return (void *)ptr;
         }
         cur = cur->next;
     }
 
-    printk("[heap] kmalloc: out of memory!\r\n");
+    printk("[heap] kmalloc: out of memory!\n");
 
     struct block_header *_head = heap_head;
     while (_head) {
-        printk("block at 0x%x: size=%d B %s\r\n", _head + HEADER_SIZE, _head->size,
+        printk("block at 0x%x: size=%d B %s\n", _head + HEADER_SIZE, _head->size,
                _head->free ? "FREE" : "USED");
         _head = _head->next;
     }
@@ -80,12 +89,12 @@ int kfree(void *ptr) {
 
     // Sanity check — ptr should be inside heap
     if ((uint8_t *)hdr < _heap || (uint8_t *)hdr >= _heap + HEAP_SIZE) {
-        printk("[heap] kfree: pointer out of range!\r\n");
+        printk("[heap] kfree: pointer out of range!\n");
         return -2;
     }
 
     if (hdr->free) {
-        printk("[heap] kfree: double free detected!\r\n");
+        printk("[heap] kfree: double free detected!\n");
         return -3;
     }
 
@@ -133,14 +142,14 @@ void *kmalloc_aligned(size_t size, size_t align) {
 }
 
 void heap_dump() {
-    dprintk("\r\n=== heap dump ===\r\n");
+    dprintk("\n=== heap dump ===\n");
 
     struct block_header *cur = heap_head;
     size_t used = 0, free = 0;
 
     int i = 0;
     while (cur) {
-        dprintk("  [%i] addr=0x%x size=%i %s\r\n", i++, cur + HEADER_SIZE, cur->size,
+        dprintk("  [%i] addr=0x%x size=%i %s\n", i++, cur + HEADER_SIZE, cur->size,
                 cur->free ? "FREE" : "USED");
 
         if (cur->free)
@@ -151,7 +160,7 @@ void heap_dump() {
         cur = cur->next;
     }
 
-    dprintk("  used: %i bytes\r\n", used);
-    dprintk("  free: %i bytes\r\n", free);
-    dprintk("=================\r\n\r\n");
+    dprintk("  used: %i bytes\n", used);
+    dprintk("  free: %i bytes\n", free);
+    dprintk("=================\n\n");
 }

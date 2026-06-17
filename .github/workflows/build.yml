@@ -2,9 +2,9 @@ name: Build
 
 on:
   push:
-    branches: ["main"]
+    branches: ["*"]
   pull_request:
-    branches: ["main"]
+    branches: ["*"]
 
 jobs:
   build:
@@ -13,10 +13,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up Python 3.14
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
       - name: Install toolchain
         run: |
           sudo apt-get update -q
           sudo apt-get install -y gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu
+
+      - name: Get mcc compiler
+        run: |
+          git clone https://github.com/fecabrera/mcc.git
+          cd mcc
+          pip install pipenv
+          pipenv install --dev --deploy --system
+          cd ..
 
       - name: Symlink cross-compiler to expected names
         run: |
@@ -25,4 +38,4 @@ jobs:
           sudo ln -sf /usr/bin/aarch64-linux-gnu-objcopy /usr/local/bin/aarch64-elf-objcopy
 
       - name: Build
-        run: make
+        run: make MCCPATH=mcc

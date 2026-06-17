@@ -2,9 +2,9 @@
 
 #include "filesystem.h"
 
-#define VFS_IO_ERROR_FILE_NOT_FOUND -1
-#define VFS_IO_ERROR_MOUNTPOINT_NOT_FOUND -2
-#define VFS_IO_ERROR_HANDLER_NOT_PROVIDED -3
+#define FS_IO_ERROR_FILE_NOT_FOUND -1
+#define FS_IO_ERROR_MOUNTPOINT_NOT_FOUND -2
+#define FS_IO_ERROR_HANDLER_NOT_PROVIDED -3
 
 typedef int (*vfs_handler_t)(struct fs_node *, uint8_t *, size_t, size_t);
 
@@ -23,6 +23,11 @@ struct vfs_mount {
  * node, and adds a "volumes" subfolder to it. Must be called before any other VFS operation.
  */
 void vfs_init();
+
+/**
+ * Returns the global VFS root node. Valid only after vfs_init().
+ */
+struct fs_node *vfs_root();
 
 /**
  * Registers a mount entry for the given path. Resolves mountpoint via _vfs_get_node, validates it
@@ -60,7 +65,7 @@ struct vfs_mount *vfs_get_mountpoint(char *mountpoint);
  *
  * @return pointer to the fs_node, or NULL if not found
  */
-struct fs_node *vfs_get_node_for_path(char *pathname);
+struct fs_node *vfs_get_node_for_path(char *pathname, struct fs_node *root);
 
 /**
  * Removes the mount entry for mountpoint from the mount table, unlinks the mount's root node from
@@ -120,8 +125,8 @@ size_t vfs_get_file_size(char *pathname);
  * @param count:    number of bytes to read
  * @param offset:   byte offset into the file to read from
  *
- * @return return value of mount->read on success; VFS_IO_ERROR_FILE_NOT_FOUND,
- *         VFS_IO_ERROR_MOUNTPOINT_NOT_FOUND, or VFS_IO_ERROR_HANDLER_NOT_PROVIDED on failure
+ * @return return value of mount->read on success; FS_IO_ERROR_FILE_NOT_FOUND,
+ *         FS_IO_ERROR_MOUNTPOINT_NOT_FOUND, or FS_IO_ERROR_HANDLER_NOT_PROVIDED on failure
  */
 int vfs_read(char *pathname, uint8_t *buffer, size_t count, size_t offset);
 
@@ -134,8 +139,8 @@ int vfs_read(char *pathname, uint8_t *buffer, size_t count, size_t offset);
  * @param count:    number of bytes to write
  * @param offset:   byte offset into the file to write to
  *
- * @return return value of mount->write on success; VFS_IO_ERROR_FILE_NOT_FOUND,
- *         VFS_IO_ERROR_MOUNTPOINT_NOT_FOUND, or VFS_IO_ERROR_HANDLER_NOT_PROVIDED on failure
+ * @return return value of mount->write on success; FS_IO_ERROR_FILE_NOT_FOUND,
+ *         FS_IO_ERROR_MOUNTPOINT_NOT_FOUND, or FS_IO_ERROR_HANDLER_NOT_PROVIDED on failure
  */
 int vfs_write(char *pathname, uint8_t *buffer, size_t count, size_t offset);
 

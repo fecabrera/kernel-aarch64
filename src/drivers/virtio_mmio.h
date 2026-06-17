@@ -185,7 +185,7 @@ void virtio_mmio_init();
  *
  * @return slot index of the first matching device, or -1 if none found
  */
-virtio_slot_t virtio_mmio_find_next_slot(uint32_t device_id, int start);
+virtio_slot_t virtio_mmio_find_next_slot(uint32_t device_id, virtio_slot_t start);
 
 /**
  * Submits a synchronous read request to the virtio-blk device at the given slot. Builds a

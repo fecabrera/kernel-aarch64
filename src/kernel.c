@@ -1,5 +1,4 @@
 #include "kernel.h"
-#include "console.h"
 #include <arch/syscall.h>
 #include <debug.h>
 #include <devices/serial.h>
@@ -15,6 +14,8 @@
 #include <mm/heap.h>
 #include <mm/mem.h>
 #include <sched/scheduler.h>
+
+extern void console(char *pathname);
 
 void kernel_init() {
     // Initialize DTB
@@ -46,7 +47,7 @@ void kernel_init() {
 
     // set up root process
     pid_t pid = scheduler_spawn(&init);
-    dprintk("[kernel] spawned init process with pid %i\r\n", pid);
+    dprintk("[kernel] spawned init process with pid %i\n", pid);
 
     // start scheduler
     timer_init();

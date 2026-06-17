@@ -16,7 +16,7 @@ int dtb_init() {
     hdr = (const struct fdt_header *)dtb_ptr;
 
     if (_be32(hdr->magic) != FDT_MAGIC) {
-        dprintk("[dtb] bad magic!\r\n");
+        dprintk("[dtb] bad magic!\n");
         return -1;
     }
 
@@ -27,7 +27,7 @@ int dtb_init() {
     if (dtb_find_prop("", "model", &prop) == 0) {
         dprintk("[dtb] model = ");
         dprintk((const char *)prop.data);
-        dprintk("\r\n");
+        dprintk("\n");
     }
     if (dtb_find_prop("", "compatible", &prop) == 0) {
         const char *s = (const char *)prop.data;
@@ -39,7 +39,7 @@ int dtb_init() {
             dprintk("\"");
             s += strlen(s) + 1;
         }
-        dprintk("\r\n");
+        dprintk("\n");
     }
 
     return 0;
@@ -108,7 +108,7 @@ int dtb_find_prop(const char *node_path, const char *prop_name, struct fdt_prop 
 }
 
 void dtb_dump() {
-    dprintk("\r\n=== dtb dump ===\r\n");
+    dprintk("\n=== dtb dump ===\n");
 
     const uint32_t *p = struct_base;
     int depth = 0;
@@ -122,7 +122,7 @@ void dtb_dump() {
                 dprintk("  ");
             dprintk("[node] ");
             dprintk(*name ? name : "/");
-            dprintk("\r\n");
+            dprintk("\n");
             depth++;
             uint32_t len = strlen(name) + 1;
             p += (len + 3) / 4;
@@ -133,13 +133,13 @@ void dtb_dump() {
             uint32_t nameoff = _be32(*p++);
             for (int i = 0; i < depth; i++)
                 dprintk("  ");
-            dprintk("  %s ( %i bytes)\r\n", strings + nameoff, len);
+            dprintk("  %s ( %i bytes)\n", strings + nameoff, len);
             p += (len + 3) / 4;
         } else if (token == FDT_END) {
             break;
         }
     }
-    dprintk("=================\r\n\r\n");
+    dprintk("=================\n\n");
 }
 
 int dtb_get_memory_register(struct memreg *ptr) {
@@ -189,7 +189,7 @@ int dtb_get_pl011_irq_number(uint32_t *ptr) {
             s += strlen(s) + 1;
         }
     }
-    dprintk("\r\n");
+    dprintk("\n");
     return ret;
 }
 
@@ -211,7 +211,7 @@ int dtb_get_timer_irq_number(uint32_t *ptr) {
             s += strlen(s) + 1;
         }
     }
-    dprintk("\r\n");
+    dprintk("\n");
     return ret;
 }
 
@@ -233,7 +233,7 @@ int dtb_get_rtc_irq_number(uint32_t *ptr) {
             s += strlen(s) + 1;
         }
     }
-    dprintk("\r\n");
+    dprintk("\n");
     return ret;
 }
 
@@ -259,6 +259,6 @@ int dtb_get_virtio_mmio_irq_number(int n, uint32_t *ptr) {
             s += strlen(s) + 1;
         }
     }
-    dprintk("\r\n");
+    dprintk("\n");
     return ret;
 }

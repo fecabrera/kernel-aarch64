@@ -267,7 +267,7 @@ void fat32_build_cluster_chains(struct fat32_bs_info *bs_info, struct queue32 *c
  *         -4 vfs_get_node_for_path failed; -5 vfs_create_mountpoint failed;
  *         -6 FAT table read error; -7 fs tree build error
  */
-int fat32_mount(char *device_path, char *mountpoint);
+int64_t fat32_mount(char *device_path, char *mountpoint);
 
 /**
  * Unmounts the FAT32 volume mounted at the VFS path derived from pathname.
@@ -278,7 +278,7 @@ int fat32_mount(char *device_path, char *mountpoint);
  *
  * @return 0 on success, -1 on error
  */
-int fat32_unmount(char *device_path);
+int64_t fat32_unmount(char *device_path);
 
 /**
  * vfs_handler_t read handler for FAT32 mountpoints.
