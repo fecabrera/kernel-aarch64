@@ -1,10 +1,10 @@
 import "debug";
 import "cpu";
 import "dtb";
-import "gic";
-import "irq";
 import "syscall";
 import "scheduler";
+import "interrupts/gic";
+import "interrupts/irq";
 
 const DEFAULT_TIMER_INTERVAL = 10;
 

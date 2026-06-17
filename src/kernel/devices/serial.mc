@@ -1,7 +1,7 @@
 import "debug";
 import "cpu";
 import "io";
-import "drivers/pl011";
+import "interrupts/drivers/pl011";
 
 /**
  * Registers a "/dev/serial" I/O module backed by the PL011 UART.

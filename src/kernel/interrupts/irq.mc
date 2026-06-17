@@ -3,7 +3,7 @@ import "cpu";
 import "syscall";
 import "scheduler";
 import "set";
-import "drivers/gic";
+import "interrupts/gic";
 
 const ESR_EC_SHIFT = 26;
 const ESR_EC_MASK = 0x3F;

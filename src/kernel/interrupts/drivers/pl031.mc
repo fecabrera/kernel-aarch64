@@ -1,9 +1,9 @@
 import "debug";
 import "cpu";
 import "dtb";
-import "gic";
-import "irq";
 import "syscall";
+import "interrupts/gic";
+import "interrupts/irq";
 
 /**
  * PL031 RTC register block, memory-mapped at RTC_BASE. All registers are 32-bit

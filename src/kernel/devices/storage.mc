@@ -1,8 +1,8 @@
 import "debug";
 import "memory";
 import "io";
-import "drivers/virtio_mmio";
 import "libc/stdio";
+import "interrupts/drivers/virtio_mmio";
 
 @static
 let _next: uint8 = 'a';
