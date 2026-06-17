@@ -64,6 +64,7 @@ boilerplate for type-safe, reusable code. mc code links against C through
 - I/O module registry (`io.mc`)
 - Process management (`process.mc`)
 - Syscall dispatch table + user-facing wrappers (`syscall.mc`, `system/syscall.mc`)
+- Exception/IRQ dispatch — sync/irq/fiq/serr handlers, IRQ registry, vbar_el1 setup (`irq.mc`)
 - Scheduler syscall handlers — exit, yield, getpid, fork, spawn (`scheduler.mc`)
 - Drivers — GIC, PL031 RTC, ARM generic timer (`drivers/gic.mc`, `drivers/pl031.mc`, `drivers/timer.mc`)
 - Device handlers — serial, storage (`devices/`)
@@ -73,7 +74,7 @@ boilerplate for type-safe, reusable code. mc code links against C through
 **Still C, wrapped via `@extern`** (port targets, low-level first):
 
 - Drivers — PL011, virtio MMIO (`src/drivers/`)
-- Arch glue — exception vectors/IRQ dispatch, `svc` syscall trampolines, system registers (`src/arch/`)
+- Arch glue — exception vector table (`vectors.S`), `svc` syscall trampolines, system registers (`src/arch/`); IRQ dispatch ported to `kernel/irq.mc`
 - Memory — heap allocator, DTB memory probe (`src/mm/`)
 - Scheduler — context-switch core, ready/wait/sleep queues, and the waitpid/sleep/msleep handlers (`src/sched/`); the rest is `@extern`-bound from `kernel/scheduler.mc`, which also implements the exit/yield/getpid/fork/spawn handlers and the `scheduler_get/set_current_process` accessors in mc
 - FAT32 driver (`src/fs/fat32.c`)
@@ -248,8 +249,8 @@ src/
   vectors.S         — exception vector table, save/restore_context macros
 
   kernel/           — mc kernel modules (logic + @extern bindings to the C below)
-    cpu.mc          — cpu_context, SPSR defines, wfe/wfi, irq_enable/disable, timer registers, bswap/be*/le* helpers
-    irq.mc          — IRQ dispatch table bindings, cpu_context, irq_register/unregister_handler
+    cpu.mc          — cpu_context, SPSR/CNTP_CTL defines, wfe/wfi, irq_enable/disable, timer registers, set_vbar_el1, bswap/be*/le* helpers
+    irq.mc          — exception/IRQ dispatch: sync/irq/fiq/serr handlers, ESR_EC decode, generic-set IRQ registry, irq_init (vbar_el1), irq_register/unregister_handler
     syscall.mc      — svc #0 dispatch table (generic set): syscall_init/register/unregister_handler, syscall_handler, SYSCALL_* numbers
     dtb.mc          — @extern bindings to the C DTB parser: dtb_init/dump/find_prop, *_irq_number lookups, fdt_header/memreg/fdt_prop structs
     process.mc      — process struct, create/duplicate/config/destroy_process
@@ -287,8 +288,8 @@ src/
     libc/           — freestanding ctype, stdio, stdlib, string, limits
 
   arch/             — AArch64-specific (C)
-    cpu.c/h         — system register accessors (cntpct, cntfrq, cntp, DAIF), SPSR defines, halt/hang, _wfi_while/_wfe_while spin macros
-    irq.c/h         — exception handlers, IRQ dispatch table, cpu_context, irq_init
+    cpu.c/h         — system register accessors (cntpct, cntfrq, cntp, vbar_el1, DAIF), SPSR defines, halt/hang, _wfi_while/_wfe_while spin macros
+    irq.h           — IRQ/exception interface: irq_handler_t, irq_init/register_handler, sync/irq/fiq/serr handlers (impl ported to kernel/irq.mc)
     syscall.c/h     — asm svc trampolines (syscall_yield/exit/getpid/waitpid/fork/sleep/msleep/time/uptime); dispatch table ported to kernel/syscall.mc
 
   drivers/          — MMIO peripheral drivers (C)

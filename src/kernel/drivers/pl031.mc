@@ -94,7 +94,7 @@ fn pl031_set_alarm(unix_time: uint32) {
  *
  * @return ctx unchanged (no context switch).
  */
-fn pl031_irq_handler(irq: int32, ctx: struct cpu_context*) -> struct cpu_context* {
+fn pl031_irq_handler(irq: uint32, ctx: struct cpu_context*) -> struct cpu_context* {
     dprintk("[pl031] alarm fired!\n");
 
     PL031->icr = RTC_INT_MATCH;   // clear interrupt

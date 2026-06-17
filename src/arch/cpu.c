@@ -38,6 +38,12 @@ void set_cntp_ctl_el0(const uint64_t value) {
     __asm__ volatile("msr cntp_ctl_el0, %0" ::"r"(value));
 }
 
+void set_vbar_el1(const uint64_t value) {
+    __asm__ volatile("msr vbar_el1, %0\n"
+                     "isb\n" // Instruction sync barrier
+                     ::"r"(value));
+}
+
 void halt() {
     _wfi_while(true);
     __builtin_unreachable();

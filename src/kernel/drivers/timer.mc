@@ -120,7 +120,7 @@ fn timer_set_interval(interval: uint64) {
  *
  * @return saved context of the next task to run as selected by the scheduler
  */
-fn timer_irq_handler(irq: int32, ctx: struct cpu_context*) -> struct cpu_context* {
+fn timer_irq_handler(irq: uint32, ctx: struct cpu_context*) -> struct cpu_context* {
     let last_ticks = tinfo.ticks;
 
     tinfo.ticks = get_cntpct_el0();

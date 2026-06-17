@@ -155,3 +155,11 @@ uint64_t get_cntp_ctl_el0();
  * @param value: value to write (combination of CNTP_CTL_* flags)
  */
 void set_cntp_ctl_el0(const uint64_t value);
+
+/**
+ * Sets the EL1 exception vector base register (vbar_el1) to the given table
+ * address, followed by an instruction sync barrier so the change takes effect.
+ *
+ * @param table: address of the exception vector table to install
+ */
+void set_vbar_el1(const uint64_t table);

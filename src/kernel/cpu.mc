@@ -136,3 +136,11 @@ struct cpu_context {
  * @param value: value to write (combination of CNTP_CTL_* flags)
  */
 @extern fn set_cntp_ctl_el0(value: uint64);
+
+/**
+ * Sets the EL1 exception vector base register (vbar_el1) to the given table
+ * address, followed by an instruction sync barrier so the change takes effect.
+ *
+ * @param table: address of the exception vector table to install
+ */
+@extern fn set_vbar_el1(table: uint64);
