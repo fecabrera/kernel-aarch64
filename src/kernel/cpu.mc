@@ -5,6 +5,18 @@ const SPSR_EL1h = 0x05; // EL1, SP_EL1 (standard kernel mode)
 const SPSR_EL2t = 0x08; // EL2, SP_EL0
 const SPSR_EL2h = 0x09; // EL2, SP_EL2
 
+// SPSR_EL1 — interrupt mask bits (DAIF, bits 9:6)
+const SPSR_D = (1 << 9); // Debug exceptions masked
+const SPSR_A = (1 << 8); // SError masked
+const SPSR_I = (1 << 7); // IRQ masked
+const SPSR_F = (1 << 6); // FIQ masked
+const SPSR_MASKS_ALL = (SPSR_D | SPSR_A | SPSR_I | SPSR_F);
+
+// cntp_ctl_el0 bits
+const CNTP_CTL_ENABLE = (1 << 0);  // Timer enabled
+const CNTP_CTL_IMASK = (1 << 1);   // Interrupt masked (suppress IRQ)
+const CNTP_CTL_ISTATUS = (1 << 2); // Interrupt status (read-only, 1 = condition met)
+
 struct cpu_context {
     x: uint64[30];
     lr: uint64;
@@ -108,3 +120,19 @@ struct cpu_context {
  * @param value: number of timer ticks until the next interrupt
  */
 @extern fn set_cntp_tval_el0(value: uint64);
+
+/**
+ * Reads the EL1 physical timer control register (cntp_ctl_el0).
+ * Check CNTP_CTL_ISTATUS to determine if the timer condition has been met.
+ *
+ * @return Current value of cntp_ctl_el0.
+ */
+@extern fn get_cntp_ctl_el0() -> uint64;
+
+/**
+ * Writes the EL1 physical timer control register (cntp_ctl_el0).
+ * Use CNTP_CTL_ENABLE, CNTP_CTL_IMASK, and CNTP_CTL_ISTATUS flags.
+ *
+ * @param value: value to write (combination of CNTP_CTL_* flags)
+ */
+@extern fn set_cntp_ctl_el0(value: uint64);

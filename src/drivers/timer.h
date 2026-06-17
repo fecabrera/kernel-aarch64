@@ -35,9 +35,10 @@ void timer_init();
 time_t timer_get_uptime();
 
 /**
- * IRQ handler for the EL1 physical timer. Increments the tick counter,
- * prints a message every second, reloads the countdown register, and
- * calls scheduler_handler to preempt the current task.
+ * IRQ handler for the EL1 physical timer. Captures the current counter value,
+ * computes the elapsed interval in milliseconds since the previous tick, calls
+ * scheduler_handler with that interval to preempt the current task, then
+ * reloads the countdown register for the next tick.
  * Registered with irq_register_handler at timer_init time.
  *
  * @param irq: IRQ ID passed by the dispatcher (unused)

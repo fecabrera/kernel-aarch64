@@ -48,7 +48,8 @@ SRCS := $(wildcard \
 		  src/kernel/drivers/*.mc \
 		  src/kernel/filesystem/*.mc \
 		  src/kernel/io/*.mc \
-		  src/kernel/mm/*.mc)
+		  src/kernel/mm/*.mc \
+		  src/kernel/system/*.mc)
 OBJS := $(patsubst src/%, build/%, $(SRCS:.c=.o))
 OBJS := $(OBJS:.S=.o)
 OBJS := $(OBJS:.mc=.o)

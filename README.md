@@ -49,13 +49,14 @@ make run
 
 ## mcc port status
 
-The kernel is mid-migration from C to **mc**, a separate language built on LLVM
-and cross-compiled to AArch64 by `mcc`. mc buys generics (one `dict<V>` instead of N copies of
-`hashmap64`), `defer`-based scope cleanup, and a real module system with
-explicit linkage — so the port trades hand-rolled, per-type C boilerplate for
-type-safe, reusable code. mc code links against C through `@extern` bindings,
-so the migration proceeds subsystem by subsystem and uses `libmc` (mcc's
-standard library) in place of the in-tree C utilities.
+The kernel is mid-migration from C to
+[**mc**](https://github.com/fecabrera/mcc), a separate language built on LLVM
+and cross-compiled to AArch64 by `mcc`. mc buys generics (one `dict<V>` instead
+of N copies of `hashmap64`), `defer`-based scope cleanup, and a real module
+system with explicit linkage — so the port trades hand-rolled, per-type C
+boilerplate for type-safe, reusable code. mc code links against C through
+`@extern` bindings, so the migration proceeds subsystem by subsystem and uses
+`libmc` (mcc's standard library) in place of the in-tree C utilities.
 
 **Ported to `.mc`** (`src/kernel/`, `src/console.mc`):
 
@@ -64,13 +65,14 @@ standard library) in place of the in-tree C utilities.
 - Process management (`process.mc`)
 - Syscall dispatch table + user-facing wrappers (`syscall.mc`, `system/syscall.mc`)
 - Scheduler syscall handlers — exit, yield, getpid, fork, spawn (`scheduler.mc`)
+- ARM generic timer driver (`drivers/timer.mc`)
 - Device handlers — serial, storage (`devices/`)
 - Interactive console / shell (`console.mc`)
 - Endian + byte-swap helpers (`cpu.mc`)
 
 **Still C, wrapped via `@extern`** (port targets, low-level first):
 
-- Drivers — GIC, PL011, PL031, timer, virtio MMIO (`src/drivers/`)
+- Drivers — GIC, PL011, PL031, virtio MMIO (`src/drivers/`)
 - Arch glue — exception vectors/IRQ dispatch, `svc` syscall trampolines, system registers (`src/arch/`)
 - Memory — heap allocator, DTB memory probe (`src/mm/`)
 - Scheduler — context-switch core, ready/wait/sleep queues, and the waitpid/sleep/msleep handlers (`src/sched/`); the rest is `@extern`-bound from `kernel/scheduler.mc`, which also implements the exit/yield/getpid/fork/spawn handlers and the `scheduler_get/set_current_process` accessors in mc
@@ -249,6 +251,7 @@ src/
     cpu.mc          — cpu_context, SPSR defines, wfe/wfi, irq_enable/disable, timer registers, bswap/be*/le* helpers
     irq.mc          — IRQ dispatch table bindings, cpu_context, irq_register/unregister_handler
     syscall.mc      — svc #0 dispatch table (generic set): syscall_init/register/unregister_handler, syscall_handler, SYSCALL_* numbers
+    dtb.mc          — @extern bindings to the C DTB parser: dtb_init/dump/find_prop, *_irq_number lookups, fdt_header/memreg/fdt_prop structs
     process.mc      — process struct, create/duplicate/config/destroy_process
     scheduler.mc    — exit/yield/getpid/fork/spawn handlers + scheduler_get/set_current_process (mc); waitpid/sleep/msleep/scheduler_handler @extern-bound
     io.mc           — I/O module registry: io_init, io_register/unregister_module, io_read/io_write
@@ -257,8 +260,9 @@ src/
     devices/
       serial.mc     — /dev/serial driver: serial_init, serial_read (pl011_getc+wfi), serial_write (pl011_putc)
       storage.mc    — block driver: storage_init scans virtio slots, registers /dev/sd<letter>; storage_read/write handlers
-    drivers/        — @extern bindings to src/drivers/
-      gic.mc, pl011.mc, pl031.mc, timer.mc, virtio_mmio.mc
+    drivers/        — @extern bindings to src/drivers/ (except timer.mc, a full mc impl)
+      gic.mc, pl011.mc, pl031.mc, virtio_mmio.mc — @extern bindings
+      timer.mc      — ARM generic timer impl: timer_init/get_uptime/set_interval, timer_irq_handler, syscall_uptime_handler
     filesystem/
       fs.mc         — fs_node tree primitives + fs_read/fs_write dispatch; fs_node / fs_mount structs
       vfs.mc        — VFS mount system: vfs_init, vfs_create/destroy_mountpoint, vfs_get_node_for_path, vfs_read/write, vfs_create_dir/file, vfs_dump_fs; owns the global _fs_root tree
@@ -288,7 +292,7 @@ src/
   drivers/          — MMIO peripheral drivers (C)
     pl011.c/h       — PL011 UART
     gic.c/h         — GIC-400 distributor + CPU interface
-    timer.c/h       — ARM generic timer
+    timer.h         — ARM generic timer interface (impl ported to kernel/drivers/timer.mc)
     pl031.c/h       — PL031 RTC
     virtio_mmio.c/h — virtio MMIO transport: slot scanning, feature negotiation, virtqueue setup (virtq_desc/virtq_avail/virtq_used), IRQ dispatch
 
