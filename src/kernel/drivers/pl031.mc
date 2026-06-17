@@ -1,6 +1,6 @@
 /**
  * Enables the RTC by setting the EN bit in CR, reads the IRQ number from the
- * DTB, registers pl031_irq_handler with the GIC, and registers time_handler for
+ * DTB, registers pl031_irq_handler with the GIC, and registers syscall_time_handler for
  * SYSCALL_TIME.
  */
 @extern fn pl031_init();

@@ -20,13 +20,13 @@ void scheduler_init() {
     set64_init(&waitpid_queue, 10);
     set64_init(&sleep_queue, 10);
 
-    syscall_register_handler(SYSCALL_EXIT, &exit_handler);
-    syscall_register_handler(SYSCALL_YIELD, &yield_handler);
-    syscall_register_handler(SYSCALL_GETPID, &getpid_handler);
-    syscall_register_handler(SYSCALL_WAITPID, &waitpid_handler);
-    syscall_register_handler(SYSCALL_FORK, &fork_handler);
-    syscall_register_handler(SYSCALL_SLEEP, &sleep_handler);
-    syscall_register_handler(SYSCALL_MSLEEP, &msleep_handler);
+    syscall_register_handler(SYSCALL_EXIT, &syscall_exit_handler);
+    syscall_register_handler(SYSCALL_YIELD, &syscall_yield_handler);
+    syscall_register_handler(SYSCALL_GETPID, &syscall_getpid_handler);
+    syscall_register_handler(SYSCALL_WAITPID, &syscall_waitpid_handler);
+    syscall_register_handler(SYSCALL_FORK, &syscall_fork_handler);
+    syscall_register_handler(SYSCALL_SLEEP, &syscall_sleep_handler);
+    syscall_register_handler(SYSCALL_MSLEEP, &syscall_msleep_handler);
 }
 
 int scheduler_enqueue(struct process *proc) {
@@ -53,23 +53,6 @@ struct process *scheduler_dequeue() {
     dprintk("[scheduler] dequeue(%i)\n", proc->pid);
 
     return proc;
-}
-
-pid_t scheduler_spawn(proc_entry entry) {
-    dprintk("[scheduler] spawn()\n");
-
-    struct process *proc = (struct process *)kmalloc(sizeof(struct process));
-
-    dprintk("[scheduler] creating process\n");
-    create_process(proc, DEFAULT_STACK_SIZE);
-
-    dprintk("[scheduler] configuring process\n");
-    process_config(proc, entry);
-
-    dprintk("[scheduler] enqueueing process\n");
-    scheduler_enqueue(proc);
-
-    return proc->pid;
 }
 
 static void _notify_sleepers() {
@@ -139,14 +122,6 @@ struct cpu_context *scheduler_handler(struct cpu_context *ctx, time_t ms_elapsed
     return proc->ctx;
 }
 
-struct cpu_context *yield_handler(struct cpu_context *ctx) {
-    ctx->x0 = 0;
-
-    dprintk("[scheduler] yield()\n");
-
-    return scheduler_handler(ctx, 0);
-}
-
 static void _notify_waiter(struct process *proc, int64_t exit_status) {
     dprintk("[scheduler] _notify_waiter(%i), exit_status=%i\n", proc->pid, exit_status);
 
@@ -157,7 +132,7 @@ static void _notify_waiter(struct process *proc, int64_t exit_status) {
     queue64_push(&ready_queue, (uintptr_t)proc);
 }
 
-static void _notify_waiters(pid_t wait_pid, int64_t exit_status) {
+void _notify_waiters(pid_t wait_pid, int64_t exit_status) {
     dprintk("[scheduler] _notify_waiters(%d), exit_status=%i, waitpid_queue->length=%d\n", wait_pid,
             exit_status, waitpid_queue.length);
 
@@ -181,46 +156,7 @@ static void _notify_waiters(pid_t wait_pid, int64_t exit_status) {
     }
 }
 
-struct cpu_context *exit_handler(struct cpu_context *ctx) {
-    struct process *proc = scheduler_get_current_process();
-    if (proc == NULL) {
-        dprintk("[scheduler] no current process to exit!\n");
-        return ctx;
-    }
-
-    dprintk("[scheduler] exit(%i), ctx->x0 = %u, ctx->x1 = %u\n", proc->pid, ctx->x0, ctx->x1);
-
-    proc->state = PROC_DEAD;
-
-    // notify waiters
-    _notify_waiters(proc->pid, ctx->x1);
-
-    // destroy process resources
-    if (destroy_process(proc) < 0) {
-        dprintk("[scheduler] failed to destroy process, addr = 0x%x\n", proc);
-    }
-
-    // clear current entry
-    scheduler_set_current_process(NULL);
-
-    return scheduler_handler(ctx, 0);
-}
-
-struct cpu_context *getpid_handler(struct cpu_context *ctx) {
-    struct process *proc = scheduler_get_current_process();
-    if (proc == NULL) {
-        dprintk("[scheduler] no current process for getpid!\n");
-        ctx->x0 = -1;
-        return ctx;
-    }
-
-    dprintk("[scheduler] getpid(%i)\n", proc->pid);
-
-    ctx->x0 = proc->pid;
-    return ctx;
-}
-
-struct cpu_context *waitpid_handler(struct cpu_context *ctx) {
+struct cpu_context *syscall_waitpid_handler(struct cpu_context *ctx) {
     pid_t pid = ctx->x1;
 
     dprintk("[scheduler] waitpid(%i)\n", pid);
@@ -242,29 +178,7 @@ struct cpu_context *waitpid_handler(struct cpu_context *ctx) {
     return scheduler_handler(ctx, 0);
 }
 
-struct cpu_context *fork_handler(struct cpu_context *ctx) {
-    struct process *proc = scheduler_get_current_process();
-    if (proc == NULL) {
-        dprintk("[scheduler] no current process to fork!\n");
-        ctx->x0 = -1;
-        return ctx;
-    }
-
-    proc->ctx = ctx;
-
-    dprintk("[scheduler] fork(%i)\n", proc->pid);
-
-    struct process *child = (struct process *)kmalloc(sizeof(struct process));
-    duplicate_process(child, proc);
-    scheduler_enqueue(child);
-
-    child->ctx->x0 = 0;
-    ctx->x0 = child->pid;
-
-    return ctx;
-}
-
-struct cpu_context *sleep_handler(struct cpu_context *ctx) {
+struct cpu_context *syscall_sleep_handler(struct cpu_context *ctx) {
     time_t seconds = ctx->x1;
 
     struct process *proc = scheduler_get_current_process();
@@ -287,7 +201,7 @@ struct cpu_context *sleep_handler(struct cpu_context *ctx) {
     return scheduler_handler(ctx, 0);
 }
 
-struct cpu_context *msleep_handler(struct cpu_context *ctx) {
+struct cpu_context *syscall_msleep_handler(struct cpu_context *ctx) {
     mseconds_t mseconds = ctx->x1;
 
     struct process *proc = scheduler_get_current_process();

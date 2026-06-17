@@ -1,3 +1,8 @@
+import "debug";
+import "memory";
+import "cpu";
+import "set";
+
 const NUM_SYSCALLS = 256;
 
 const SYSCALL_EXIT = 0;
@@ -10,91 +15,101 @@ const SYSCALL_MSLEEP = 6;
 const SYSCALL_TIME = 7;
 const SYSCALL_UPTIME = 8;
 
-/**
- * Voluntarily yields the CPU to the scheduler via SYSCALL_YIELD (svc #0).
- * Traps into EL1, where yield_handler sets the return value to 0 in ctx->x0 and calls
- * scheduler_handler to pick the next runnable task. Execution resumes in the calling task when it
- * is next scheduled.
- *
- * @return 0 on return from the scheduler.
- */
-@extern fn syscall_yield() -> int64;
+@static let _syscall_table: struct set<uint64, fn (struct cpu_context *) -> struct cpu_context*>;
 
 /**
- * Terminates the calling process via SYSCALL_EXIT (svc #0).
- * Traps into EL1, where exit_handler marks the process PROC_DEAD, destroys it, and calls
- * scheduler_handler to run the next task. Does not return.
- *
- * @param status: exit status passed in x1 (logged by exit_handler).
+ * Initializes the syscall subsystem.
+ * Must be called before any syscall_register_handler or syscall_handler invocations. Initializes
+ * the internal syscall dispatch table.
  */
-@extern fn syscall_exit(status: int64);
+fn syscall_init() {
+    set_init(&_syscall_table, 10);
+}
 
 /**
- * Returns the PID of the calling process via SYSCALL_GETPID (svc #0).
- * Traps into EL1, where getpid_handler writes current->pid into ctx->x0.
- * Execution resumes in the calling task without a context switch.
+ * Registers a handler for the given syscall ID.
  *
- * @return PID of the current process, or -1 if no process is currently scheduled.
+ * @param syscall_id: syscall number to handle (0–NUM_SYSCALLS-1)
+ * @param fnc: function to call when the syscall is invoked
  */
-@extern fn syscall_getpid() -> int64;
+fn syscall_register_handler(syscall_id: uint64, fnc: fn (struct cpu_context*) -> struct cpu_context*) {
+    if (get_syscall_handler(syscall_id) == null) {
+        set_syscall_handler(syscall_id, fnc);
+        dprintk("[syscall] handler registered for syscall %i, addr = 0x%x\n", syscall_id, fnc);
+    } else {
+        dprintk("[syscall] There's already a handler registered for syscall %i!\n", syscall_id);
+    }
+}
 
 /**
- * Blocks the calling process until the process with the given PID exits via SYSCALL_WAITPID (svc
- * #0). Traps into EL1, where waitpid_handler moves the caller to the wait queue and performs a
- * context switch. Execution resumes when the target process calls syscall_exit.
+ * Removes the handler for the given syscall ID.
+ * After this call, invoking the syscall will return ctx unchanged.
  *
- * @param pid: PID of the process to wait for
- *
- * @return exit status of the terminated process, or -1 if no process is
- *         currently scheduled.
+ * @param syscall_id: syscall number to unregister (0–NUM_SYSCALLS-1)
  */
-@extern fn syscall_waitpid(pid: int64) -> int64;
+fn syscall_unregister_handler(syscall_id: uint64) {
+    if (get_syscall_handler(syscall_id) == null) {
+        dprintk("[syscall] There's no handler registered for syscall %i!\n", syscall_id);
+    } else {
+        remove_syscall_handler(syscall_id);
+        dprintk("[syscall] Handler unregistered for syscall %i!\n", syscall_id);
+    }
+}
 
 /**
- * Forks the calling process via SYSCALL_FORK (svc #0). Traps into EL1, where fork_handler
- * duplicates the current process (stack and context) and enqueues the child. The child resumes from
- * the same point with a return value of 0; the parent receives the child's PID.
+ * Dispatches a syscall based on the number in ctx->x0.
+ * Called from sync_handler when ESR_EC_SVC64 is detected.
  *
- * @return child PID in the parent, 0 in the child, or -1 on failure.
+ * @param ctx: saved context of the calling process
+ *
+ * @return pointer to the saved cpu_context of the next task to run; may equal ctx if no context
+ *         switch is needed.
  */
-@extern fn syscall_fork() -> int64;
+fn syscall_handler(ctx: struct cpu_context *) -> struct cpu_context* {
+    let syscall_id = ctx->x[0];
+    let fnc = get_syscall_handler(syscall_id);
+    
+    if (fnc == null)
+        dprintk("[syscall] Handler not found for syscall %i!\n", syscall_id);
+    else
+        ctx = fnc(ctx);
+
+    return ctx;
+}
 
 /**
- * Blocks the calling process for the given number of seconds via SYSCALL_SLEEP (svc #0). Traps into
- * EL1, where sleep_handler sets process->sleep_for and moves the caller to the sleep queue. The
- * timer tick decrements sleep_for on each tick; process is enqueued when it reaches zero.
+ * Looks up the handler registered for syscall_id in the dispatch table.
  *
- * @param s: number of seconds to sleep
+ * @param syscall_id: syscall number to look up
  *
- * @return 0 on wakeup, or -1 if no process is currently scheduled.
+ * @return the registered handler, or null if none is registered
  */
-@extern fn syscall_sleep(s: uint64) -> int64;
+@static
+fn get_syscall_handler(syscall_id: uint64) -> fn (struct cpu_context*) -> struct cpu_context* {
+    let fnc: fn (struct cpu_context*) -> struct cpu_context*;
+    if (!set_get(&_syscall_table, syscall_id, &fnc))
+        return null;
+    
+    return fnc;
+}
 
 /**
- * Blocks the calling process for the given number of milliseconds via SYSCALL_MSLEEP (svc #0).
- * Traps into EL1, where msleep_handler sets process->sleep_for directly to the given value and
- * moves the caller to the sleep queue. The timer tick decrements sleep_for on each tick; process is
- * enqueued when it reaches zero.
+ * Stores fnc as the handler for syscall_id, overwriting any existing entry.
  *
- * @param ms: number of milliseconds to sleep
- *
- * @return 0 on wakeup, or -1 if no process is currently scheduled.
+ * @param syscall_id: syscall number to bind
+ * @param fnc:        handler to store
  */
-@extern fn syscall_msleep(ms: uint64) -> int64;
+@static
+fn set_syscall_handler(syscall_id: uint64, fnc: fn (struct cpu_context*) -> struct cpu_context*) {
+    set_set(&_syscall_table, syscall_id, fnc);
+}
 
 /**
- * Returns the current Unix timestamp via SYSCALL_TIME (svc #0).
- * Traps into EL1, where time_handler reads the RTC and writes the value into ctx->x0.
+ * Removes the dispatch-table entry for syscall_id, if any.
  *
- * @return current Unix timestamp, or -1 on failure.
+ * @param syscall_id: syscall number to clear
  */
-@extern fn syscall_time() -> uint64;
-
-/**
- * Returns the system uptime in milliseconds via SYSCALL_UPTIME (svc #0).
- * Traps into EL1, where syscall_uptime_handler reads cntpct_el0 and computes elapsed milliseconds
- * since timer_init.
- *
- * @return system uptime in milliseconds
- */
-@extern fn syscall_uptime() -> uint64;
+@static
+fn remove_syscall_handler(syscall_id: uint64) {
+    set_remove(&_syscall_table, syscall_id);
+}

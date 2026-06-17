@@ -1,55 +1,3 @@
-#pragma once
-
-#include "irq.h"
-#include <sys/types.h>
-#include <time.h>
-
-#define NUM_SYSCALLS 256
-
-#define SYSCALL_EXIT 0
-#define SYSCALL_YIELD 1
-#define SYSCALL_GETPID 2
-#define SYSCALL_WAITPID 3
-#define SYSCALL_FORK 4
-#define SYSCALL_SLEEP 5
-#define SYSCALL_MSLEEP 6
-#define SYSCALL_TIME 7
-#define SYSCALL_UPTIME 8
-
-/**
- * Initializes the syscall subsystem.
- * Must be called before any syscall_register_handler or syscall_handler invocations. Initializes
- * the internal syscall dispatch table.
- */
-void syscall_init();
-
-/**
- * Dispatches a syscall based on the number in ctx->x0.
- * Called from sync_handler when ESR_EC_SVC64 is detected.
- *
- * @param ctx: saved context of the calling process
- *
- * @return pointer to the saved cpu_context of the next task to run; may equal ctx if no context
- *         switch is needed.
- */
-struct cpu_context *syscall_handler(struct cpu_context *ctx);
-
-/**
- * Registers a handler for the given syscall ID.
- *
- * @param syscall_id: syscall number to handle (0–NUM_SYSCALLS-1)
- * @param fnc: function to call when the syscall is invoked
- */
-void syscall_register_handler(uint64_t syscall_id, interrupt_handler_t fnc);
-
-/**
- * Removes the handler for the given syscall ID.
- * After this call, invoking the syscall will return ctx unchanged.
- *
- * @param syscall_id: syscall number to unregister (0–NUM_SYSCALLS-1)
- */
-void syscall_unregister_handler(uint64_t syscall_id);
-
 /**
  * Voluntarily yields the CPU to the scheduler via SYSCALL_YIELD (svc #0).
  * Traps into EL1, where syscall_yield_handler sets the return value to 0 in ctx->x0 and calls
@@ -58,7 +6,7 @@ void syscall_unregister_handler(uint64_t syscall_id);
  *
  * @return 0 on return from the scheduler.
  */
-int64_t syscall_yield();
+@extern @symbol("syscall_yield") fn yield() -> int64;
 
 /**
  * Terminates the calling process via SYSCALL_EXIT (svc #0).
@@ -67,7 +15,7 @@ int64_t syscall_yield();
  *
  * @param status: exit status passed in x1 (logged by syscall_exit_handler).
  */
-void syscall_exit(int64_t status);
+@extern @symbol("syscall_exit") fn exit(status: int64);
 
 /**
  * Returns the PID of the calling process via SYSCALL_GETPID (svc #0).
@@ -76,7 +24,7 @@ void syscall_exit(int64_t status);
  *
  * @return PID of the current process, or -1 if no process is currently scheduled.
  */
-pid_t syscall_getpid();
+@extern @symbol("syscall_getpid") fn getpid() -> int64;
 
 /**
  * Blocks the calling process until the process with the given PID exits via SYSCALL_WAITPID (svc
@@ -88,7 +36,7 @@ pid_t syscall_getpid();
  * @return exit status of the terminated process, or -1 if no process is
  *         currently scheduled.
  */
-int64_t syscall_waitpid(pid_t pid);
+@extern @symbol("syscall_waitpid") fn waitpid(pid: int64) -> int64;
 
 /**
  * Forks the calling process via SYSCALL_FORK (svc #0). Traps into EL1, where syscall_fork_handler
@@ -97,18 +45,18 @@ int64_t syscall_waitpid(pid_t pid);
  *
  * @return child PID in the parent, 0 in the child, or -1 on failure.
  */
-pid_t syscall_fork();
+@extern @symbol("syscall_fork") fn fork() -> int64;
 
 /**
  * Blocks the calling process for the given number of seconds via SYSCALL_SLEEP (svc #0). Traps into
  * EL1, where syscall_sleep_handler sets process->sleep_for and moves the caller to the sleep queue. The
  * timer tick decrements sleep_for on each tick; process is enqueued when it reaches zero.
  *
- * @param seconds: number of seconds to sleep
+ * @param s: number of seconds to sleep
  *
  * @return 0 on wakeup, or -1 if no process is currently scheduled.
  */
-int64_t syscall_sleep(time_t seconds);
+@extern @symbol("syscall_sleep") fn sleep(s: uint64) -> int64;
 
 /**
  * Blocks the calling process for the given number of milliseconds via SYSCALL_MSLEEP (svc #0).
@@ -120,7 +68,7 @@ int64_t syscall_sleep(time_t seconds);
  *
  * @return 0 on wakeup, or -1 if no process is currently scheduled.
  */
-int64_t syscall_msleep(mseconds_t ms);
+@extern @symbol("syscall_msleep") fn msleep(ms: uint64) -> int64;
 
 /**
  * Returns the current Unix timestamp via SYSCALL_TIME (svc #0).
@@ -128,7 +76,7 @@ int64_t syscall_msleep(mseconds_t ms);
  *
  * @return current Unix timestamp, or -1 on failure.
  */
-time_t syscall_time();
+@extern @symbol("syscall_time") fn time() -> uint64;
 
 /**
  * Returns the system uptime in milliseconds via SYSCALL_UPTIME (svc #0).
@@ -137,4 +85,4 @@ time_t syscall_time();
  *
  * @return system uptime in milliseconds
  */
-time_t syscall_uptime();
+@extern @symbol("syscall_uptime") fn uptime() -> uint64;

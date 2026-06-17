@@ -2,13 +2,13 @@ import "debug";
 import "array";
 import "string";
 import "memory";
-import "syscall";
 import "scheduler";
 import "filesystem/vfs";
 import "filesystem/fat32";
 import "libc/ctype";
 import "libc/stdlib";
 import "libc/string";
+import "system/syscall";
 
 @static
 let available_commands: uint8*[][2] = [
@@ -277,7 +277,7 @@ fn console_getline(pathname: uint8*, buffer: uint8*) -> int32 {
 
 /**
  * Forks a child process to run a command handler. The child invokes fnc and
- * exits with its return value; the parent blocks via syscall_waitpid and logs
+ * exits with its return value; the parent blocks via waitpid and logs
  * the child's exit status. On fork failure the command is not run.
  *
  * @param fnc:  command handler to run in the child
@@ -286,15 +286,15 @@ fn console_getline(pathname: uint8*, buffer: uint8*) -> int32 {
  */
 @private
 fn console_run_command(fnc: fn (int64, uint8**) -> int64, argc: int64, argv: uint8**) {
-    let pid: int64 = syscall_fork();
+    let pid: int64 = fork();
     if (pid < 0) {
         printk("[console] fork() returned %d!\n", pid);
     } else if (pid > 0) {
-        let status: int64 = syscall_waitpid(pid);
+        let status: int64 = waitpid(pid);
         printk("[console] process %d returned %d!\n", pid, status);
     } else {
         let status: int64 = fnc(argc, argv);
-        syscall_exit(status);
+        exit(status);
     }
 }
 
@@ -305,7 +305,7 @@ fn console_run_command(fnc: fn (int64, uint8**) -> int64, argc: int64, argv: uin
  * ls [path] (list a folder's entries), cd <path> (change the working
  * directory), cat <path> (print a file), echo [args...] (print first arg),
  * mount <device> [mountpoint] (fat32_mount; mountpoint defaults to
- * /volumes/<label>), exit [status] (syscall_exit), help (list commands).
+ * /volumes/<label>), exit [status] (exit), help (list commands).
  * Unknown commands print a "not found!" message. Empty input is ignored.
  *
  * @param argc: number of arguments

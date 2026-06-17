@@ -21,7 +21,7 @@
 
 /**
  * Enables the RTC by setting the EN bit in CR, reads the IRQ number from the
- * DTB, registers pl031_irq_handler with the GIC, and registers time_handler for
+ * DTB, registers pl031_irq_handler with the GIC, and registers syscall_time_handler for
  * SYSCALL_TIME.
  */
 void pl031_init();
@@ -69,4 +69,4 @@ void pl031_set_alarm(uint32_t unix_time);
  *
  * @return ctx unchanged, with ctx->x0 set to the current Unix timestamp
  */
-struct cpu_context *time_handler(struct cpu_context *ctx);
+struct cpu_context *syscall_time_handler(struct cpu_context *ctx);

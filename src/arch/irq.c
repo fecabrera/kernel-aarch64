@@ -63,11 +63,11 @@ struct cpu_context *sync_handler(struct cpu_context *ctx, uint64_t esr, uint64_t
         break;
     case ESR_EC_IABT_EL0:
         dprintk("[sync] instruction abort, elr = 0x%x, far 0x%x\n", elr, far);
-        ctx = exit_handler(ctx);
+        ctx = syscall_exit_handler(ctx);
         break;
     case ESR_EC_DABT_EL0:
         dprintk("[sync] data abort, elr = 0x%x, far = 0x%x\n", elr, far);
-        ctx = exit_handler(ctx);
+        ctx = syscall_exit_handler(ctx);
         break;
     default:
         printk("[sync] esr = 0x%x, elr = 0x%x, far = 0x%x, ec = 0x%x\n", esr, elr, far, ec);

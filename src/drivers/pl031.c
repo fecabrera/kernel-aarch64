@@ -13,7 +13,7 @@ void pl031_init() {
     if (dtb_get_rtc_irq_number(&pl031_irq) == 0) {
         dprintk("[pl031] Initializing IRQ: %i\n", pl031_irq);
         irq_register_handler(pl031_irq, &pl031_irq_handler);
-        syscall_register_handler(SYSCALL_TIME, &time_handler);
+        syscall_register_handler(SYSCALL_TIME, &syscall_time_handler);
     } else {
         dprintk("[pl031] IRQ not found!!\n");
     }
@@ -39,7 +39,7 @@ struct cpu_context *pl031_irq_handler(__attribute__((unused)) int irq, struct cp
     return ctx;
 }
 
-struct cpu_context *time_handler(struct cpu_context *ctx) {
+struct cpu_context *syscall_time_handler(struct cpu_context *ctx) {
     dprintk("[pl031] time()\n");
 
     ctx->x0 = pl031_get_time();

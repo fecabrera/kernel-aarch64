@@ -8,13 +8,13 @@
  * Registers all scheduler syscall handlers. Must be called before irq_enable().
  *
  * Registered handlers:
- *   SYSCALL_EXIT             → exit_handler
- *   SYSCALL_YIELD            → yield_handler
- *   SYSCALL_GETPID           → getpid_handler
- *   SYSCALL_WAITPID          → waitpid_handler
- *   SYSCALL_FORK             → fork_handler
- *   SYSCALL_SLEEP            → sleep_handler
- *   SYSCALL_MSLEEP           → msleep_handler
+ *   SYSCALL_EXIT             → syscall_exit_handler
+ *   SYSCALL_YIELD            → syscall_yield_handler
+ *   SYSCALL_GETPID           → syscall_getpid_handler
+ *   SYSCALL_WAITPID          → syscall_waitpid_handler
+ *   SYSCALL_FORK             → syscall_fork_handler
+ *   SYSCALL_SLEEP            → syscall_sleep_handler
+ *   SYSCALL_MSLEEP           → syscall_msleep_handler
  */
 void scheduler_init();
 
@@ -89,7 +89,7 @@ struct cpu_context *scheduler_handler(struct cpu_context *ctx, time_t ms_elapsed
  *
  * @return saved context of the next task to run
  */
-struct cpu_context *exit_handler(struct cpu_context *ctx);
+struct cpu_context *syscall_exit_handler(struct cpu_context *ctx);
 
 /**
  * Syscall handler for SYSCALL_YIELD. Sets ctx->x0 = 0 and delegates to
@@ -99,7 +99,7 @@ struct cpu_context *exit_handler(struct cpu_context *ctx);
  *
  * @return saved context of the next task to run
  */
-struct cpu_context *yield_handler(struct cpu_context *ctx);
+struct cpu_context *syscall_yield_handler(struct cpu_context *ctx);
 
 /**
  * Syscall handler for SYSCALL_GETPID. Writes current->pid into ctx->x0.
@@ -110,7 +110,7 @@ struct cpu_context *yield_handler(struct cpu_context *ctx);
  * @return ctx unchanged, with ctx->x0 set to the PID, or -1 if no process is
  *         currently scheduled
  */
-struct cpu_context *getpid_handler(struct cpu_context *ctx);
+struct cpu_context *syscall_getpid_handler(struct cpu_context *ctx);
 
 /**
  * Syscall handler for SYSCALL_WAITPID. Saves ctx into current->ctx, moves
@@ -122,7 +122,7 @@ struct cpu_context *getpid_handler(struct cpu_context *ctx);
  *
  * @return saved context of the next task to run
  */
-struct cpu_context *waitpid_handler(struct cpu_context *ctx);
+struct cpu_context *syscall_waitpid_handler(struct cpu_context *ctx);
 
 /**
  * Syscall handler for SYSCALL_FORK. Saves ctx into current->ctx, duplicates
@@ -134,7 +134,7 @@ struct cpu_context *waitpid_handler(struct cpu_context *ctx);
  *
  * @return ctx of the parent, with ctx->x0 set to the child's PID, or -1 on failure
  */
-struct cpu_context *fork_handler(struct cpu_context *ctx);
+struct cpu_context *syscall_fork_handler(struct cpu_context *ctx);
 
 /**
  * Syscall handler for SYSCALL_SLEEP. Sets current->sleep_for to
@@ -148,7 +148,7 @@ struct cpu_context *fork_handler(struct cpu_context *ctx);
  * @return ctx of the next task to run, or ctx unchanged if no process is
  *         currently scheduled
  */
-struct cpu_context *sleep_handler(struct cpu_context *ctx);
+struct cpu_context *syscall_sleep_handler(struct cpu_context *ctx);
 
 /**
  * Syscall handler for SYSCALL_MSLEEP. Sets current->sleep_for directly to
@@ -162,4 +162,4 @@ struct cpu_context *sleep_handler(struct cpu_context *ctx);
  * @return ctx of the next task to run, or ctx unchanged if no process is
  *         currently scheduled
  */
-struct cpu_context *msleep_handler(struct cpu_context *ctx);
+struct cpu_context *syscall_msleep_handler(struct cpu_context *ctx);

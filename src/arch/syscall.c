@@ -1,58 +1,5 @@
 #include "syscall.h"
 #include <arch/cpu.h>
-#include <debug.h>
-#include <dsa/set.h>
-
-static struct set64 _syscall_table;
-
-void syscall_init() { set64_init(&_syscall_table, 10); }
-
-static interrupt_handler_t _get_syscall_handler(uint64_t syscall_id) {
-    uintptr_t syscall_handler_ptr;
-    if (set64_get(&_syscall_table, syscall_id, &syscall_handler_ptr) == 1)
-        return (interrupt_handler_t)syscall_handler_ptr;
-    else
-        return NULL;
-}
-
-static void _set_syscall_handler(uint64_t syscall_id, interrupt_handler_t fnc) {
-    set64_set(&_syscall_table, syscall_id, (uintptr_t)fnc);
-}
-
-static void _remove_syscall_handler(uint64_t syscall_id) {
-    set64_remove(&_syscall_table, syscall_id);
-}
-
-struct cpu_context *syscall_handler(struct cpu_context *ctx) {
-    uint32_t syscall_id = ctx->x0;
-    interrupt_handler_t fnc = _get_syscall_handler(syscall_id);
-
-    if (fnc == NULL)
-        dprintk("[syscall] Handler not found for syscall %i!\n", syscall_id);
-    else
-        ctx = fnc(ctx);
-
-    return ctx;
-}
-
-void syscall_register_handler(uint64_t syscall_id, interrupt_handler_t fnc) {
-    interrupt_handler_t syscall_handler = _get_syscall_handler(syscall_id);
-    if (syscall_handler == NULL) {
-        _set_syscall_handler(syscall_id, fnc);
-        dprintk("[syscall] handler registered for syscall %i, addr = 0x%x\n", syscall_id, fnc);
-    } else {
-        dprintk("[syscall] There's already a handler registered for syscall %i!\n", syscall_id);
-    }
-}
-
-void syscall_unregister_handler(uint64_t syscall_id) {
-    if (_get_syscall_handler(syscall_id) == NULL) {
-        dprintk("[syscall] There's no handler registered for syscall %i!\n", syscall_id);
-    } else {
-        _remove_syscall_handler(syscall_id);
-        dprintk("[syscall] Handler unregistered for syscall %i!\n", syscall_id);
-    }
-}
 
 int64_t syscall_yield() {
     int64_t ret;

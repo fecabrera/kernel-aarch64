@@ -62,6 +62,8 @@ standard library) in place of the in-tree C utilities.
 - VFS — node tree + mount system (`filesystem/fs.mc`, `filesystem/vfs.mc`)
 - I/O module registry (`io.mc`)
 - Process management (`process.mc`)
+- Syscall dispatch table + user-facing wrappers (`syscall.mc`, `system/syscall.mc`)
+- Scheduler syscall handlers — exit, yield, getpid, fork, spawn (`scheduler.mc`)
 - Device handlers — serial, storage (`devices/`)
 - Interactive console / shell (`console.mc`)
 - Endian + byte-swap helpers (`cpu.mc`)
@@ -69,9 +71,9 @@ standard library) in place of the in-tree C utilities.
 **Still C, wrapped via `@extern`** (port targets, low-level first):
 
 - Drivers — GIC, PL011, PL031, timer, virtio MMIO (`src/drivers/`)
-- Arch glue — exception vectors/IRQ dispatch, syscalls, system registers (`src/arch/`)
+- Arch glue — exception vectors/IRQ dispatch, `svc` syscall trampolines, system registers (`src/arch/`)
 - Memory — heap allocator, DTB memory probe (`src/mm/`)
-- Scheduler — context-switch core (`src/sched/`); `@extern`-bound from `kernel/scheduler.mc`, which also implements the `scheduler_get/set_current_process` accessors in mc
+- Scheduler — context-switch core, ready/wait/sleep queues, and the waitpid/sleep/msleep handlers (`src/sched/`); the rest is `@extern`-bound from `kernel/scheduler.mc`, which also implements the exit/yield/getpid/fork/spawn handlers and the `scheduler_get/set_current_process` accessors in mc
 - FAT32 driver (`src/fs/fat32.c`)
 - Boot entry / init sequence (`src/kernel.c`)
 
@@ -165,7 +167,7 @@ standard library) in place of the in-tree C utilities.
 
 - Full save/restore of all 31 registers + ELR/SPSR.
 - IRQ handlers return `struct cpu_context *` for context switching.
-- IABT/DABT terminate the faulting process via `exit_handler`.
+- IABT/DABT terminate the faulting process via `syscall_exit_handler`.
 - Unknown exceptions dump the full register context.
 
 ### **Preemptive scheduler**
@@ -202,7 +204,7 @@ standard library) in place of the in-tree C utilities.
 - `serial_read` blocks reading `count` bytes from the UART by calling `pl011_getc` in a loop, spinning on `wfi()` until each byte arrives; returns `count`.
 - `serial_write` writes `count` bytes to the UART one byte at a time via `pl011_putc`; returns `count`.
 - `console(pathname)` in `console.mc` runs an interactive terminal loop on the given VFS device, prompting with the current working directory's name (or `/` at the root) followed by `" > "`, tokenizing each input line into `argc/argv` (whitespace-delimited; double-quoted strings are single tokens; backslash escapes any character, including `\"` inside quotes), and dispatching to `console_parse_command`. Lines with an unterminated quote or trailing backslash are rejected with an error.
-- `console_parse_command(argc, argv)` forks a child process for each command (parent waits via `syscall_waitpid`), except `cd`, which is dispatched directly so it can mutate the console process's own cwd. Built-ins: `ls [path]` (lists a folder's entries relative to the cwd, skipping hidden `.`/`..`; defaults to `/`), `cd <path>` (changes the cwd to a child folder, following `.`/`..` links), `cat <path>` (resolves relative to the cwd, validates the node is a file, then reads and prints it), `echo [args...]` (print first arg), `mount <device> [mountpoint]` (`fat32_mount`; mountpoint defaults to `/volumes/<label>`), `exit [status]` (`syscall_exit`), `help` (list commands); unknown commands print a "not found!" message.
+- `console_parse_command(argc, argv)` forks a child process for each command (parent waits via `waitpid`), except `cd`, which is dispatched directly so it can mutate the console process's own cwd. Built-ins: `ls [path]` (lists a folder's entries relative to the cwd, skipping hidden `.`/`..`; defaults to `/`), `cd <path>` (changes the cwd to a child folder, following `.`/`..` links), `cat <path>` (resolves relative to the cwd, validates the node is a file, then reads and prints it), `echo [args...]` (print first arg), `mount <device> [mountpoint]` (`fat32_mount`; mountpoint defaults to `/volumes/<label>`), `exit [status]` (`exit`), `help` (list commands); unknown commands print a "not found!" message.
 - `console_getc(pathname)` reads the next character from a VFS device, blocking and discarding ANSI escape sequences.
 - `console_getline(pathname, buffer)` reads one line via `console_getc`, echoing characters back and handling backspace and CR; returns character count.
 
@@ -214,7 +216,7 @@ standard library) in place of the in-tree C utilities.
 
 ### **Syscall interface**
 
-- `svc #0` dispatch table backed by a `set64` hash map; `syscall_init()` must be called before any handler registration.
+- `svc #0` dispatch (`syscall.mc`): `syscall_handler` reads the syscall number from `ctx->x[0]` and dispatches through a table backed by a generic `set<uint64, handler>`; `syscall_init()` must be called before any handler registration. The user-facing `svc` wrappers live in `system/syscall.mc` under bare names (`yield`, `exit`, `fork`, `waitpid`, `sleep`, …), each `@symbol`-bound to the corresponding `syscall_*` asm trampoline in `src/arch/syscall.c`.
 - `syscall_register_handler` / `syscall_unregister_handler` add and remove handlers at runtime.
 - `syscall_yield()` triggers an immediate context switch.
 - `syscall_exit(status)` terminates the calling process and schedules the next one.
@@ -246,9 +248,9 @@ src/
   kernel/           — mc kernel modules (logic + @extern bindings to the C below)
     cpu.mc          — cpu_context, SPSR defines, wfe/wfi, irq_enable/disable, timer registers, bswap/be*/le* helpers
     irq.mc          — IRQ dispatch table bindings, cpu_context, irq_register/unregister_handler
-    syscall.mc      — syscall_init/register/unregister/yield/exit/getpid/waitpid/fork/sleep/msleep/time/uptime bindings
+    syscall.mc      — svc #0 dispatch table (generic set): syscall_init/register/unregister_handler, syscall_handler, SYSCALL_* numbers
     process.mc      — process struct, create/duplicate/config/destroy_process
-    scheduler.mc    — @extern scheduler bindings + scheduler_get/set_current_process (implemented in mc)
+    scheduler.mc    — exit/yield/getpid/fork/spawn handlers + scheduler_get/set_current_process (mc); waitpid/sleep/msleep/scheduler_handler @extern-bound
     io.mc           — I/O module registry: io_init, io_register/unregister_module, io_read/io_write
     debug.mc        — printk/dprintk bindings
     uchar.mc        — utf16lencpy/utf16bencpy bindings
@@ -263,6 +265,8 @@ src/
       fat32.mc      — fat32_mount/unmount/read/write bindings to src/fs/fat32.c
     mm/
       heap.mc       — kmalloc/kfree/krealloc/kmalloc_aligned bindings
+    system/
+      syscall.mc    — user-facing svc wrappers under bare names: yield/exit/getpid/waitpid/fork/sleep/msleep/time/uptime (@symbol-bound to syscall_* arch trampolines)
 
   libmc/            — mcc standard library (generic, type-parametric)
     memory.mc       — alloc<T>/alloc_aligned<T>/resize<T>/dealloc<T>, copy_bytes/set_bytes/copy_items/set_items
@@ -279,7 +283,7 @@ src/
   arch/             — AArch64-specific (C)
     cpu.c/h         — system register accessors (cntpct, cntfrq, cntp, DAIF), SPSR defines, halt/hang, _wfi_while/_wfe_while spin macros
     irq.c/h         — exception handlers, IRQ dispatch table, cpu_context, irq_init
-    syscall.c/h     — syscall dispatch table (set64-backed), syscall_init/handler/register/unregister/yield/exit/getpid/waitpid/fork
+    syscall.c/h     — asm svc trampolines (syscall_yield/exit/getpid/waitpid/fork/sleep/msleep/time/uptime); dispatch table ported to kernel/syscall.mc
 
   drivers/          — MMIO peripheral drivers (C)
     pl011.c/h       — PL011 UART
@@ -294,7 +298,7 @@ src/
 
   sched/            — scheduler (C)
     process.h       — process struct (impl ported to kernel/process.mc)
-    scheduler.c/h   — FIFO ready queue (queue64), waitpid/sleep queues (set64 keyed by pid), scheduler_enqueue/dequeue/spawn, context switch via timer and yield/exit/waitpid/fork/sleep syscalls
+    scheduler.c/h   — FIFO ready queue (queue64), waitpid/sleep queues (set64 keyed by pid), scheduler_enqueue/dequeue, scheduler_handler, waitpid/sleep/msleep handlers, _notify_waiters; exit/yield/getpid/fork/spawn ported to kernel/scheduler.mc
 
   fs/               — filesystem driver (C)
     filesystem.h, vfs.h — shared fs_node / VFS interface headers (impls in kernel/filesystem/)
