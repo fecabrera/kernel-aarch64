@@ -4,14 +4,24 @@
 
 #define RTC_BASE 0x09010000UL
 
-#define RTC_DR (*(volatile uint32_t *)(RTC_BASE + 0x000))   // Data (current time, read-only)
-#define RTC_MR (*(volatile uint32_t *)(RTC_BASE + 0x004))   // Match (alarm time)
-#define RTC_LR (*(volatile uint32_t *)(RTC_BASE + 0x008))   // Load (set current time)
-#define RTC_CR (*(volatile uint32_t *)(RTC_BASE + 0x00C))   // Control
-#define RTC_IMSC (*(volatile uint32_t *)(RTC_BASE + 0x010)) // Interrupt mask
-#define RTC_RIS (*(volatile uint32_t *)(RTC_BASE + 0x014))  // Raw interrupt status
-#define RTC_MIS (*(volatile uint32_t *)(RTC_BASE + 0x018))  // Masked interrupt status
-#define RTC_ICR (*(volatile uint32_t *)(RTC_BASE + 0x01C))  // Interrupt clear
+/**
+ * PL031 RTC register block, memory-mapped at RTC_BASE. All registers are 32-bit
+ * and laid out contiguously from offset 0x000; access them through the PL031
+ * pointer (e.g. PL031->dr).
+ */
+struct pl031_regs {
+    volatile uint32_t dr;   // 0x000 Data (current time, read-only)
+    volatile uint32_t mr;   // 0x004 Match (alarm time)
+    volatile uint32_t lr;   // 0x008 Load (set current time)
+    volatile uint32_t cr;   // 0x00C Control
+    volatile uint32_t imsc; // 0x010 Interrupt mask
+    volatile uint32_t ris;  // 0x014 Raw interrupt status
+    volatile uint32_t mis;  // 0x018 Masked interrupt status
+    volatile uint32_t icr;  // 0x01C Interrupt clear
+};
+
+// Memory-mapped PL031 register block
+#define PL031 ((struct pl031_regs *)RTC_BASE)
 
 // CR flags
 #define RTC_CR_EN (1 << 0) // RTC enable
@@ -62,7 +72,7 @@ void pl031_set_alarm(uint32_t unix_time);
 
 /**
  * Syscall handler for SYSCALL_TIME. Reads the current Unix timestamp from
- * the RTC data register (RTC_DR) and writes it into ctx->x0. Does not
+ * the RTC data register (PL031->dr) and writes it into ctx->x0. Does not
  * perform a context switch.
  *
  * @param ctx: saved context of the calling process

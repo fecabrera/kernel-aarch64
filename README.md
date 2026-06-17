@@ -65,14 +65,14 @@ boilerplate for type-safe, reusable code. mc code links against C through
 - Process management (`process.mc`)
 - Syscall dispatch table + user-facing wrappers (`syscall.mc`, `system/syscall.mc`)
 - Scheduler syscall handlers — exit, yield, getpid, fork, spawn (`scheduler.mc`)
-- ARM generic timer driver (`drivers/timer.mc`)
+- Drivers — GIC, PL031 RTC, ARM generic timer (`drivers/gic.mc`, `drivers/pl031.mc`, `drivers/timer.mc`)
 - Device handlers — serial, storage (`devices/`)
 - Interactive console / shell (`console.mc`)
 - Endian + byte-swap helpers (`cpu.mc`)
 
 **Still C, wrapped via `@extern`** (port targets, low-level first):
 
-- Drivers — GIC, PL011, PL031, virtio MMIO (`src/drivers/`)
+- Drivers — PL011, virtio MMIO (`src/drivers/`)
 - Arch glue — exception vectors/IRQ dispatch, `svc` syscall trampolines, system registers (`src/arch/`)
 - Memory — heap allocator, DTB memory probe (`src/mm/`)
 - Scheduler — context-switch core, ready/wait/sleep queues, and the waitpid/sleep/msleep handlers (`src/sched/`); the rest is `@extern`-bound from `kernel/scheduler.mc`, which also implements the exit/yield/getpid/fork/spawn handlers and the `scheduler_get/set_current_process` accessors in mc
@@ -260,8 +260,10 @@ src/
     devices/
       serial.mc     — /dev/serial driver: serial_init, serial_read (pl011_getc+wfi), serial_write (pl011_putc)
       storage.mc    — block driver: storage_init scans virtio slots, registers /dev/sd<letter>; storage_read/write handlers
-    drivers/        — @extern bindings to src/drivers/ (except timer.mc, a full mc impl)
-      gic.mc, pl011.mc, pl031.mc, virtio_mmio.mc — @extern bindings
+    drivers/        — mc drivers (gic/pl031/timer are full impls; pl011/virtio_mmio are @extern bindings)
+      pl011.mc, virtio_mmio.mc — @extern bindings to src/drivers/
+      gic.mc        — GIC impl: gicd_regs/gicc_regs register structs, gic_init/enable_irq/trigger_sgi/acknowledge/end_of_interrupt
+      pl031.mc      — PL031 RTC impl: pl031_regs struct, pl031_init/get_time/set_time/set_alarm, pl031_irq_handler, syscall_time_handler
       timer.mc      — ARM generic timer impl: timer_init/get_uptime/set_interval, timer_irq_handler, syscall_uptime_handler
     filesystem/
       fs.mc         — fs_node tree primitives + fs_read/fs_write dispatch; fs_node / fs_mount structs
@@ -291,9 +293,9 @@ src/
 
   drivers/          — MMIO peripheral drivers (C)
     pl011.c/h       — PL011 UART
-    gic.c/h         — GIC-400 distributor + CPU interface
+    gic.h           — GIC-400 interface (impl ported to kernel/drivers/gic.mc)
     timer.h         — ARM generic timer interface (impl ported to kernel/drivers/timer.mc)
-    pl031.c/h       — PL031 RTC
+    pl031.h         — PL031 RTC interface (impl ported to kernel/drivers/pl031.mc)
     virtio_mmio.c/h — virtio MMIO transport: slot scanning, feature negotiation, virtqueue setup (virtq_desc/virtq_avail/virtq_used), IRQ dispatch
 
   mm/               — memory subsystem (C)

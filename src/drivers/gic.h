@@ -5,13 +5,26 @@
 #define GICD_BASE 0x08000000UL
 #define GICC_BASE 0x08010000UL
 
-// Distributor registers
-#define GICD_CTLR (*(volatile uint32_t *)(GICD_BASE + 0x000))
-#define GICD_ISENABLER ((volatile uint32_t *)(GICD_BASE + 0x100))
-#define GICD_IPRIORITYR ((volatile uint32_t *)(GICD_BASE + 0x400))
-#define GICD_ITARGETSR ((volatile uint32_t *)(GICD_BASE + 0x800))
-#define GICD_ICFGR ((volatile uint32_t *)(GICD_BASE + 0xC00))
-#define GICD_SGIR (*(volatile uint32_t *)(GICD_BASE + 0xF00))
+/**
+ * GIC distributor register block, memory-mapped at GICD_BASE. The named
+ * registers sit at fixed offsets with reserved gaps between them; the banked
+ * registers (isenabler, ipriorityr, itargetsr, icfgr) are word arrays indexed
+ * by IRQ ID. Access through the GICD pointer (e.g. GICD->ctlr).
+ */
+struct gicd_regs {
+    volatile uint32_t ctlr;                   // 0x000 Distributor control
+    uint32_t _reserved0[(0x100 - 0x004) / 4]; // 0x004–0x0FC
+    volatile uint32_t isenabler[32];          // 0x100 Set-enable (1 bit/IRQ)
+    uint32_t _reserved1[(0x400 - 0x180) / 4]; // 0x180–0x3FC
+    volatile uint32_t ipriorityr[256];        // 0x400 Priority (1 byte/IRQ)
+    volatile uint32_t itargetsr[256];         // 0x800 CPU targets (1 byte/IRQ)
+    volatile uint32_t icfgr[64];              // 0xC00 Config (2 bits/IRQ)
+    uint32_t _reserved2[(0xF00 - 0xD00) / 4]; // 0xD00–0xEFC
+    volatile uint32_t sgir;                   // 0xF00 Software-generated interrupt
+};
+
+// Memory-mapped GIC distributor register block
+#define GICD ((struct gicd_regs *)GICD_BASE)
 
 // GICD_SGIR — target list filter (bits 25:24)
 #define GICD_SGIR_TARGET_LIST (0b00 << 24)   // send to CPUs in target list (bits 19:16)
@@ -51,19 +64,28 @@
 #define GICD_TARGET_CPU5 (1 << 5)
 #define GICD_TARGET_CPU6 (1 << 6)
 #define GICD_TARGET_CPU7 (1 << 7)
-#define GICD_TARGET_ALL (GICD_TARGET_CPU0 | GICD_TARGET_CPU1 | \
-                         GICD_TARGET_CPU2 | GICD_TARGET_CPU3 | \
-                         GICD_TARGET_CPU4 | GICD_TARGET_CPU5 | \
-                         GICD_TARGET_CPU6 | GICD_TARGET_CPU7)
+#define GICD_TARGET_ALL                                                                            \
+    (GICD_TARGET_CPU0 | GICD_TARGET_CPU1 | GICD_TARGET_CPU2 | GICD_TARGET_CPU3 |                   \
+     GICD_TARGET_CPU4 | GICD_TARGET_CPU5 | GICD_TARGET_CPU6 | GICD_TARGET_CPU7)
 
 // GICC_IAR — interrupt acknowledge register masks
 #define GICC_IAR_IRQ_MASK 0x3FF // bits 9:0 — IRQ ID
 
-// CPU interface registers
-#define GICC_CTLR (*(volatile uint32_t *)(GICC_BASE + 0x000))
-#define GICC_PMR (*(volatile uint32_t *)(GICC_BASE + 0x004))
-#define GICC_IAR (*(volatile uint32_t *)(GICC_BASE + 0x00C))
-#define GICC_EOIR (*(volatile uint32_t *)(GICC_BASE + 0x010))
+/**
+ * GIC CPU interface register block, memory-mapped at GICC_BASE. Registers are
+ * 32-bit; a one-word gap at 0x008 (the unused BPR) separates pmr from iar.
+ * Access through the GICC pointer (e.g. GICC->iar).
+ */
+struct gicc_regs {
+    volatile uint32_t ctlr; // 0x000 CPU interface control
+    volatile uint32_t pmr;  // 0x004 Interrupt priority mask
+    uint32_t _reserved0;    // 0x008 (BPR, unused)
+    volatile uint32_t iar;  // 0x00C Interrupt acknowledge
+    volatile uint32_t eoir; // 0x010 End of interrupt
+};
+
+// Memory-mapped GIC CPU interface register block
+#define GICC ((struct gicc_regs *)GICC_BASE)
 
 /**
  * Initializes the GIC distributor and CPU interface.
@@ -82,7 +104,7 @@ void gic_enable_irq(uint32_t irq);
 
 /**
  * Triggers a Software Generated Interrupt on the current CPU by writing
- * to GICD_SGIR with GICD_SGIR_TARGET_SELF.
+ * to GICD->sgir with GICD_SGIR_TARGET_SELF.
  *
  * @param irq: SGI ID to trigger (0–15)
  */

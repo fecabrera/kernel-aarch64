@@ -1,7 +1,6 @@
 #include "scheduler.h"
 #include <arch/syscall.h>
 #include <debug.h>
-#include <drivers/gic.h>
 #include <drivers/timer.h>
 #include <dsa/queue.h>
 #include <dsa/set.h>
