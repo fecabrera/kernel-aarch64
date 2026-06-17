@@ -64,9 +64,9 @@ boilerplate for type-safe, reusable code. mc code links against C through
 - I/O module registry (`io.mc`)
 - Process management (`process.mc`)
 - Syscall dispatch table + user-facing wrappers (`syscall.mc`, `system/syscall.mc`)
-- Exception/IRQ dispatch — sync/irq/fiq/serr handlers, IRQ registry, vbar_el1 setup (`irq.mc`)
+- Exception/IRQ dispatch — sync/irq/fiq/serr handlers, IRQ registry, vbar_el1 setup (`interrupts/irq.mc`)
 - Scheduler syscall handlers — exit, yield, getpid, fork, spawn (`scheduler.mc`)
-- Drivers — GIC, PL031 RTC, ARM generic timer (`drivers/gic.mc`, `drivers/pl031.mc`, `drivers/timer.mc`)
+- Drivers — GIC, PL031 RTC, ARM generic timer (`interrupts/gic.mc`, `interrupts/drivers/pl031.mc`, `interrupts/drivers/timer.mc`)
 - Device handlers — serial, storage (`devices/`)
 - Interactive console / shell (`console.mc`)
 - Endian + byte-swap helpers (`cpu.mc`)
@@ -74,7 +74,7 @@ boilerplate for type-safe, reusable code. mc code links against C through
 **Still C, wrapped via `@extern`** (port targets, low-level first):
 
 - Drivers — PL011, virtio MMIO (`src/drivers/`)
-- Arch glue — exception vector table (`vectors.S`), `svc` syscall trampolines, system registers (`src/arch/`); IRQ dispatch ported to `kernel/irq.mc`
+- Arch glue — exception vector table (`vectors.S`), `svc` syscall trampolines, system registers (`src/arch/`); IRQ dispatch ported to `kernel/interrupts/irq.mc`
 - Memory — heap allocator, DTB memory probe (`src/mm/`)
 - Scheduler — context-switch core, ready/wait/sleep queues, and the waitpid/sleep/msleep handlers (`src/sched/`); the rest is `@extern`-bound from `kernel/scheduler.mc`, which also implements the exit/yield/getpid/fork/spawn handlers and the `scheduler_get/set_current_process` accessors in mc
 - FAT32 driver (`src/fs/fat32.c`)
@@ -219,17 +219,17 @@ boilerplate for type-safe, reusable code. mc code links against C through
 
 ### **Syscall interface**
 
-- `svc #0` dispatch (`syscall.mc`): `syscall_handler` reads the syscall number from `ctx->x[0]` and dispatches through a table backed by a generic `set<uint64, handler>`; `syscall_init()` must be called before any handler registration. The user-facing `svc` wrappers live in `system/syscall.mc` under bare names (`yield`, `exit`, `fork`, `waitpid`, `sleep`, …), each `@symbol`-bound to the corresponding `syscall_*` asm trampoline in `src/arch/syscall.c`.
+- `svc #0` dispatch (`syscall.mc`): `syscall_handler` reads the syscall number from `ctx->x[0]` and dispatches through a table backed by a generic `set<uint64, handler>`; `syscall_init()` must be called before any handler registration. The user-facing `svc` wrappers live in `system/syscall.mc` under bare names (`yield`, `exit`, `fork`, `waitpid`, `sleep`, …), each `@extern`-bound to the like-named asm trampoline in `src/arch/syscall.c`.
 - `syscall_register_handler` / `syscall_unregister_handler` add and remove handlers at runtime.
-- `syscall_yield()` triggers an immediate context switch.
-- `syscall_exit(status)` terminates the calling process and schedules the next one.
-- `syscall_getpid()` returns the calling process's PID.
-- `syscall_waitpid(pid)` blocks the caller until the target process exits.
-- `syscall_fork()` duplicates the calling process (child resumes at the fork site with return value 0).
-- `syscall_sleep(seconds)` blocks the caller in a sleep queue; wakes when `timer_get_uptime()` reaches the absolute `sleep_until` timestamp.
-- `syscall_msleep(ms)` same as `syscall_sleep` but duration is in milliseconds.
-- `syscall_time()` returns the current Unix timestamp from the RTC.
-- `syscall_uptime()` returns system uptime in milliseconds, computed from `cntpct_el0` ticks since boot.
+- `yield()` triggers an immediate context switch.
+- `exit(status)` terminates the calling process and schedules the next one.
+- `getpid()` returns the calling process's PID.
+- `waitpid(pid)` blocks the caller until the target process exits.
+- `fork()` duplicates the calling process (child resumes at the fork site with return value 0).
+- `sleep(seconds)` blocks the caller in a sleep queue; wakes when `timer_get_uptime()` reaches the absolute `sleep_until` timestamp.
+- `msleep(ms)` same as `sleep` but duration is in milliseconds.
+- `time()` returns the current Unix timestamp from the RTC.
+- `uptime()` returns system uptime in milliseconds, computed from `cntpct_el0` ticks since boot.
 
 ## Source layout
 
@@ -250,7 +250,6 @@ src/
 
   kernel/           — mc kernel modules (logic + @extern bindings to the C below)
     cpu.mc          — cpu_context, SPSR/CNTP_CTL defines, wfe/wfi, irq_enable/disable, timer registers, set_vbar_el1, bswap/be*/le* helpers
-    irq.mc          — exception/IRQ dispatch: sync/irq/fiq/serr handlers, ESR_EC decode, generic-set IRQ registry, irq_init (vbar_el1), irq_register/unregister_handler
     syscall.mc      — svc #0 dispatch table (generic set): syscall_init/register/unregister_handler, syscall_handler, SYSCALL_* numbers
     dtb.mc          — @extern bindings to the C DTB parser: dtb_init/dump/find_prop, *_irq_number lookups, fdt_header/memreg/fdt_prop structs
     process.mc      — process struct, create/duplicate/config/destroy_process
@@ -261,11 +260,13 @@ src/
     devices/
       serial.mc     — /dev/serial driver: serial_init, serial_read (pl011_getc+wfi), serial_write (pl011_putc)
       storage.mc    — block driver: storage_init scans virtio slots, registers /dev/sd<letter>; storage_read/write handlers
-    drivers/        — mc drivers (gic/pl031/timer are full impls; pl011/virtio_mmio are @extern bindings)
-      pl011.mc, virtio_mmio.mc — @extern bindings to src/drivers/
+    interrupts/     — exception/IRQ dispatch, GIC, and peripheral drivers
+      irq.mc        — exception/IRQ dispatch: sync/irq/fiq/serr handlers, ESR_EC decode, generic-set IRQ registry, irq_init (vbar_el1), irq_register/unregister_handler
       gic.mc        — GIC impl: gicd_regs/gicc_regs register structs, gic_init/enable_irq/trigger_sgi/acknowledge/end_of_interrupt
-      pl031.mc      — PL031 RTC impl: pl031_regs struct, pl031_init/get_time/set_time/set_alarm, pl031_irq_handler, syscall_time_handler
-      timer.mc      — ARM generic timer impl: timer_init/get_uptime/set_interval, timer_irq_handler, syscall_uptime_handler
+      drivers/      — mc drivers (pl031/timer are full impls; pl011/virtio_mmio are @extern bindings)
+        pl011.mc, virtio_mmio.mc — @extern bindings to src/drivers/
+        pl031.mc    — PL031 RTC impl: pl031_regs struct, pl031_init/get_time/set_time/set_alarm, pl031_irq_handler, syscall_time_handler
+        timer.mc    — ARM generic timer impl: timer_init/get_uptime/set_interval, timer_irq_handler, syscall_uptime_handler
     filesystem/
       fs.mc         — fs_node tree primitives + fs_read/fs_write dispatch; fs_node / fs_mount structs
       vfs.mc        — VFS mount system: vfs_init, vfs_create/destroy_mountpoint, vfs_get_node_for_path, vfs_read/write, vfs_create_dir/file, vfs_dump_fs; owns the global _fs_root tree
@@ -273,7 +274,7 @@ src/
     mm/
       heap.mc       — kmalloc/kfree/krealloc/kmalloc_aligned bindings
     system/
-      syscall.mc    — user-facing svc wrappers under bare names: yield/exit/getpid/waitpid/fork/sleep/msleep/time/uptime (@symbol-bound to syscall_* arch trampolines)
+      syscall.mc    — user-facing svc wrappers under bare names: yield/exit/getpid/waitpid/fork/sleep/msleep/time/uptime (@extern-bound to like-named arch trampolines)
 
   libmc/            — mcc standard library (generic, type-parametric)
     memory.mc       — alloc<T>/alloc_aligned<T>/resize<T>/dealloc<T>, copy_bytes/set_bytes/copy_items/set_items
@@ -289,14 +290,14 @@ src/
 
   arch/             — AArch64-specific (C)
     cpu.c/h         — system register accessors (cntpct, cntfrq, cntp, vbar_el1, DAIF), SPSR defines, halt/hang, _wfi_while/_wfe_while spin macros
-    irq.h           — IRQ/exception interface: irq_handler_t, irq_init/register_handler, sync/irq/fiq/serr handlers (impl ported to kernel/irq.mc)
-    syscall.c/h     — asm svc trampolines (syscall_yield/exit/getpid/waitpid/fork/sleep/msleep/time/uptime); dispatch table ported to kernel/syscall.mc
+    irq.h           — IRQ/exception interface: irq_handler_t, irq_init/register_handler, sync/irq/fiq/serr handlers (impl ported to kernel/interrupts/irq.mc)
+    syscall.c/h     — asm svc trampolines (yield/exit/getpid/waitpid/fork/sleep/msleep/time/uptime); dispatch table ported to kernel/syscall.mc
 
   drivers/          — MMIO peripheral drivers (C)
     pl011.c/h       — PL011 UART
-    gic.h           — GIC-400 interface (impl ported to kernel/drivers/gic.mc)
-    timer.h         — ARM generic timer interface (impl ported to kernel/drivers/timer.mc)
-    pl031.h         — PL031 RTC interface (impl ported to kernel/drivers/pl031.mc)
+    gic.h           — GIC-400 interface (impl ported to kernel/interrupts/gic.mc)
+    timer.h         — ARM generic timer interface (impl ported to kernel/interrupts/drivers/timer.mc)
+    pl031.h         — PL031 RTC interface (impl ported to kernel/interrupts/drivers/pl031.mc)
     virtio_mmio.c/h — virtio MMIO transport: slot scanning, feature negotiation, virtqueue setup (virtq_desc/virtq_avail/virtq_used), IRQ dispatch
 
   mm/               — memory subsystem (C)

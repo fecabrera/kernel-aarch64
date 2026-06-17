@@ -1,7 +1,7 @@
 #include "syscall.h"
 #include <arch/cpu.h>
 
-int64_t syscall_yield() {
+int64_t yield() {
     int64_t ret;
     __asm__ volatile("mov x0, %1\n"
                      "svc #0\n"
@@ -12,7 +12,7 @@ int64_t syscall_yield() {
     return ret;
 }
 
-void syscall_exit(int64_t status) {
+void exit(int64_t status) {
     __asm__ volatile("mov x0, %0\n"
                      "mov x1, %1\n"
                      "svc #0"
@@ -22,7 +22,7 @@ void syscall_exit(int64_t status) {
     halt();
 }
 
-pid_t syscall_getpid() {
+pid_t getpid() {
     int64_t ret;
     __asm__ volatile("mov x0, %1\n"
                      "svc #0\n"
@@ -33,7 +33,7 @@ pid_t syscall_getpid() {
     return ret;
 }
 
-int64_t syscall_waitpid(pid_t pid) {
+int64_t waitpid(pid_t pid) {
     int64_t ret;
     __asm__ volatile("mov x0, %1\n"
                      "mov x1, %2\n"
@@ -45,7 +45,7 @@ int64_t syscall_waitpid(pid_t pid) {
     return ret;
 }
 
-pid_t syscall_fork() {
+pid_t fork() {
     int64_t ret;
     __asm__ volatile("mov x0, %1\n"
                      "svc #0\n"
@@ -56,7 +56,7 @@ pid_t syscall_fork() {
     return ret;
 }
 
-int64_t syscall_sleep(time_t seconds) {
+int64_t sleep(time_t seconds) {
     int64_t ret;
     __asm__ volatile("mov x0, %1\n"
                      "mov x1, %2\n"
@@ -68,7 +68,7 @@ int64_t syscall_sleep(time_t seconds) {
     return ret;
 }
 
-int64_t syscall_msleep(mseconds_t ms) {
+int64_t msleep(mseconds_t ms) {
     int64_t ret;
     __asm__ volatile("mov x0, %1\n"
                      "mov x1, %2\n"
@@ -80,7 +80,7 @@ int64_t syscall_msleep(mseconds_t ms) {
     return ret;
 }
 
-time_t syscall_time() {
+time_t time() {
     time_t ret;
     __asm__ volatile("mov x0, %1\n"
                      "svc #0\n"
@@ -91,7 +91,7 @@ time_t syscall_time() {
     return ret;
 }
 
-time_t syscall_uptime() {
+time_t uptime() {
     time_t ret;
     __asm__ volatile("mov x0, %1\n"
                      "svc #0\n"

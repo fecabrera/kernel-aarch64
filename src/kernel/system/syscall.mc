@@ -6,7 +6,7 @@
  *
  * @return 0 on return from the scheduler.
  */
-@extern @symbol("syscall_yield") fn yield() -> int64;
+@extern fn yield() -> int64;
 
 /**
  * Terminates the calling process via SYSCALL_EXIT (svc #0).
@@ -15,7 +15,7 @@
  *
  * @param status: exit status passed in x1 (logged by syscall_exit_handler).
  */
-@extern @symbol("syscall_exit") fn exit(status: int64);
+@extern fn exit(status: int64);
 
 /**
  * Returns the PID of the calling process via SYSCALL_GETPID (svc #0).
@@ -24,19 +24,19 @@
  *
  * @return PID of the current process, or -1 if no process is currently scheduled.
  */
-@extern @symbol("syscall_getpid") fn getpid() -> int64;
+@extern fn getpid() -> int64;
 
 /**
  * Blocks the calling process until the process with the given PID exits via SYSCALL_WAITPID (svc
  * #0). Traps into EL1, where syscall_waitpid_handler moves the caller to the wait queue and performs a
- * context switch. Execution resumes when the target process calls syscall_exit.
+ * context switch. Execution resumes when the target process calls exit.
  *
  * @param pid: PID of the process to wait for
  *
  * @return exit status of the terminated process, or -1 if no process is
  *         currently scheduled.
  */
-@extern @symbol("syscall_waitpid") fn waitpid(pid: int64) -> int64;
+@extern fn waitpid(pid: int64) -> int64;
 
 /**
  * Forks the calling process via SYSCALL_FORK (svc #0). Traps into EL1, where syscall_fork_handler
@@ -45,7 +45,7 @@
  *
  * @return child PID in the parent, 0 in the child, or -1 on failure.
  */
-@extern @symbol("syscall_fork") fn fork() -> int64;
+@extern fn fork() -> int64;
 
 /**
  * Blocks the calling process for the given number of seconds via SYSCALL_SLEEP (svc #0). Traps into
@@ -56,7 +56,7 @@
  *
  * @return 0 on wakeup, or -1 if no process is currently scheduled.
  */
-@extern @symbol("syscall_sleep") fn sleep(s: uint64) -> int64;
+@extern fn sleep(s: uint64) -> int64;
 
 /**
  * Blocks the calling process for the given number of milliseconds via SYSCALL_MSLEEP (svc #0).
@@ -68,7 +68,7 @@
  *
  * @return 0 on wakeup, or -1 if no process is currently scheduled.
  */
-@extern @symbol("syscall_msleep") fn msleep(ms: uint64) -> int64;
+@extern fn msleep(ms: uint64) -> int64;
 
 /**
  * Returns the current Unix timestamp via SYSCALL_TIME (svc #0).
@@ -76,7 +76,7 @@
  *
  * @return current Unix timestamp, or -1 on failure.
  */
-@extern @symbol("syscall_time") fn time() -> uint64;
+@extern fn time() -> uint64;
 
 /**
  * Returns the system uptime in milliseconds via SYSCALL_UPTIME (svc #0).
@@ -85,4 +85,4 @@
  *
  * @return system uptime in milliseconds
  */
-@extern @symbol("syscall_uptime") fn uptime() -> uint64;
+@extern fn uptime() -> uint64;

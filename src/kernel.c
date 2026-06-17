@@ -53,7 +53,7 @@ void kernel_init() {
     timer_init();
 
     // force context switch via syscall
-    syscall_yield();
+    yield();
 }
 
 void init() { console("/dev/serial"); }
