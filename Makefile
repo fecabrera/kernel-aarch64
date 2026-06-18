@@ -21,13 +21,8 @@ CFLAGS  = -ffreestanding -nostdlib -nostdinc \
 
 SRCS := $(wildcard \
 		  src/*.c \
-		  src/*.mc \
  		  src/*.S \
   		  src/lib/*.c \
-  		  src/libmc/*.mc \
-  		  src/libmc/iteration/*.mc \
-  		  src/libmc/hashing/*.mc \
-  		  src/libmc/libc/*.mc \
 		  src/dsa/*.c \
 		  src/dsa/deque/*.c \
 		  src/dsa/hashmap/*.c \
@@ -42,12 +37,16 @@ SRCS := $(wildcard \
 		  src/sched/*.c \
 		  src/fs/*.c \
 		  src/io/*.c \
+		  src/*.mc \
+  		  src/libmc/*.mc \
+  		  src/libmc/iteration/*.mc \
+  		  src/libmc/hashing/*.mc \
+  		  src/libmc/libc/*.mc \
 		  src/kernel/*.mc \
-		  src/kernel/arch/*.mc \
 		  src/kernel/devices/*.mc \
-		  src/kernel/drivers/*.mc \
 		  src/kernel/filesystem/*.mc \
-		  src/kernel/io/*.mc \
+		  src/kernel/interrupts/*.mc \
+		  src/kernel/interrupts/drivers/*.mc \
 		  src/kernel/mm/*.mc \
 		  src/kernel/system/*.mc)
 OBJS := $(patsubst src/%, build/%, $(SRCS:.c=.o))
