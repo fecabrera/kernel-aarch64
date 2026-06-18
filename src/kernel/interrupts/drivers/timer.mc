@@ -6,45 +6,6 @@ import "scheduler";
 import "interrupts/gic";
 import "interrupts/irq";
 
-const DEFAULT_TIMER_INTERVAL = 10;
-
-@static let timer_irq: uint32;
-@static let tinfo: struct sched_info;
-
-/**
- * Converts a duration in milliseconds to counter ticks at the current frequency.
- *
- * @param value: duration in milliseconds
- *
- * @return equivalent number of counter ticks
- */
-@inline fn ms_to_hz(value: uint64) -> uint64 {
-    return value * tinfo.frequency / 1000;
-}
-
-/**
- * Converts a count of counter ticks to milliseconds at the current frequency.
- *
- * @param value: number of counter ticks
- *
- * @return equivalent duration in milliseconds
- */
-@inline fn hz_to_ms(value: uint64) -> uint64 {
-    return value * 1000 / tinfo.frequency;
-}
-
-/**
- * Returns the countdown value (in ticks) for n tick intervals, i.e. the number
- * of ticks to program into cntp_tval_el0 to fire after n * interval ms.
- *
- * @param n: number of tick intervals
- *
- * @return countdown value in counter ticks
- */
-@inline fn time_quantum(n: uint64) -> uint64 {
-    return ms_to_hz(n * tinfo.interval);
-}
-
 /**
  * Timing state maintained by the timer driver across each tick interrupt.
  * Used to compute the real elapsed interval and system uptime in milliseconds.
@@ -55,6 +16,11 @@ struct sched_info {
     frequency: uint64;     // counter frequency in Hz, read from cntfrq_el0
     interval: uint64;      // desired tick interval in milliseconds
 }
+
+const DEFAULT_TIMER_INTERVAL = 10;
+
+@static let timer_irq: uint32;
+@static let tinfo: struct sched_info;
 
 /**
  * Initializes the ARM generic timer. Reads the timer frequency from cntfrq_el0,
@@ -152,4 +118,38 @@ fn syscall_uptime_handler(ctx: struct cpu_context*) -> struct cpu_context* {
 
     ctx->x[0] = uptime;
     return ctx;
+}
+
+/**
+ * Converts a duration in milliseconds to counter ticks at the current frequency.
+ *
+ * @param value: duration in milliseconds
+ *
+ * @return equivalent number of counter ticks
+ */
+@inline fn ms_to_hz(value: uint64) -> uint64 {
+    return value * tinfo.frequency / 1000;
+}
+
+/**
+ * Converts a count of counter ticks to milliseconds at the current frequency.
+ *
+ * @param value: number of counter ticks
+ *
+ * @return equivalent duration in milliseconds
+ */
+@inline fn hz_to_ms(value: uint64) -> uint64 {
+    return value * 1000 / tinfo.frequency;
+}
+
+/**
+ * Returns the countdown value (in ticks) for n tick intervals, i.e. the number
+ * of ticks to program into cntp_tval_el0 to fire after n * interval ms.
+ *
+ * @param n: number of tick intervals
+ *
+ * @return countdown value in counter ticks
+ */
+@inline fn time_quantum(n: uint64) -> uint64 {
+    return ms_to_hz(n * tinfo.interval);
 }

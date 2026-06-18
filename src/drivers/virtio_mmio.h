@@ -29,32 +29,51 @@
 
 // ── Register accessors ───────────────────────────────────────────────────────
 
-#define VIRTIO_REG(n, off) (*(volatile uint32_t *)(VIRTIO_MMIO_ADDR(n) + (off)))
+/**
+ * virtio-mmio (modern, v2) register block for one device. All registers are
+ * 32-bit; reserved gaps are skipped to keep the named registers at their
+ * architectural offsets. Each of the 32 slots has its own block at
+ * VIRTIO_MMIO_ADDR(n); access it through the VIRTIO(n) pointer (e.g.
+ * VIRTIO(slot)->magic).
+ */
+struct virtio_mmio_regs {
+    volatile uint32_t magic;                  // 0x000 R   magic value
+    volatile uint32_t version;                // 0x004 R   device version
+    volatile uint32_t device_id;              // 0x008 R   device type
+    volatile uint32_t vendor_id;              // 0x00c R   vendor
+    volatile uint32_t device_features;        // 0x010 R   features offered
+    volatile uint32_t device_features_sel;    // 0x014 W   select feature word
+    uint32_t _reserved0[(0x020 - 0x018) / 4]; // 0x018–0x01c
+    volatile uint32_t driver_features;        // 0x020 W   features accepted
+    volatile uint32_t driver_features_sel;    // 0x024 W   select feature word
+    uint32_t _reserved1[(0x030 - 0x028) / 4]; // 0x028–0x02c
+    volatile uint32_t queue_sel;              // 0x030 W   select virtqueue
+    volatile uint32_t queue_num_max;          // 0x034 R   max queue size
+    volatile uint32_t queue_num;              // 0x038 W   set queue size
+    uint32_t _reserved2[(0x044 - 0x03c) / 4]; // 0x03c–0x040
+    volatile uint32_t queue_ready;            // 0x044 RW  activate queue
+    uint32_t _reserved3[(0x050 - 0x048) / 4]; // 0x048–0x04c
+    volatile uint32_t queue_notify;           // 0x050 W   kick device
+    uint32_t _reserved4[(0x060 - 0x054) / 4]; // 0x054–0x05c
+    volatile uint32_t interrupt_status;       // 0x060 R   pending interrupts
+    volatile uint32_t interrupt_ack;          // 0x064 W   clear interrupts
+    uint32_t _reserved5[(0x070 - 0x068) / 4]; // 0x068–0x06c
+    volatile uint32_t status;                 // 0x070 RW  device status
+    uint32_t _reserved6[(0x080 - 0x074) / 4]; // 0x074–0x07c
+    volatile uint32_t queue_desc_low;         // 0x080 W   descriptor table PA low
+    volatile uint32_t queue_desc_high;        // 0x084 W   descriptor table PA high
+    uint32_t _reserved7[(0x090 - 0x088) / 4]; // 0x088–0x08c
+    volatile uint32_t queue_driver_low;       // 0x090 W   available ring PA low
+    volatile uint32_t queue_driver_high;      // 0x094 W   available ring PA high
+    uint32_t _reserved8[(0x0a0 - 0x098) / 4]; // 0x098–0x09c
+    volatile uint32_t queue_device_low;       // 0x0a0 W   used ring PA low
+    volatile uint32_t queue_device_high;      // 0x0a4 W   used ring PA high
+    uint32_t _reserved9[(0x0fc - 0x0a8) / 4]; // 0x0a8–0x0f8
+    volatile uint32_t config_gen;             // 0x0fc R   config generation counter
+    volatile uint32_t config[];               // 0x100 RW  device-specific config
+};
 
-#define VIRTIO_MAGIC(n) VIRTIO_REG(n, 0x000)               // R   magic value
-#define VIRTIO_VERSION(n) VIRTIO_REG(n, 0x004)             // R   device version
-#define VIRTIO_DEVICE_ID(n) VIRTIO_REG(n, 0x008)           // R   device type
-#define VIRTIO_VENDOR_ID(n) VIRTIO_REG(n, 0x00c)           // R   vendor
-#define VIRTIO_DEVICE_FEATURES(n) VIRTIO_REG(n, 0x010)     // R   features offered
-#define VIRTIO_DEVICE_FEATURES_SEL(n) VIRTIO_REG(n, 0x014) // W   select feature word
-#define VIRTIO_DRIVER_FEATURES(n) VIRTIO_REG(n, 0x020)     // W   features accepted
-#define VIRTIO_DRIVER_FEATURES_SEL(n) VIRTIO_REG(n, 0x024) // W   select feature word
-#define VIRTIO_QUEUE_SEL(n) VIRTIO_REG(n, 0x030)           // W   select virtqueue
-#define VIRTIO_QUEUE_NUM_MAX(n) VIRTIO_REG(n, 0x034)       // R   max queue size
-#define VIRTIO_QUEUE_NUM(n) VIRTIO_REG(n, 0x038)           // W   set queue size
-#define VIRTIO_QUEUE_READY(n) VIRTIO_REG(n, 0x044)         // RW  activate queue
-#define VIRTIO_QUEUE_NOTIFY(n) VIRTIO_REG(n, 0x050)        // W   kick device
-#define VIRTIO_INTERRUPT_STATUS(n) VIRTIO_REG(n, 0x060)    // R   pending interrupts
-#define VIRTIO_INTERRUPT_ACK(n) VIRTIO_REG(n, 0x064)       // W   clear interrupts
-#define VIRTIO_STATUS(n) VIRTIO_REG(n, 0x070)              // RW  device status
-#define VIRTIO_QUEUE_DESC_LOW(n) VIRTIO_REG(n, 0x080)      // W   descriptor table PA low
-#define VIRTIO_QUEUE_DESC_HIGH(n) VIRTIO_REG(n, 0x084)     // W   descriptor table PA high
-#define VIRTIO_QUEUE_DRIVER_LOW(n) VIRTIO_REG(n, 0x090)    // W   available ring PA low
-#define VIRTIO_QUEUE_DRIVER_HIGH(n) VIRTIO_REG(n, 0x094)   // W   available ring PA high
-#define VIRTIO_QUEUE_DEVICE_LOW(n) VIRTIO_REG(n, 0x0a0)    // W   used ring PA low
-#define VIRTIO_QUEUE_DEVICE_HIGH(n) VIRTIO_REG(n, 0x0a4)   // W   used ring PA high
-#define VIRTIO_CONFIG_GEN(n) VIRTIO_REG(n, 0x0fc)          // R   config generation counter
-#define VIRTIO_CONFIG(n) VIRTIO_REG(n, 0x100)              // RW  device-specific config
+#define VIRTIO(n) ((struct virtio_mmio_regs *)VIRTIO_MMIO_ADDR(n))
 
 // ── Status register bits (write in order during init) ────────────────────────
 

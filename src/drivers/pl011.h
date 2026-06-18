@@ -2,19 +2,29 @@
 
 #include <stdint.h>
 
-#define UART0_BASE 0x09000000UL
+/**
+ * PL011 UART register block, memory-mapped at UART0_BASE. All registers are
+ * 32-bit; reserved gaps (RSR/ECR, ILPR, etc.) are skipped to keep the named
+ * registers at their architectural offsets. Access them through the PL011
+ * pointer (e.g. PL011->dr).
+ */
+struct pl011_regs {
+    volatile uint32_t dr;                     // 0x000 Data
+    uint32_t _reserved0[(0x018 - 0x004) / 4]; // 0x004–0x014
+    volatile uint32_t fr;                     // 0x018 Flags
+    uint32_t _reserved1[(0x024 - 0x01C) / 4]; // 0x01C–0x020
+    volatile uint32_t ibrd;                   // 0x024 Baud integer
+    volatile uint32_t fbrd;                   // 0x028 Baud fraction
+    volatile uint32_t lcr_h;                  // 0x02C Line control
+    volatile uint32_t cr;                     // 0x030 Control
+    volatile uint32_t ifls;                   // 0x034 FIFO level select
+    volatile uint32_t imsc;                   // 0x038 Interrupt mask
+    volatile uint32_t ris;                    // 0x03C Raw interrupt status
+    volatile uint32_t mis;                    // 0x040 Masked interrupt status
+    volatile uint32_t icr;                    // 0x044 Interrupt clear
+};
 
-#define PL011_DR (*(volatile uint32_t *)(UART0_BASE + 0x000))    // Data
-#define PL011_FR (*(volatile uint32_t *)(UART0_BASE + 0x018))    // Flags
-#define PL011_IBRD (*(volatile uint32_t *)(UART0_BASE + 0x024))  // Baud integer
-#define PL011_FBRD (*(volatile uint32_t *)(UART0_BASE + 0x028))  // Baud fraction
-#define PL011_LCR_H (*(volatile uint32_t *)(UART0_BASE + 0x02C)) // Line control
-#define PL011_CR (*(volatile uint32_t *)(UART0_BASE + 0x030))    // Control
-#define PL011_IFLS (*(volatile uint32_t *)(UART0_BASE + 0x034))  // FIFO level select
-#define PL011_IMSC (*(volatile uint32_t *)(UART0_BASE + 0x038))  // Interrupt mask
-#define PL011_RIS (*(volatile uint32_t *)(UART0_BASE + 0x03C))   // Raw interrupt status
-#define PL011_MIS (*(volatile uint32_t *)(UART0_BASE + 0x040))   // Masked interrupt status
-#define PL011_ICR (*(volatile uint32_t *)(UART0_BASE + 0x044))   // Interrupt clear
+#define UART0_BASE 0x09000000UL
 
 // FR flags
 #define PL011_FR_CTS (1 << 0)  // Clear to send
@@ -86,6 +96,8 @@
 #define PL011_DR_DATA_MASK 0xFF
 
 #define RX_BUF_SIZE 1024
+
+#define PL011 ((struct pl011_regs *)UART0_BASE)
 
 /**
  * Writes a single character to the UART, spinning via wfi() until the TX FIFO has space.

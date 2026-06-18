@@ -66,14 +66,14 @@ boilerplate for type-safe, reusable code. mc code links against C through
 - Syscall dispatch table + user-facing wrappers (`syscall.mc`, `system/syscall.mc`)
 - Exception/IRQ dispatch — sync/irq/fiq/serr handlers, IRQ registry, vbar_el1 setup (`interrupts/irq.mc`)
 - Scheduler syscall handlers — exit, yield, getpid, fork, spawn (`scheduler.mc`)
-- Drivers — GIC, PL031 RTC, ARM generic timer (`interrupts/gic.mc`, `interrupts/drivers/pl031.mc`, `interrupts/drivers/timer.mc`)
+- Drivers — GIC, PL031 RTC, ARM generic timer, PL011 UART, virtio MMIO (`interrupts/gic.mc`, `interrupts/drivers/pl031.mc`, `interrupts/drivers/timer.mc`, `interrupts/drivers/pl011.mc`, `interrupts/drivers/virtio_mmio.mc`); only `pl011_vprintf` remains in C
 - Device handlers — serial, storage (`devices/`)
 - Interactive console / shell (`console.mc`)
 - Endian + byte-swap helpers (`cpu.mc`)
 
 **Still C, wrapped via `@extern`** (port targets, low-level first):
 
-- Drivers — PL011, virtio MMIO (`src/drivers/`)
+- PL011 `printf` core — `pl011_vprintf` (`src/drivers/pl011.c`); the rest of the PL011 driver is ported to `kernel/interrupts/drivers/pl011.mc`
 - Arch glue — exception vector table (`vectors.S`), `svc` syscall trampolines, system registers (`src/arch/`); IRQ dispatch ported to `kernel/interrupts/irq.mc`
 - Memory — heap allocator, DTB memory probe (`src/mm/`)
 - Scheduler — context-switch core, ready/wait/sleep queues, and the waitpid/sleep/msleep handlers (`src/sched/`); the rest is `@extern`-bound from `kernel/scheduler.mc`, which also implements the exit/yield/getpid/fork/spawn handlers and the `scheduler_get/set_current_process` accessors in mc
@@ -115,7 +115,7 @@ boilerplate for type-safe, reusable code. mc code links against C through
 - Scans all 32 MMIO slots, validates magic, version, and device ID.
 - Negotiates features, sets up per-slot 64-entry virtqueues (`struct virtq` with desc/avail/used rings).
 - `virtio_mmio_read` submits synchronous block reads via 3-descriptor chains; polls the used ring via `wfi()` until the device signals completion.
-- IRQ handler acks `VIRTIO_INTERRUPT_STATUS`.
+- IRQ handler reads and acks the device's `interrupt_status` register.
 
 ### **Filesystem abstraction**
 
@@ -263,8 +263,9 @@ src/
     interrupts/     — exception/IRQ dispatch, GIC, and peripheral drivers
       irq.mc        — exception/IRQ dispatch: sync/irq/fiq/serr handlers, ESR_EC decode, generic-set IRQ registry, irq_init (vbar_el1), irq_register/unregister_handler
       gic.mc        — GIC impl: gicd_regs/gicc_regs register structs, gic_init/enable_irq/trigger_sgi/acknowledge/end_of_interrupt
-      drivers/      — mc drivers (pl031/timer are full impls; pl011/virtio_mmio are @extern bindings)
-        pl011.mc, virtio_mmio.mc — @extern bindings to src/drivers/
+      drivers/      — mc peripheral drivers (full impls)
+        pl011.mc    — PL011 UART impl: pl011_regs struct, pl011_init/getc/putc/printf, pl011_irq_handler (pl011_vprintf still @extern from src/drivers/pl011.c)
+        virtio_mmio.mc — virtio MMIO impl: virtio_mmio_regs/virtq structs, virtio_mmio_init/probe_device/read/find_next_slot, virtio_mmio_irq_handler
         pl031.mc    — PL031 RTC impl: pl031_regs struct, pl031_init/get_time/set_time/set_alarm, pl031_irq_handler, syscall_time_handler
         timer.mc    — ARM generic timer impl: timer_init/get_uptime/set_interval, timer_irq_handler, syscall_uptime_handler
     filesystem/
@@ -293,12 +294,12 @@ src/
     irq.h           — IRQ/exception interface: irq_handler_t, irq_init/register_handler, sync/irq/fiq/serr handlers (impl ported to kernel/interrupts/irq.mc)
     syscall.c/h     — asm svc trampolines (yield/exit/getpid/waitpid/fork/sleep/msleep/time/uptime); dispatch table ported to kernel/syscall.mc
 
-  drivers/          — MMIO peripheral drivers (C)
-    pl011.c/h       — PL011 UART
+  drivers/          — MMIO peripheral driver interfaces (C); impls ported to kernel/interrupts/
+    pl011.c/h       — PL011 UART: only pl011_vprintf remains in C; rest ported to kernel/interrupts/drivers/pl011.mc
     gic.h           — GIC-400 interface (impl ported to kernel/interrupts/gic.mc)
     timer.h         — ARM generic timer interface (impl ported to kernel/interrupts/drivers/timer.mc)
     pl031.h         — PL031 RTC interface (impl ported to kernel/interrupts/drivers/pl031.mc)
-    virtio_mmio.c/h — virtio MMIO transport: slot scanning, feature negotiation, virtqueue setup (virtq_desc/virtq_avail/virtq_used), IRQ dispatch
+    virtio_mmio.h   — virtio MMIO interface: register/virtq structs and prototypes (impl ported to kernel/interrupts/drivers/virtio_mmio.mc)
 
   mm/               — memory subsystem (C)
     mem.c/h         — reads RAM base/size from DTB at boot

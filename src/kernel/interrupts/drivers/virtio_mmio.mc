@@ -1,4 +1,14 @@
+import "debug";
 import "cpu";
+import "dtb";
+import "memory";
+import "interrupts/irq";
+import "interrupts/gic";
+
+// ── MMIO base and per-device stride ──────────────────────────────────────────
+
+const VIRTIO_MMIO_BASE = 0x0a000000;
+const VIRTIO_MMIO_STRIDE = 0x200;
 
 const DEFAULT_VIRTIO_QUEUE_NUM = 64;
 
@@ -125,12 +135,179 @@ struct virtio_mmio_regs {
     config: uint32;              // 0x100  RW  device-specific config (first word)
 }
 
+struct virtq_desc {
+    addr: uint64;  // physical address of the buffer
+    length: uint32;   // length in bytes
+    flags: uint16; // VIRTQ_DESC_F_NEXT, VIRTQ_DESC_F_WRITE, etc.
+    next: uint16;  // index of next descriptor in chain (if F_NEXT set)
+}
+
+struct virtq_avail {
+    flags: uint16;                          // VIRTQ_AVAIL_F_NO_INTERRUPT
+    idx: uint16;                            // next slot the driver will write
+    ring: uint16[DEFAULT_VIRTIO_QUEUE_NUM]; // descriptor indices
+}
+
+struct virtq_ring {
+    id: uint32;  // descriptor chain head index
+    length: uint32; // bytes written (for reads)
+}
+
+struct virtq_used {
+    flags: uint16; // VIRTQ_USED_F_NO_NOTIFY
+    idx: uint16;   // next slot the device will write
+    ring: struct virtq_ring[DEFAULT_VIRTIO_QUEUE_NUM];
+}
+
+struct virtq {
+    desc: struct virtq_desc[DEFAULT_VIRTIO_QUEUE_NUM];
+    avail: struct virtq_avail;
+    used: struct virtq_used;
+}
+
+struct virtio_blk_req_header {
+    type: uint32; // VIRTIO_BLK_T_IN (0) = read, VIRTIO_BLK_T_OUT (1) = write
+    reserved: uint32;
+    sector: uint64; // 512-byte sector number to start from
+}
+
+struct virtio_mmio_device {
+    irq_id: uint32;
+    device_id: uint32;
+    queue: struct virtq;
+}
+
+@static let _irq_to_slot: int8[256];
+@static let _handlers: (fn (int8, struct cpu_context*) -> struct cpu_context*)[32];
+@static let _devices: struct virtio_mmio_device[32];
+
 /**
  * Scans all 32 virtio MMIO slots, initializes each valid device found (modern version, non-zero
  * device ID), reads its feature words, and registers its IRQ handler with the GIC. Must be called
  * after gic_init and irq_init, and before irq_enable.
  */
-@extern fn virtio_mmio_init();
+fn virtio_mmio_init() {
+    set_bytes(_irq_to_slot, 0, 256);
+    set_bytes(_handlers, 0, 32);
+    set_bytes(_devices, 0, 32);
+
+    let slot: int8 = 0;
+    while (slot < 32) {
+        virtio_mmio_probe_device(slot);
+        slot = slot + 1;
+    }
+}
+
+@private
+fn virtio_mmio_probe_device(slot: int8) -> int32 {
+    let device = &_devices[slot];
+    let virtio = virtio_mmio_reg(slot);
+
+    let magic = virtio->magic;
+    let version = virtio->version;
+    let device_id = virtio->device_id;
+
+    // parse magic
+    if (magic != VIRTIO_MMIO_MAGIC)
+        return VIRTIO_MMIO_BAD_MAGIC;
+
+    // parse version
+    if (version != VIRTIO_MMIO_VERSION_MODERN)
+        return VIRTIO_MMIO_UNSUPPORTED_VERSION;
+
+    // parse device ID
+    if (device_id == VIRTIO_DEVICE_ID_INVALID)
+        return VIRTIO_MMIO_INVALID_DEVICE;
+
+    dprintk("[virtio_mmio@%x] magic = 0x%x, version = %i, device_id = %i\n",
+            virtio, magic, version, virtio->device_id);
+
+    // acknowledge
+    virtio->status = VIRTIO_STATUS_ACKNOWLEDGE | VIRTIO_STATUS_DRIVER;
+
+    // get features
+    let features_lo: uint32;
+    let features_hi: uint32;
+
+    virtio->device_features_sel = VIRTIO_FEATURES_LOW;
+    features_lo = virtio->device_features;
+
+    virtio->device_features_sel = VIRTIO_FEATURES_HIGH;
+    features_hi = virtio->device_features;
+
+    dprintk("[virtio_mmio@%x] features: low=0x%x, high=0x%x\n",
+            virtio, features_lo, features_hi);
+
+    // negociate features
+    dprintk("[virtio_mmio@%x] negociating features\n", slot);
+
+    virtio->driver_features_sel = VIRTIO_FEATURES_LOW;
+    virtio->driver_features = features_lo & (VIRTIO_BLK_F_BLK_SIZE | VIRTIO_BLK_F_SIZE_MAX);
+
+    virtio->driver_features_sel = VIRTIO_FEATURES_HIGH;
+    virtio->driver_features = features_hi & VIRTIO_F_VERSION_1; // must keep this
+
+    virtio->status = virtio->status | VIRTIO_STATUS_FEATURES_OK;
+
+    // check response
+    if ((virtio->status & VIRTIO_STATUS_FEATURES_OK) == 0) {
+        dprintk("[virtio_mmio@%x] features rejected\n", virtio);
+        virtio->status = virtio->status | VIRTIO_STATUS_FAILED;
+
+        return VIRTIO_MMIO_NEGOTIATION_FAILED; // negotiation failed
+    }
+
+    // negotiation accepted
+    dprintk("[virtio_mmio@%x] features accepted\n", virtio);
+
+    // set up virtqueue
+    virtio->queue_sel = 0;
+
+    let virtio_queue_num_max = virtio->queue_num_max;
+    dprintk("[virtio_mmio@%x] virtio_queue_num_max=%i\n", virtio, virtio_queue_num_max);
+
+    if (virtio_queue_num_max < DEFAULT_VIRTIO_QUEUE_NUM) {
+        dprintk("[virtio_mmio@%x] device doesn't support queue_num=%i\n",
+                virtio, DEFAULT_VIRTIO_QUEUE_NUM);
+        return VIRTIO_MMIO_QUEUE_NUM_ERROR;
+    }
+
+    virtio->queue_num = DEFAULT_VIRTIO_QUEUE_NUM;
+
+    let q = &device->queue;
+
+    // Write physical addresses (split into low/high 32-bit halves)
+    virtio->queue_desc_low = (&q->desc as uint64) as uint32;
+    virtio->queue_desc_high = (&q->desc as uint64 >> 32) as uint32;
+
+    virtio->queue_driver_low = (&q->avail as uint64) as uint32;
+    virtio->queue_driver_high = (&q->avail as uint64 >> 32) as uint32;
+
+    virtio->queue_device_low = (&q->used as uint64) as uint32;
+    virtio->queue_device_high = (&q->used as uint64 >> 32) as uint32;
+
+    // Mark the queue live
+    virtio->queue_ready = 1;
+
+    // initialize IRQ
+    let virtio_mmio_irq: uint32;
+    if (dtb_get_virtio_mmio_irq_number(slot as int32, &virtio_mmio_irq) != 0) {
+        dprintk("[virtio_mmio] IRQ not found!!\n");
+        return VIRTIO_MMIO_IRQ_NOT_FOUND;
+    }
+
+    _irq_to_slot[virtio_mmio_irq] = slot;
+
+    dprintk("[virtio_mmio@%x] Initializing IRQ: %i\n", virtio, virtio_mmio_irq);
+    irq_register_handler(virtio_mmio_irq, virtio_mmio_irq_handler);
+    gic_enable_irq(virtio_mmio_irq);
+
+    // if everything goes well we add it to our table
+    device->irq_id = virtio_mmio_irq;
+    device->device_id = device_id;
+
+    return 0;
+}
 
 /**
  * Scans initialized slots after `start` and returns the index of the first slot whose device_id
@@ -142,7 +319,16 @@ struct virtio_mmio_regs {
  *
  * @return slot index of the first matching device, or -1 if none found
  */
-@extern fn virtio_mmio_find_next_slot(device_id: uint32, start: int8) -> int8;
+fn virtio_mmio_find_next_slot(device_id: uint32, start: int8) -> int8 {
+    let idx: int8 = start + 1;
+    while (idx < 32) {
+        defer idx = idx + 1;
+        if (_devices[idx].device_id == device_id)
+            return idx;
+    }
+
+    return -1;
+}
 
 /**
  * Submits a synchronous read request to the virtio-blk device at the given slot. Builds a
@@ -156,7 +342,56 @@ struct virtio_mmio_regs {
  * @return VIRTIO_BLK_S_OK (0) on success, VIRTIO_BLK_S_IOERR or VIRTIO_BLK_S_UNSUPP on device
  *         error, VIRTIO_MMIO_INVALID_DEVICE if the slot has no initialized device
  */
-@extern fn virtio_mmio_read(slot: int8, sector_number: uint64, data: uint8*) -> int32;
+fn virtio_mmio_read(slot: int8, sector_number: uint64, data: uint8*) -> int32 {
+    let device = &_devices[slot];
+
+    if (device->device_id == VIRTIO_DEVICE_ID_INVALID) {
+        dprintk("[virtio_mmio] Device slot %i is invalid!\n", slot);
+        return VIRTIO_MMIO_INVALID_DEVICE;
+    }
+
+    // 1. Fill the header
+    let hdr: struct virtio_blk_req_header;
+    hdr.type = VIRTIO_BLK_T_IN;
+    hdr.sector = sector_number;
+
+    let status: uint8 = 0xFF; // device writes 0 on success, 1 on error, 2 = unsupported
+
+    let q = &device->queue;
+
+    // 2. Fill descriptor chain (indices 0, 1, 2)
+    q->desc[0].addr = &hdr as uint64;
+    q->desc[0].length = sizeof(struct virtio_blk_req_header) as uint32;
+    q->desc[0].flags = VIRTQ_DESC_F_NEXT;
+    q->desc[0].next = 1;
+
+    q->desc[1].addr = data as uint64;
+    q->desc[1].length = VIRTIO_MMIO_BLK_SECTOR_SIZE;
+    q->desc[1].flags = VIRTQ_DESC_F_WRITE | VIRTQ_DESC_F_NEXT;
+    q->desc[1].next = 2;
+
+    q->desc[2].addr = &status as uint64;
+    q->desc[2].length = 1;
+    q->desc[2].flags = VIRTQ_DESC_F_WRITE;
+
+    // 3. Post to available ring
+    let idx: uint16 = q->avail.idx % DEFAULT_VIRTIO_QUEUE_NUM;
+    q->avail.ring[idx] = 0; // head descriptor index
+    q->avail.idx = q->avail.idx + 1;
+
+    // 4. Kick the device
+    let virtio = virtio_mmio_reg(slot);
+    virtio->queue_notify = 0;
+
+    // 5. Poll or wait for IRQ — device writes to used ring when done
+    // In the IRQ handler, check used.idx advanced and read status byte
+    while(status == VIRTIO_BLK_S_NONE)
+        wfi();
+
+    dprintk("[virtio_mmio@%x] status = %u\n", virtio, status);
+
+    return status as int32;
+}
 
 /**
  * IRQ handler for virtio MMIO device interrupts. Maps the IRQ ID to its slot via _irq_to_slot,
@@ -170,4 +405,28 @@ struct virtio_mmio_regs {
  * @return ctx of the next task to run as returned by the slot handler,
  *         or ctx unchanged if no handler is registered
  */
-@extern fn virtio_mmio_irq_handler(irq: int32, ctx: struct cpu_context*) -> struct cpu_context*;
+fn virtio_mmio_irq_handler(irq: uint32, ctx: struct cpu_context*) -> struct cpu_context* {
+    let slot = _irq_to_slot[irq];
+    let fnc = _handlers[slot];
+
+    let virtio = virtio_mmio_reg(slot);
+    let status = virtio->interrupt_status;
+    virtio->interrupt_ack = status;
+
+    dprintk("[virtio_mmio@%x] IRQ handler, status = %u\n", virtio, status);
+
+    if (fnc == null) {
+        dprintk("[virtio_mmio@%x] Handler not found for slot %i!\n", virtio, slot);
+        return ctx;
+    }
+
+    return fnc(slot, ctx);
+}
+
+@private @inline fn virtio_mmio_addr(slot: int8) -> uint64 {
+    return VIRTIO_MMIO_BASE + (slot as uint64 * VIRTIO_MMIO_STRIDE);
+}
+
+@private @inline fn virtio_mmio_reg(slot: int8) -> struct virtio_mmio_regs* {
+    return virtio_mmio_addr(slot) as struct virtio_mmio_regs*;
+}

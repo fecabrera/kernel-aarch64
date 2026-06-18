@@ -31,7 +31,7 @@ const RTC_CR_EN = (1 << 0); // RTC enable
 const RTC_INT_MATCH = (1 << 0); // Match interrupt
 
 // Memory-mapped PL031 register block
-@static let PL031: struct pl031_regs*;
+@static let PL031: struct pl031_regs* = RTC_BASE as struct pl031_regs*;
 
 @static let pl031_irq: uint32;
 
@@ -41,7 +41,6 @@ const RTC_INT_MATCH = (1 << 0); // Match interrupt
  * SYSCALL_TIME.
  */
 fn pl031_init() {
-    PL031 = RTC_BASE as struct pl031_regs*;
     PL031->cr = RTC_CR_EN;
 
     if (dtb_get_rtc_irq_number(&pl031_irq) == 0) {
