@@ -29,7 +29,7 @@ struct io_file {
 fn io_init() {
     _dev_root = vfs_create_dir("/", "dev", 0, null);
     if (_dev_root == null) {
-        dprintk("[virtio_mmio@%x] cannot creat mountpoint \"%s\"!\n");
+        dprintk("[io] cannot create \"/dev\" folder!\n");
         hang();
     }
     dev_mp = vfs_create_mountpoint("/dev", null, null, io_read, io_write);
@@ -127,7 +127,7 @@ fn io_unregister_module(name: uint8*) -> int32 {
  * @return return value of module->read, or -1 if the module is not found
  */
 fn io_read(node: struct fs_node*, buff: uint8*, count: uint64, offset: uint64) -> int32 {
-    dprintk("[io] read(): mod=\"%s\", buff=0x%08X, count=%d, offset=%d\n",
+    dprintk("[io] read(): mod=\"%s\", buff=%p, count=%d, offset=%d\n",
             node->name, buff, count, offset);
 
     let module = io_get_module(node->name);
@@ -151,7 +151,7 @@ fn io_read(node: struct fs_node*, buff: uint8*, count: uint64, offset: uint64) -
  * @return return value of module->write, or -1 if the module is not found
  */
 fn io_write(node: struct fs_node*, buff: uint8*, count: uint64, offset: uint64) -> int32 {
-    dprintk("[io] write(): mod=\"%s\", buff=0x%08X, count=%d, offset=%d\n",
+    dprintk("[io] write(): mod=\"%s\", buff=%p, count=%d, offset=%d\n",
             node->name, buff, count, offset);
 
     let module = io_get_module(node->name);

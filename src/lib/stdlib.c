@@ -40,6 +40,34 @@ char *itoa(int64_t value, char *str, int base) {
     return str;
 }
 
+char *utoa(uint64_t value, char *str, int base) {
+    char *buff = str;
+
+    if (value == 0) {
+        *buff++ = '0';
+        *buff = '\0';
+        return str;
+    }
+
+    while (value != 0) {
+        *buff++ = _itoa_digits[value % base];
+        value /= base;
+    }
+
+    /* digits were written least-significant first; reverse them */
+    char *start = str;
+    char *end = buff - 1;
+    while (start < end) {
+        char tmp = *start;
+        *start++ = *end;
+        *end-- = tmp;
+    }
+
+    *buff = '\0';
+
+    return str;
+}
+
 static long long _ato(const char *str) {
     while (*str == ' ' || *str == '\t' || *str == '\n' || *str == '\r' || *str == '\f' ||
            *str == '\v')

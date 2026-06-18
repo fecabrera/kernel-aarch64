@@ -46,12 +46,12 @@ fn ctx_dump(ctx: struct cpu_context*) {
     {
         let i: int32 = 0;
         while(i < 15) {
-            printk("x%i  = 0x%x\n", i, ctx->x[i]);
+            printk("x%i  = %p\n", i, ctx->x[i]);
             i = i + 1;
         }
     }
-    printk("lr  = 0x%x\n", ctx->lr);
-    printk("elr = 0x%x\n", ctx->elr);
+    printk("lr  = %p\n", ctx->lr);
+    printk("elr = %p\n", ctx->elr);
     printk("spsr= 0b");
     {
         // print all 64 bits of spsr, MSB first
@@ -127,7 +127,7 @@ fn irq_register_handler(irq: uint32,
                         callback: fn (uint32, struct cpu_context*) -> struct cpu_context*) -> int32 {
     if (get_irq_handler(irq) == null) {
         set_irq_handler(irq, callback);
-        dprintk("[irq] handler registered for IRQ %i, address = 0x%x\n", irq, callback as uint64);
+        dprintk("[irq] handler registered for IRQ %i, address = %p\n", irq, callback);
         return 0;
     }
     
@@ -168,7 +168,7 @@ fn irq_unregister_handler(irq: uint32) -> int32 {
  * @return pointer to the saved cpu_context of the next task to run
  */
 fn sync_handler(ctx: struct cpu_context*, esr: uint64, elr: uint64, far: uint64) -> struct cpu_context* {
-    dprintk("[sync] sync_handler(), ctx=0x%08X, esr=0x%08X, elr=0x%08X, far=0x%08X\n", ctx, esr, elr, far);
+    dprintk("[sync] sync_handler(), ctx=%p, esr=%p, elr=%p, far=%p\n", ctx, esr, elr, far);
     
     let ec: uint32 = ((esr >> ESR_EC_SHIFT) & ESR_EC_MASK) as uint32;
     
@@ -177,13 +177,13 @@ fn sync_handler(ctx: struct cpu_context*, esr: uint64, elr: uint64, far: uint64)
         dprintk("[sync] syscall(%d)\n", ctx->x[0]);
         ctx = syscall_handler(ctx);
     when ESR_EC_IABT_EL0:
-        dprintk("[sync] instruction abort, elr = 0x%x, far 0x%x\n", elr, far);
+        dprintk("[sync] instruction abort, elr = %p, far %p\n", elr, far);
         ctx = syscall_exit_handler(ctx);
     when ESR_EC_DABT_EL0:
-        dprintk("[sync] data abort, elr = 0x%x, far = 0x%x\n", elr, far);
+        dprintk("[sync] data abort, elr = %p, far = %p\n", elr, far);
         ctx = syscall_exit_handler(ctx);
     else:
-        printk("[sync] esr = 0x%x, elr = 0x%x, far = 0x%x, ec = 0x%x\n", esr, elr, far, ec);
+        printk("[sync] esr = %p, elr = %p, far = %p, ec = %02x\n", esr, elr, far, ec);
         ctx_dump(ctx);
 
         hang();

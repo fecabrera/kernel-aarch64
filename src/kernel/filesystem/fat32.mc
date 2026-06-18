@@ -301,7 +301,7 @@ fn fat32_read(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint
     let fs_mp = node->mount;
     let bs_info = fs_mp->info as struct fat32_bs_info*;
 
-    dprintk("[fat32] node: entry_ref=0x%08X, fs_mp=0x%08X, bs_info=0x%08X\n", entry_ref, fs_mp,
+    dprintk("[fat32] node: entry_ref=%p, fs_mp=%p, bs_info=%p\n", entry_ref, fs_mp,
             bs_info);
     dprintk("[fat32] fs_mp: mp=\"%s\", device=\"%s\"\n", fs_mp->mountpoint, fs_mp->device);
     dprintk("[fat32] entry_ref: cluster=%d, offset=%d, n_lfn_entries=%d\n", entry_ref->cluster,
@@ -315,7 +315,7 @@ fn fat32_read(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint
     let dir_entry = alloc<uint8>(dir_entry_size as uint64) as struct fat32_dir_entry*;
     defer dealloc(dir_entry);
 
-    dprintk("[fat32] count=%d, offset=0x%08X\n", dir_entry_size, dir_entry_offset);
+    dprintk("[fat32] count=%d, offset=%p\n", dir_entry_size, dir_entry_offset);
     let status = vfs_read(fs_mp->device, dir_entry as uint8*, dir_entry_size as uint64, dir_entry_offset as uint64);
     if (status < 0) {
         dprintk("[fat32] vfs_read() returned %d!\n", status);
@@ -371,7 +371,7 @@ fn fat32_read(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint
             let data_sector: uint32 = bs_info->first_data_sector + (cluster_to_read - bs_info->root_cluster);
             let data_offset: uint32 = data_sector * (bs_info->n_bytes_per_sector as uint32);
 
-            dprintk("[fat32] cluster_to_read=%d, data_sector=%d, data_offset=0x%08X\n",
+            dprintk("[fat32] cluster_to_read=%d, data_sector=%d, data_offset=%p\n",
                     cluster_to_read, data_sector, data_offset);
             vfs_read(fs_mp->device, &tmp[i * (bs_info->n_bytes_per_sector as uint64)],
                     bs_info->n_bytes_per_sector as uint64, data_offset as uint64);
@@ -404,7 +404,7 @@ fn fat32_write(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uin
     let fs_mp = node->mount;
     let bs_info = fs_mp->info as struct fat32_bs_info*;
 
-    dprintk("[fat32] node: entry_ref=0x%08X, fs_mp=0x%08X, bs_info=0x%08X\n", entry_ref, fs_mp,
+    dprintk("[fat32] node: entry_ref=%p, fs_mp=%p, bs_info=%p\n", entry_ref, fs_mp,
             bs_info);
     dprintk("[fat32] fs_mp: mp=\"%s\", device=\"%s\"\n", fs_mp->mountpoint, fs_mp->device);
     dprintk("[fat32] entry_ref: cluster=%d, offset=%d, n_lfn_entries=%d\n", entry_ref->cluster,

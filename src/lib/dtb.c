@@ -239,7 +239,7 @@ int dtb_get_rtc_irq_number(uint32_t *ptr) {
 
 int dtb_get_virtio_mmio_irq_number(int n, uint32_t *ptr) {
     char prop_name[50];
-    sprintf(prop_name, "virtio_mmio@%x", VIRTIO_MMIO_ADDR(n));
+    sprintf(prop_name, "virtio_mmio@%lx", VIRTIO_MMIO_ADDR(n));
 
     struct fdt_prop prop;
     int ret = dtb_find_prop(prop_name, "interrupts", &prop);

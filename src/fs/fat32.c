@@ -270,7 +270,7 @@ uint32_t fat32_read_fat_table(struct fat32_bs_info *bs_info, uint8_t *buff,
     uint16_t n_entries_per_sector = bs_info->n_bytes_per_sector / 4;
     uint32_t offset = sector_offset * n_entries_per_sector;
 
-    dprintk("fat sector %d (0x%08x):\n", sector_offset,
+    dprintk("fat sector %d (%p):\n", sector_offset,
             (bs_info->first_fat_sector + sector_offset) * n_entries_per_sector);
 
     fat_table_entry_t *_fat_table = bs_info->fat_table + offset;
@@ -280,7 +280,7 @@ uint32_t fat32_read_fat_table(struct fat32_bs_info *bs_info, uint8_t *buff,
     for (i = 0; i < n_entries_per_sector && offset + i < bs_info->table_size_32; i++) {
         uint32_t entry_value = _le32(_entry[i]) & 0x0FFFFFFF;
         if (entry_value)
-            dprintk("  cluster %d: 0x%08x\n", offset + i, entry_value);
+            dprintk("  cluster %d: %p\n", offset + i, entry_value);
         _fat_table[i] = entry_value;
     }
 
@@ -293,7 +293,7 @@ static int _fat32_read_cluster(char *pathname, struct fat32_bs_info *bs_info, ui
     uint32_t sector_offset = cluster - bs_info->root_cluster;
     uint32_t sector = bs_info->first_data_sector + sector_offset;
 
-    dprintk("cluster %d (0x%08x):\n", cluster, sector * bs_info->n_bytes_per_sector);
+    dprintk("cluster %d (%p):\n", cluster, sector * bs_info->n_bytes_per_sector);
     uint16_t n_entries_per_sector = bs_info->n_bytes_per_sector / 32;
 
     // allocate buffer
@@ -520,7 +520,7 @@ static int _read_fat_table(char *pathname, struct fat32_bs_info *bs_info, uint8_
     for (size_t i = 0; i < bs_info->table_size_32; i++) {
         size_t offset = i * bs_info->n_bytes_per_sector;
         dprintk("\e[A");
-        dprintk("[fat32] reading sector %d/%d, addr=0x%08X\n", i + 1, bs_info->table_size_32,
+        dprintk("[fat32] reading sector %d/%d, addr=%p\n", i + 1, bs_info->table_size_32,
                 fat_table_addr + offset);
 
         if (vfs_read(pathname, fat_table + offset, bs_info->n_bytes_per_sector,

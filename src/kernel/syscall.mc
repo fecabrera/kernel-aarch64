@@ -35,7 +35,7 @@ fn syscall_init() {
 fn syscall_register_handler(syscall_id: uint64, fnc: fn (struct cpu_context*) -> struct cpu_context*) {
     if (get_syscall_handler(syscall_id) == null) {
         set_syscall_handler(syscall_id, fnc);
-        dprintk("[syscall] handler registered for syscall %i, addr = 0x%x\n", syscall_id, fnc);
+        dprintk("[syscall] handler registered for syscall %i, addr = %p\n", syscall_id, fnc);
     } else {
         dprintk("[syscall] There's already a handler registered for syscall %i!\n", syscall_id);
     }

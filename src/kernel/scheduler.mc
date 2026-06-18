@@ -1,8 +1,15 @@
+import "debug";
 import "cpu";
 import "process";
+import "queue";
+import "set";
 
 @extern let idle_ctx: struct cpu_context*;
 @extern let current: struct process*;
+
+@static let ready_queue: struct queue<struct process*>;
+@static let waitpid_queue: struct set<int64, struct process*>;
+@static let sleep_queue: struct set<int64, struct process*>;
 
 /**
  * Registers all scheduler syscall handlers. Must be called before irq_enable().
@@ -136,7 +143,7 @@ fn syscall_exit_handler(ctx: struct cpu_context*) -> struct cpu_context* {
 
     // destroy process resources
     if (destroy_process(proc) < 0) {
-        dprintk("[scheduler] failed to destroy process, addr = 0x%x\n", proc);
+        dprintk("[scheduler] failed to destroy process, addr = %p\n", proc);
     }
 
     // clear current entry

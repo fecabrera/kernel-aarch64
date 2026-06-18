@@ -15,6 +15,19 @@
 char *itoa(int64_t value, char *str, int base);
 
 /**
+ * Converts an unsigned integer to a null-terminated string in the given base, using lowercase
+ * digits. Never emits a sign, so it is correct across the full uint64_t range (e.g. pointers and
+ * large addresses in base 16).
+ *
+ * @param value: unsigned integer to convert
+ * @param str: output buffer (must be large enough to hold the result)
+ * @param base: numeric base (e.g. 2, 8, 10, 16)
+ *
+ * @return str
+ */
+char *utoa(uint64_t value, char *str, int base);
+
+/**
  * Converts the initial decimal digits of str to an integer, skipping leading whitespace and
  * handling an optional leading sign. Stops at the first non-digit character.
  *

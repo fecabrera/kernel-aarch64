@@ -212,11 +212,11 @@ fn vfs_get_file_size(pathname: uint8*) -> uint64 {
  *         FS_IO_ERROR_MOUNTPOINT_NOT_FOUND, or FS_IO_ERROR_HANDLER_NOT_PROVIDED on failure
  */
 fn vfs_read(pathname: uint8*, buffer: uint8*, count: uint64, offset: uint64) -> int32 {
-    dprintk("[vfs] read(): file=\"%s\", buff=0x%08x, count=%d, offset=%d\n",
+    dprintk("[vfs] read(): file=\"%s\", buff=%p, count=%d, offset=%d\n",
             pathname, buffer, count, offset);
 
     let node = vfs_get_node_for_path(pathname, null);
-    // printk("[vfs] node=0x%08X\n", node);
+    // printk("[vfs] node=%p\n", node);
     return fs_read(node, buffer, count, offset);
 }
 
@@ -233,11 +233,11 @@ fn vfs_read(pathname: uint8*, buffer: uint8*, count: uint64, offset: uint64) -> 
  *         FS_IO_ERROR_MOUNTPOINT_NOT_FOUND, or FS_IO_ERROR_HANDLER_NOT_PROVIDED on failure
  */
 fn vfs_write(pathname: uint8*, buffer: uint8*, count: uint64, offset: uint64) -> int32 {
-    dprintk("[vfs] write(): file=\"%s\", buff=0x%08x, count=%d, offset=%d\n",
+    dprintk("[vfs] write(): file=\"%s\", buff=%p, count=%d, offset=%d\n",
             pathname, buffer, count, offset);
 
     let node = vfs_get_node_for_path(pathname, null);
-    // printk("[vfs] node=0x%08X\n", node);
+    // printk("[vfs] node=%p\n", node);
     return fs_write(node, buffer, count, offset);
 }
 
@@ -292,6 +292,6 @@ fn vfs_create_file(path: uint8*, name: uint8*, file_size: uint64, attrs: uint16,
  * children. Skips entering "." and ".." nodes to avoid cycles.
  */
 fn vfs_dump_fs() {
-    dprintk("[vfs] _vfs_root=0x%08X &_vfs_root=0x%08X\n", _vfs_root, &_vfs_root);
+    dprintk("[vfs] _vfs_root=%p &_vfs_root=%p\n", _vfs_root, &_vfs_root);
     fs_dump_node(_vfs_root->child, "");
 }

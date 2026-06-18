@@ -1,6 +1,7 @@
 #include "pl011.h"
 #include <ctype.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -29,11 +30,19 @@ void pl011_vprintf(const char *format, __builtin_va_list args) {
         while (*format >= '0' && *format <= '9')
             pad_width = pad_width * 10 + (*format++ - '0');
 
+        // length modifier: 'l' (long) or 'll' (long long); both 64-bit on LP64
+        int long_count = 0;
+        while (*format == 'l') {
+            long_count++;
+            format++;
+        }
+
         switch (*format++) {
         case 'd':
         case 'i': {
-            int val = __builtin_va_arg(args, int);
-            itoa((int64_t)val, tmp, 10);
+            int64_t val = long_count ? (int64_t)__builtin_va_arg(args, long long)
+                                     : (int64_t)__builtin_va_arg(args, int);
+            itoa(val, tmp, 10);
             int len = strlen(tmp);
             for (int i = len; i < pad_width; i++)
                 pl011_putc(pad_char);
@@ -42,8 +51,9 @@ void pl011_vprintf(const char *format, __builtin_va_list args) {
             break;
         }
         case 'u': {
-            unsigned int val = __builtin_va_arg(args, unsigned int);
-            itoa((int64_t)val, tmp, 10);
+            uint64_t val = long_count ? (uint64_t)__builtin_va_arg(args, unsigned long long)
+                                      : (uint64_t)__builtin_va_arg(args, unsigned int);
+            utoa(val, tmp, 10);
             int len = strlen(tmp);
             for (int i = len; i < pad_width; i++)
                 pl011_putc(pad_char);
@@ -53,8 +63,9 @@ void pl011_vprintf(const char *format, __builtin_va_list args) {
         }
         case 'X':
         case 'x': {
-            unsigned int val = __builtin_va_arg(args, unsigned int);
-            itoa((int64_t)val, tmp, 16);
+            uint64_t val = long_count ? (uint64_t)__builtin_va_arg(args, unsigned long long)
+                                      : (uint64_t)__builtin_va_arg(args, unsigned int);
+            utoa(val, tmp, 16);
             int len = strlen(tmp);
             for (int i = len; i < pad_width; i++)
                 pl011_putc(pad_char);
@@ -78,6 +89,15 @@ void pl011_vprintf(const char *format, __builtin_va_list args) {
         case 'c':
             pl011_putc((char)__builtin_va_arg(args, int));
             break;
+        case 'p': {
+            uint64_t val = (uint64_t)__builtin_va_arg(args, void *);
+            utoa(val, tmp, 16);
+            pl011_putc('0');
+            pl011_putc('x');
+            for (char *p = tmp; *p; p++)
+                pl011_putc(*p);
+            break;
+        }
         case '%':
             pl011_putc('%');
             break;

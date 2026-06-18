@@ -219,7 +219,7 @@ fn virtio_mmio_probe_device(slot: int8) -> int32 {
     if (device_id == VIRTIO_DEVICE_ID_INVALID)
         return VIRTIO_MMIO_INVALID_DEVICE;
 
-    dprintk("[virtio_mmio@%x] magic = 0x%x, version = %i, device_id = %i\n",
+    dprintk("[virtio_mmio@%lx] magic = 0x%x, version = %i, device_id = %i\n",
             virtio, magic, version, virtio->device_id);
 
     // acknowledge
@@ -232,11 +232,11 @@ fn virtio_mmio_probe_device(slot: int8) -> int32 {
     virtio->device_features_sel = VIRTIO_FEATURES_HIGH;
     let features_hi = virtio->device_features;
 
-    dprintk("[virtio_mmio@%x] features: low=0x%x, high=0x%x\n",
+    dprintk("[virtio_mmio@%lx] features: low=0x%x, high=0x%x\n",
             virtio, features_lo, features_hi);
 
     // negociate features
-    dprintk("[virtio_mmio@%x] negociating features\n", slot);
+    dprintk("[virtio_mmio@%lx] negociating features\n", virtio);
 
     virtio->driver_features_sel = VIRTIO_FEATURES_LOW;
     virtio->driver_features = features_lo & (VIRTIO_BLK_F_BLK_SIZE | VIRTIO_BLK_F_SIZE_MAX);
@@ -248,23 +248,23 @@ fn virtio_mmio_probe_device(slot: int8) -> int32 {
 
     // check response
     if ((virtio->status & VIRTIO_STATUS_FEATURES_OK) == 0) {
-        dprintk("[virtio_mmio@%x] features rejected\n", virtio);
+        dprintk("[virtio_mmio@%lx] features rejected\n", virtio);
         virtio->status = virtio->status | VIRTIO_STATUS_FAILED;
 
         return VIRTIO_MMIO_NEGOTIATION_FAILED; // negotiation failed
     }
 
     // negotiation accepted
-    dprintk("[virtio_mmio@%x] features accepted\n", virtio);
+    dprintk("[virtio_mmio@%lx] features accepted\n", virtio);
 
     // set up virtqueue
     virtio->queue_sel = 0;
 
     let virtio_queue_num_max = virtio->queue_num_max;
-    dprintk("[virtio_mmio@%x] virtio_queue_num_max=%i\n", virtio, virtio_queue_num_max);
+    dprintk("[virtio_mmio@%lx] virtio_queue_num_max=%i\n", virtio, virtio_queue_num_max);
 
     if (virtio_queue_num_max < DEFAULT_VIRTIO_QUEUE_NUM) {
-        dprintk("[virtio_mmio@%x] device doesn't support queue_num=%i\n",
+        dprintk("[virtio_mmio@%lx] device doesn't support queue_num=%i\n",
                 virtio, DEFAULT_VIRTIO_QUEUE_NUM);
         return VIRTIO_MMIO_QUEUE_NUM_ERROR;
     }
@@ -295,7 +295,7 @@ fn virtio_mmio_probe_device(slot: int8) -> int32 {
 
     _irq_to_slot[virtio_mmio_irq] = slot;
 
-    dprintk("[virtio_mmio@%x] Initializing IRQ: %i\n", virtio, virtio_mmio_irq);
+    dprintk("[virtio_mmio@%lx] Initializing IRQ: %i\n", virtio, virtio_mmio_irq);
     irq_register_handler(virtio_mmio_irq, virtio_mmio_irq_handler);
     gic_enable_irq(virtio_mmio_irq);
 
@@ -385,7 +385,7 @@ fn virtio_mmio_read(slot: int8, sector_number: uint64, data: uint8*) -> int32 {
     while(status == VIRTIO_BLK_S_NONE)
         wfi();
 
-    dprintk("[virtio_mmio@%x] status = %u\n", virtio, status);
+    dprintk("[virtio_mmio@%lx] status = %u\n", virtio, status);
 
     return status as int32;
 }
@@ -410,10 +410,10 @@ fn virtio_mmio_irq_handler(irq: uint32, ctx: struct cpu_context*) -> struct cpu_
     let status = virtio->interrupt_status;
     virtio->interrupt_ack = status;
 
-    dprintk("[virtio_mmio@%x] IRQ handler, status = %u\n", virtio, status);
+    dprintk("[virtio_mmio@%lx] IRQ handler, status = %u\n", virtio, status);
 
     if (fnc == null) {
-        dprintk("[virtio_mmio@%x] Handler not found for slot %i!\n", virtio, slot);
+        dprintk("[virtio_mmio@%lx] Handler not found for slot %i!\n", virtio, slot);
         return ctx;
     }
 

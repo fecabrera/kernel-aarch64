@@ -13,7 +13,7 @@ void heap_init() {
     heap_head->free = BLOCK_FREE;
     heap_head->next = NULL;
 
-    dprintk("[heap] heap initialized: start=0x%08X, size=%d B\n", _heap, heap_head->size);
+    dprintk("[heap] heap initialized: start=%p, size=%d B\n", _heap, heap_head->size);
 }
 
 // Merge adjacent free blocks (called after kfree, prevents fragmentation)
@@ -59,7 +59,7 @@ void *kmalloc(size_t size) {
             uint8_t *ptr = (uint8_t *)cur + HEADER_SIZE;
 
             if (ptr >= _heap + HEAP_SIZE) {
-                printk("address=0x%016X\n", ptr);
+                printk("address=%p\n", ptr);
                 halt();
             }
 
@@ -72,7 +72,7 @@ void *kmalloc(size_t size) {
 
     struct block_header *_head = heap_head;
     while (_head) {
-        printk("block at 0x%x: size=%d B %s\n", _head + HEADER_SIZE, _head->size,
+        printk("block at %p: size=%d B %s\n", _head + HEADER_SIZE, _head->size,
                _head->free ? "FREE" : "USED");
         _head = _head->next;
     }
@@ -149,7 +149,7 @@ void heap_dump() {
 
     int i = 0;
     while (cur) {
-        dprintk("  [%i] addr=0x%x size=%i %s\n", i++, cur + HEADER_SIZE, cur->size,
+        dprintk("  [%i] addr=%p size=%i %s\n", i++, cur + HEADER_SIZE, cur->size,
                 cur->free ? "FREE" : "USED");
 
         if (cur->free)

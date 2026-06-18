@@ -68,6 +68,7 @@ boilerplate for type-safe, reusable code. mc code links against C through
 - Scheduler syscall handlers — exit, yield, getpid, fork, spawn (`scheduler.mc`)
 - Drivers — GIC, PL031 RTC, ARM generic timer, PL011 UART, virtio MMIO (`interrupts/gic.mc`, `interrupts/drivers/pl031.mc`, `interrupts/drivers/timer.mc`, `interrupts/drivers/pl011.mc`, `interrupts/drivers/virtio_mmio.mc`); only `pl011_vprintf` remains in C
 - Device handlers — serial, storage (`devices/`)
+- DTB memory probe (`mm/mem.mc`)
 - Interactive console / shell (`console.mc`)
 - Endian + byte-swap helpers (`cpu.mc`)
 
@@ -75,7 +76,7 @@ boilerplate for type-safe, reusable code. mc code links against C through
 
 - PL011 `printf` core — `pl011_vprintf` (`src/drivers/pl011.c`); the rest of the PL011 driver is ported to `kernel/interrupts/drivers/pl011.mc`
 - Arch glue — exception vector table (`vectors.S`), `svc` syscall trampolines, system registers (`src/arch/`); IRQ dispatch ported to `kernel/interrupts/irq.mc`
-- Memory — heap allocator, DTB memory probe (`src/mm/`)
+- Memory — heap allocator (`src/mm/heap.c`); DTB memory probe ported to `kernel/mm/mem.mc`
 - Scheduler — context-switch core, ready/wait/sleep queues, and the waitpid/sleep/msleep handlers (`src/sched/`); the rest is `@extern`-bound from `kernel/scheduler.mc`, which also implements the exit/yield/getpid/fork/spawn handlers and the `scheduler_get/set_current_process` accessors in mc
 - FAT32 driver (`src/fs/fat32.c`)
 - Boot entry / init sequence (`src/kernel.c`)
@@ -274,6 +275,7 @@ src/
       fat32.mc      — fat32_mount/unmount/read/write bindings to src/fs/fat32.c
     mm/
       heap.mc       — kmalloc/kfree/krealloc/kmalloc_aligned bindings
+      mem.mc        — mem_init: reads RAM base/size from the DTB at boot
     system/
       syscall.mc    — user-facing svc wrappers under bare names: yield/exit/getpid/waitpid/fork/sleep/msleep/time/uptime (@extern-bound to like-named arch trampolines)
 
@@ -302,7 +304,7 @@ src/
     virtio_mmio.h   — virtio MMIO interface: register/virtq structs and prototypes (impl ported to kernel/interrupts/drivers/virtio_mmio.mc)
 
   mm/               — memory subsystem (C)
-    mem.c/h         — reads RAM base/size from DTB at boot
+    mem.h           — RAM base/size probe interface (impl ported to kernel/mm/mem.mc)
     heap.c/h        — kmalloc/kfree/krealloc/kmalloc_aligned
 
   sched/            — scheduler (C)

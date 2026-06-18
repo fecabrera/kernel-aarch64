@@ -369,7 +369,7 @@ fn fs_dump_node(node: struct fs_node*, prefix: uint8*) {
     if (node == null)
         return;
 
-    dprintk("[dump] node=0x%08X name=0x%08X first=0x%08X\n", node, node->name, node->name);
+    dprintk("[dump] node=%p name=%p first=%p\n", node, node->name, node->name);
 
     fs_dump_file(node, prefix);
 
