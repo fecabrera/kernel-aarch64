@@ -226,14 +226,11 @@ fn virtio_mmio_probe_device(slot: int8) -> int32 {
     virtio->status = VIRTIO_STATUS_ACKNOWLEDGE | VIRTIO_STATUS_DRIVER;
 
     // get features
-    let features_lo: uint32;
-    let features_hi: uint32;
-
     virtio->device_features_sel = VIRTIO_FEATURES_LOW;
-    features_lo = virtio->device_features;
+    let features_lo = virtio->device_features;
 
     virtio->device_features_sel = VIRTIO_FEATURES_HIGH;
-    features_hi = virtio->device_features;
+    let features_hi = virtio->device_features;
 
     dprintk("[virtio_mmio@%x] features: low=0x%x, high=0x%x\n",
             virtio, features_lo, features_hi);

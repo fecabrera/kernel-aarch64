@@ -4,16 +4,14 @@ import "dict";
 import "filesystem/fs";
 import "filesystem/vfs";
 
-struct io_module
-{
+struct io_module {
     attrs: uint8;
     read: fn (uint8*, uint64, uint64, uint64) -> int32;
     write: fn (uint8*, uint64, uint64, uint64) -> int32;
     drv_info: uint64;
 }
 
-struct io_file
-{
+struct io_file {
     pid: int64;
     module: struct io_module*;
 }

@@ -31,7 +31,7 @@ const RTC_CR_EN = (1 << 0); // RTC enable
 const RTC_INT_MATCH = (1 << 0); // Match interrupt
 
 // Memory-mapped PL031 register block
-@static let PL031: struct pl031_regs* = RTC_BASE as struct pl031_regs*;
+@static let PL031 = RTC_BASE as struct pl031_regs*;
 
 @static let pl031_irq: uint32;
 
@@ -57,6 +57,7 @@ fn pl031_init() {
  *
  * @return Current Unix timestamp.
  */
+@inline
 fn pl031_get_time() -> uint32 {
     return PL031->dr;
 }
@@ -66,6 +67,7 @@ fn pl031_get_time() -> uint32 {
  *
  * @param unix_time: Unix timestamp to set
  */
+@inline
 fn pl031_set_time(unix_time: uint32) {
     PL031->lr = unix_time;
 }

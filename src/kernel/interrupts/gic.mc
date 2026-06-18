@@ -79,8 +79,8 @@ const GICD_TARGET_ALL = (GICD_TARGET_CPU0 | GICD_TARGET_CPU1 | GICD_TARGET_CPU2 
 const GICC_IAR_IRQ_MASK = 0x3FF; // bits 9:0 — IRQ ID
 
 // Memory-mapped GIC distributor and CPU interface register blocks
-@static let GICD: struct gicd_regs*;
-@static let GICC: struct gicc_regs*;
+@static let GICD = GICD_BASE as struct gicd_regs*;
+@static let GICC = GICC_BASE as struct gicc_regs*;
 
 /**
  * Initializes the GIC distributor and CPU interface.
@@ -88,8 +88,6 @@ const GICC_IAR_IRQ_MASK = 0x3FF; // bits 9:0 — IRQ ID
  * mask to accept all interrupt priority levels.
  */
 fn gic_init() {
-    GICD = GICD_BASE as struct gicd_regs*;
-    GICC = GICC_BASE as struct gicc_regs*;
     GICD->ctlr = 1;  // Enable distributor
     GICC->ctlr = 1;   // Enable CPU interface
     GICC->pmr = 0xFF; // Accept all priority levels

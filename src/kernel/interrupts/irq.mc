@@ -55,7 +55,7 @@ fn ctx_dump(ctx: struct cpu_context*) {
     printk("spsr= 0b");
     {
         // print all 64 bits of spsr, MSB first
-        let i: int32 = sizeof(uint64) as int32 * 8 - 1;
+        let i = sizeof(uint64) as int32 * 8 - 1;
         until (i < 0) {
             printk("%d", (ctx->spsr as int32 >> i) & 1);
             i = i - 1;

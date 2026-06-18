@@ -94,7 +94,6 @@ fn timer_irq_handler(irq: uint32, ctx: struct cpu_context*) -> struct cpu_contex
 
     let interval = hz_to_ms(tinfo.ticks - last_ticks);
     let uptime = hz_to_ms(tinfo.ticks - tinfo.initial_ticks);
-    // printk("[scheduler] interval = %d ms, uptime = %d ms\n", interval, uptime);
 
     let next_ctx = scheduler_handler(ctx, interval);
 

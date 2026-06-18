@@ -100,7 +100,7 @@ const PL011_DR_DATA_MASK = 0xFF;
 
 // const RX_BUF_SIZE = 1024;
 
-@static let PL011: struct pl011_regs* = UART0_BASE as struct pl011_regs*;
+@static let PL011 = UART0_BASE as struct pl011_regs*;
 
 @static let pl011_irq: uint32;
 
