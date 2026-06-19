@@ -3,9 +3,12 @@ import "cpu";
 import "process";
 import "queue";
 import "set";
+import "interrupts/drivers/timer";
 
-@extern let idle_ctx: struct cpu_context*;
-@extern let current: struct process*;
+@static let idle_ctx: struct cpu_context* = null;
+@static let idle_stack: uint8[DEFAULT_STACK_SIZE];
+
+@static let current: struct process* = null;
 
 @static let ready_queue: struct queue<struct process*>;
 @static let waitpid_queue: struct set<int64, struct process*>;
@@ -23,7 +26,22 @@ import "set";
  *   SYSCALL_SLEEP            → syscall_sleep_handler
  *   SYSCALL_MSLEEP           → syscall_msleep_handler
  */
-@extern fn scheduler_init();
+fn scheduler_init() {
+    idle_ctx = (idle_stack as uint64 + DEFAULT_STACK_SIZE - 272) as struct cpu_context*;
+    set_bytes(idle_ctx as uint8*, 0, 272);
+
+    queue_init(&ready_queue, 10);
+    set_init(&waitpid_queue, 10);
+    set_init(&sleep_queue, 10);
+
+    syscall_register_handler(SYSCALL_EXIT, syscall_exit_handler);
+    syscall_register_handler(SYSCALL_YIELD, syscall_yield_handler);
+    syscall_register_handler(SYSCALL_GETPID, syscall_getpid_handler);
+    syscall_register_handler(SYSCALL_WAITPID, syscall_waitpid_handler);
+    syscall_register_handler(SYSCALL_FORK, syscall_fork_handler);
+    syscall_register_handler(SYSCALL_SLEEP, syscall_sleep_handler);
+    syscall_register_handler(SYSCALL_MSLEEP, syscall_msleep_handler);
+}
 
 /**
  * Sets proc->state to PROC_READY and pushes it onto the tail of the ready queue.
@@ -33,12 +51,46 @@ import "set";
  *
  * @return 0 on success
  */
-@extern fn scheduler_enqueue(proc: struct process*) -> int32;
+fn scheduler_enqueue(proc: struct process*) -> int32 {
+    proc->state = PROC_READY;
+    queue_push(&ready_queue, proc);
+
+    dprintk("[scheduler] enqueue(), q = { ", proc->pid);
+    let i: uint64 = 0;
+    while (i < ready_queue.length) {
+        let proc = queue_at(&ready_queue, i);
+        dprintk("%i ", proc->pid);
+        i = i + 1;
+    }
+    let current_pid: int64 = 0;
+    if (current != null)
+        current_pid = current->pid;
+    dprintk("}, current = %i\n", current_pid);
+
+    return 0;
+}
+
+/**
+ * Removes the head of the ready queue, marks the process PROC_DEAD, and
+ * returns it. Does not affect `current`.
+ *
+ * @return pointer to the dequeued process, or NULL if the queue is empty
+ */
+fn scheduler_dequeue() -> struct process* {
+    if (ready_queue.length == 0)
+        return null;
+
+    let proc = queue_pop(&ready_queue);
+    proc->state = PROC_DEAD;
+
+    dprintk("[scheduler] dequeue(%i)\n", proc->pid);
+
+    return proc;
+}
 
 /**
  * Returns the process currently scheduled on this CPU, or null when none is
- * running (e.g. while the idle context executes). Backed by the C-side
- * `current` global.
+ * running (e.g. while the idle context executes).
  *
  * @return pointer to the running process, or null
  */
@@ -48,22 +100,13 @@ fn scheduler_get_current_process() -> struct process* {
 
 /**
  * Sets the process considered currently scheduled. Pass null to clear it (done
- * by the scheduler when a process blocks or exits). Backed by the C-side
- * `current` global.
+ * by the scheduler when a process blocks or exits).
  *
  * @param proc: process to mark as running, or null to clear
  */
 fn scheduler_set_current_process(proc: struct process*) {
     current = proc;
 }
-
-/**
- * Removes the head of the ready queue, marks the process PROC_DEAD, and
- * returns it. Does not affect `current`.
- *
- * @return pointer to the dequeued process, or NULL if the queue is empty
- */
-@extern fn scheduler_dequeue() -> struct process*;
 
 /**
  * Allocates a process, configures it with the given entry point, and enqueues
@@ -105,17 +148,114 @@ fn scheduler_spawn(entry: fn ()) -> int64 {
  *
  * @return saved context of the next task to run
  */
-@extern fn scheduler_handler(ctx: struct cpu_context*, ms_elapsed: uint64) -> struct cpu_context*;
+fn scheduler_handler(ctx: struct cpu_context*, ms_elapsed: uint64) -> struct cpu_context* {
+    if (ms_elapsed > 0 and sleep_queue.length > 0)
+        notify_sleepers();
+
+    let previous = scheduler_get_current_process();
+    if (previous != null) {
+        previous->ctx = ctx;
+        queue_push(&ready_queue, previous);
+    }
+
+    if (ready_queue.length == 0) {
+        dprintk("[scheduler] idle()\n");
+        idle_ctx->elr = halt as uint64;
+        idle_ctx->spsr = SPSR_EL1h;
+        return idle_ctx;
+    }
+
+    let proc = queue_pop(&ready_queue);
+    scheduler_set_current_process(proc);
+
+    if (previous != null and previous->pid != proc->pid) {
+        dprintk("[scheduler] context_switch(), q = { ");
+
+        let procs = ready_queue.data as struct process**;
+        
+        let i: uint64 = 0;
+        while (i < ready_queue.length) {
+            dprintk("%i ", procs[i]->pid);
+            i = i + 1;
+        }
+
+        dprintk("}, ");
+
+        if (previous != null)
+            dprintk("previous = %ld, ", previous->pid);
+        else
+            dprintk("previous = <null>, ");
+        dprintk("current = %ld, ms_elapsed = %d ms\n", proc->pid, ms_elapsed);
+    }
+
+    return proc->ctx;
+}
+
+/**
+ * Wakes every process in the sleep queue whose sleep_until has been reached,
+ * clearing its sleep timer and re-enqueueing it on the ready queue. Called from
+ * scheduler_handler on each timer tick while the sleep queue is non-empty.
+ */
+@private
+fn notify_sleepers() {
+    let uptime = timer_get_uptime();
+
+    let proc = scheduler_get_current_process();
+    let current_pid: int64 = 0;
+    if (proc != null)
+        current_pid = proc->pid;
+    dprintk("[scheduler] __notify_sleepers(), current=%i\n", current_pid);
+
+    for entry in &sleep_queue {
+        let proc = entry.value;
+        dprintk("[scheduler] pid=%i, sleep_until=%i, uptime=%i\n",
+                proc->pid, proc->sleep_until, uptime);
+
+        if (proc->sleep_until <= uptime) {
+            dprintk("[scheduler] notifying pid %i\n", proc->pid);
+
+            set_remove(&sleep_queue, proc->pid);
+
+            proc->state = PROC_READY;
+            proc->sleep_until = 0;
+            proc->ctx->x[0] = 0;
+
+            queue_push(&ready_queue, proc);
+        }
+    }
+}
 
 /**
  * Wakes every process blocked in waitpid on wait_pid, delivering exit_status as
- * each waiter's return value and re-enqueueing it on the ready queue. Bound to
- * the C scheduler's internal `_notify_waiters`; called by syscall_exit_handler.
+ * each waiter's return value and re-enqueueing it on the ready queue. Called by
+ * syscall_exit_handler.
  *
  * @param wait_pid:    PID of the process that exited
  * @param exit_status: status to deliver to the waiters
  */
-@extern @symbol("_notify_waiters") fn notify_waiters(wait_pid: int64, exit_status: int64);
+@private
+fn notify_waiters(wait_pid: int64, exit_status: int64) {
+    dprintk("[scheduler] notify_waiters(%ld), exit_status=%ld, waitpid_queue->length=%d\n",
+            wait_pid, exit_status, waitpid_queue.length);
+
+    for entry in &waitpid_queue {
+        let proc = entry.value;
+        dprintk("proc->pid=%i, proc->wait_pid=%i\n", proc->pid, proc->wait_pid);
+
+        if (proc->wait_pid != wait_pid)
+            continue;
+
+        set_remove(&waitpid_queue, proc->pid);
+
+        dprintk("[scheduler] _notify_waiter(%i), exit_status=%i\n", proc->pid, exit_status);
+
+        proc->state = PROC_READY;
+        proc->wait_pid = 0;
+        proc->ctx->x[0] = exit_status as uint64;
+
+        queue_push(&ready_queue, proc);
+    }
+}
 
 /**
  * Syscall handler for SYSCALL_EXIT. Marks current PROC_DEAD, notifies any
@@ -163,7 +303,7 @@ fn syscall_exit_handler(ctx: struct cpu_context*) -> struct cpu_context* {
 fn syscall_yield_handler(ctx: struct cpu_context*) -> struct cpu_context* {
     ctx->x[0] = 0;
 
-    dprintk("[scheduler] yield()\n");
+    dprintk("[scheduler] yield(), ctx->x0 = %u\n", ctx->x[0]);
 
     return scheduler_handler(ctx, 0);
 }
@@ -185,7 +325,7 @@ fn syscall_getpid_handler(ctx: struct cpu_context*) -> struct cpu_context* {
         return ctx;
     }
 
-    dprintk("[scheduler] getpid(%i)\n", proc->pid);
+    dprintk("[scheduler] getpid(%i), ctx->x0 = %u, ctx->x1 = %u\n", proc->pid, ctx->x[0], ctx->x[1]);
 
     ctx->x[0] = proc->pid as uint64;
     return ctx;
@@ -201,7 +341,27 @@ fn syscall_getpid_handler(ctx: struct cpu_context*) -> struct cpu_context* {
  *
  * @return saved context of the next task to run
  */
-@extern fn syscall_waitpid_handler(ctx: struct cpu_context*) -> struct cpu_context*;
+fn syscall_waitpid_handler(ctx: struct cpu_context*) -> struct cpu_context* {
+    let pid = ctx->x[1] as int64;
+
+    dprintk("[scheduler] waitpid(), ctx->x0 = %u, ctx->x1 = %u\n", ctx->x[0], ctx->x[1]);
+
+    let proc = scheduler_get_current_process();
+    if (proc == null) {
+        dprintk("[scheduler] no current process for waitpid!\n");
+        ctx->x[0] = -1 as uint64;
+        return ctx;
+    }
+
+    proc->state = PROC_BLOCKED;
+    proc->wait_pid = pid;
+    proc->ctx = ctx;
+
+    set_set(&waitpid_queue, proc->pid, proc);
+    scheduler_set_current_process(null);
+
+    return scheduler_handler(ctx, 0);
+}
 
 /**
  * Syscall handler for SYSCALL_FORK. Saves ctx into current->ctx, duplicates
@@ -223,7 +383,7 @@ fn syscall_fork_handler(ctx: struct cpu_context*) -> struct cpu_context* {
 
     proc->ctx = ctx;
 
-    dprintk("[scheduler] fork(%i)\n", proc->pid);
+    dprintk("[scheduler] fork(%i), ctx->x0 = %u\n", proc->pid, ctx->x[0]);
 
     let child: struct process* = alloc<struct process>(1);
     duplicate_process(child, proc);
@@ -247,7 +407,28 @@ fn syscall_fork_handler(ctx: struct cpu_context*) -> struct cpu_context* {
  * @return ctx of the next task to run, or ctx unchanged if no process is
  *         currently scheduled
  */
-@extern fn syscall_sleep_handler(ctx: struct cpu_context*) -> struct cpu_context*;
+fn syscall_sleep_handler(ctx: struct cpu_context*) -> struct cpu_context* {
+    let seconds = ctx->x[1];
+
+    let proc = scheduler_get_current_process();
+    if (proc == null) {
+        dprintk("[scheduler] no current process for sleep!\n");
+        ctx->x[0] = -1 as uint64;
+        return ctx;
+    }
+
+    dprintk("[scheduler] sleep(), ctx->x0 = %u, ctx->x1 = %u\n", ctx->x[0], ctx->x[1]);
+
+    let sleep_duration = seconds * 1000;
+    proc->state = PROC_BLOCKED;
+    proc->sleep_until = timer_get_uptime() + sleep_duration;
+    proc->ctx = ctx;
+
+    set_set(&sleep_queue, proc->pid, proc);
+    scheduler_set_current_process(null);
+
+    return scheduler_handler(ctx, 0);
+}
 
 /**
  * Syscall handler for SYSCALL_MSLEEP. Sets current->sleep_for directly to
@@ -261,4 +442,25 @@ fn syscall_fork_handler(ctx: struct cpu_context*) -> struct cpu_context* {
  * @return ctx of the next task to run, or ctx unchanged if no process is
  *         currently scheduled
  */
-@extern fn syscall_msleep_handler(ctx: struct cpu_context*) -> struct cpu_context*;
+fn syscall_msleep_handler(ctx: struct cpu_context*) -> struct cpu_context* {
+    let mseconds = ctx->x[1];
+
+    let proc = scheduler_get_current_process();
+    if (proc == null) {
+        dprintk("[scheduler] no current process for msleep!\n");
+        ctx->x[0] = -1 as uint64;
+        return ctx;
+    }
+
+    dprintk("[scheduler] msleep(), ctx->x0 = %u, ctx->x1 = %u\n", ctx->x[0], ctx->x[1]);
+
+    proc->state = PROC_BLOCKED;
+    proc->sleep_until = timer_get_uptime() + mseconds;
+    proc->ctx = ctx;
+
+    set_set(&sleep_queue, proc->pid, proc);
+    scheduler_set_current_process(null);
+
+    return scheduler_handler(ctx, 0);
+}
+

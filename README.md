@@ -63,28 +63,28 @@ boilerplate for type-safe, reusable code. mc code links against C through
 - VFS — node tree + mount system (`filesystem/fs.mc`, `filesystem/vfs.mc`)
 - I/O module registry (`io.mc`)
 - Process management (`process.mc`)
-- Syscall dispatch table + user-facing wrappers (`syscall.mc`, `system/syscall.mc`)
+- Syscall dispatch table + `svc` wrappers (`syscall.mc`, `system/syscall.mc`; wrappers emit `svc #0` via inline `@asm`)
 - Exception/IRQ dispatch — sync/irq/fiq/serr handlers, IRQ registry, vbar_el1 setup (`interrupts/irq.mc`)
-- Scheduler syscall handlers — exit, yield, getpid, fork, spawn (`scheduler.mc`)
+- Scheduler — ready/wait/sleep queues, scheduler_handler, spawn/enqueue/dequeue, and all syscall handlers (exit/yield/getpid/waitpid/fork/sleep/msleep) (`scheduler.mc`)
 - Drivers — GIC, PL031 RTC, ARM generic timer, PL011 UART, virtio MMIO (`interrupts/gic.mc`, `interrupts/drivers/pl031.mc`, `interrupts/drivers/timer.mc`, `interrupts/drivers/pl011.mc`, `interrupts/drivers/virtio_mmio.mc`); only `pl011_vprintf` remains in C
 - Device handlers — serial, storage (`devices/`)
 - DTB memory probe (`mm/mem.mc`)
 - Interactive console / shell (`console.mc`)
-- Endian + byte-swap helpers (`cpu.mc`)
+- CPU helpers (`cpu.mc`) — register accessors (cntpct/cntfrq/cntp_ctl/cntp_tval, vbar_el1), wfi/wfe, irq enable/disable, and bswap, all via inline `@asm`
 
 **Still C, wrapped via `@extern`** (port targets, low-level first):
 
 - PL011 `printf` core — `pl011_vprintf` (`src/drivers/pl011.c`); the rest of the PL011 driver is ported to `kernel/interrupts/drivers/pl011.mc`
-- Arch glue — exception vector table (`vectors.S`), `svc` syscall trampolines, system registers (`src/arch/`); IRQ dispatch ported to `kernel/interrupts/irq.mc`
+- Arch glue — `halt`/`hang` (`arch/cpu.c`); register accessors and `svc` trampolines ported to mc (`cpu.mc`, `system/syscall.mc`)
 - Memory — heap allocator (`src/mm/heap.c`); DTB memory probe ported to `kernel/mm/mem.mc`
-- Scheduler — context-switch core, ready/wait/sleep queues, and the waitpid/sleep/msleep handlers (`src/sched/`); the rest is `@extern`-bound from `kernel/scheduler.mc`, which also implements the exit/yield/getpid/fork/spawn handlers and the `scheduler_get/set_current_process` accessors in mc
 - FAT32 driver (`src/fs/fat32.c`)
 - Boot entry / init sequence (`src/kernel.c`)
 
-**Not being ported** (retire with the C code that uses them):
+**Not being ported:**
 
-- `src/dsa/` — type-specialized C data structures, superseded by `libmc`'s generics.
-- `src/lib/` — freestanding C libc, superseded by `libmc`.
+- `start.S`, `vectors.S` — boot stub and exception vectors / context save-restore; stay hand-written AArch64 assembly by design.
+- `src/dsa/` — type-specialized C data structures, superseded by `libmc`'s generics (retire with the C that uses them).
+- `src/lib/` — freestanding C libc, superseded by `libmc` (retire with the C that uses them).
 
 ## Features
 
@@ -182,7 +182,7 @@ boilerplate for type-safe, reusable code. mc code links against C through
 - `create_process`/`duplicate_process`/`destroy_process` with 16-byte aligned task stacks.
 - Each process tracks a current working directory (`fs_node *`), seeded to the VFS root by `create_process` and inherited from the parent on `duplicate_process` (fork).
 - Idles via `halt` when the ready queue is empty.
-- waitpid and sleep queues backed by `set64` (keyed by pid), replacing the prior `deque64` lists.
+- Ready queue is a generic `queue<process*>`; the waitpid and sleep queues are generic `set`s keyed by pid.
 - Context-switch logging (`dprintk`) is silent unless `DEBUG=1`.
 
 ### **IRQ interface**
@@ -220,7 +220,7 @@ boilerplate for type-safe, reusable code. mc code links against C through
 
 ### **Syscall interface**
 
-- `svc #0` dispatch (`syscall.mc`): `syscall_handler` reads the syscall number from `ctx->x[0]` and dispatches through a table backed by a generic `set<uint64, handler>`; `syscall_init()` must be called before any handler registration. The user-facing `svc` wrappers live in `system/syscall.mc` under bare names (`yield`, `exit`, `fork`, `waitpid`, `sleep`, …), each `@extern`-bound to the like-named asm trampoline in `src/arch/syscall.c`.
+- `svc #0` dispatch (`syscall.mc`): `syscall_handler` reads the syscall number from `ctx->x[0]` and dispatches through a table backed by a generic `set<uint64, handler>`; `syscall_init()` must be called before any handler registration. The user-facing `svc` wrappers live in `system/syscall.mc` under bare names (`yield`, `exit`, `fork`, `waitpid`, `sleep`, `time`, `uptime`, …) and emit `svc #0` directly via inline `@asm`.
 - `syscall_register_handler` / `syscall_unregister_handler` add and remove handlers at runtime.
 - `yield()` triggers an immediate context switch.
 - `exit(status)` terminates the calling process and schedules the next one.
@@ -250,11 +250,11 @@ src/
   vectors.S         — exception vector table, save/restore_context macros
 
   kernel/           — mc kernel modules (logic + @extern bindings to the C below)
-    cpu.mc          — cpu_context, SPSR/CNTP_CTL defines, wfe/wfi, irq_enable/disable, timer registers, set_vbar_el1, bswap/be*/le* helpers
+    cpu.mc          — cpu_context, SPSR/CNTP_CTL defines; inline-@asm impls of wfe/wfi, irq_enable/disable, timer registers, set_vbar_el1, bswap; be*/le* helpers
     syscall.mc      — svc #0 dispatch table (generic set): syscall_init/register/unregister_handler, syscall_handler, SYSCALL_* numbers
     dtb.mc          — @extern bindings to the C DTB parser: dtb_init/dump/find_prop, *_irq_number lookups, fdt_header/memreg/fdt_prop structs
     process.mc      — process struct, create/duplicate/config/destroy_process
-    scheduler.mc    — exit/yield/getpid/fork/spawn handlers + scheduler_get/set_current_process (mc); waitpid/sleep/msleep/scheduler_handler @extern-bound
+    scheduler.mc    — full scheduler: idle ctx+stack, ready/wait/sleep queues, scheduler_init/enqueue/dequeue/spawn/handler, notify_sleepers/waiters, all syscall handlers, scheduler_get/set_current_process
     io.mc           — I/O module registry: io_init, io_register/unregister_module, io_read/io_write
     debug.mc        — printk/dprintk bindings
     uchar.mc        — utf16lencpy/utf16bencpy bindings
@@ -277,7 +277,7 @@ src/
       heap.mc       — kmalloc/kfree/krealloc/kmalloc_aligned bindings
       mem.mc        — mem_init: reads RAM base/size from the DTB at boot
     system/
-      syscall.mc    — user-facing svc wrappers under bare names: yield/exit/getpid/waitpid/fork/sleep/msleep/time/uptime (@extern-bound to like-named arch trampolines)
+      syscall.mc    — user-facing svc wrappers (bare names): yield/exit/getpid/waitpid/fork/sleep/msleep/time/uptime, all emitting svc #0 via inline @asm
 
   libmc/            — mcc standard library (generic, type-parametric)
     memory.mc       — alloc<T>/alloc_aligned<T>/resize<T>/dealloc<T>, copy_bytes/set_bytes/copy_items/set_items
@@ -292,9 +292,9 @@ src/
     libc/           — freestanding ctype, stdio, stdlib, string, limits
 
   arch/             — AArch64-specific (C)
-    cpu.c/h         — system register accessors (cntpct, cntfrq, cntp, vbar_el1, DAIF), SPSR defines, halt/hang, _wfi_while/_wfe_while spin macros
+    cpu.c/h         — halt/hang + _wfi_while/_wfe_while spin macros; the register accessors (cntpct/cntfrq/cntp/vbar_el1/DAIF) are ported to kernel/cpu.mc (inline @asm)
     irq.h           — IRQ/exception interface: irq_handler_t, irq_init/register_handler, sync/irq/fiq/serr handlers (impl ported to kernel/interrupts/irq.mc)
-    syscall.c/h     — asm svc trampolines (yield/exit/getpid/waitpid/fork/sleep/msleep/time/uptime); dispatch table ported to kernel/syscall.mc
+    syscall.h       — SYSCALL_* numbers + time/uptime prototypes; syscall.c is gone — the svc wrappers and dispatch table are ported to kernel/system/syscall.mc and kernel/syscall.mc
 
   drivers/          — MMIO peripheral driver interfaces (C); impls ported to kernel/interrupts/
     pl011.c/h       — PL011 UART: only pl011_vprintf remains in C; rest ported to kernel/interrupts/drivers/pl011.mc
@@ -309,7 +309,7 @@ src/
 
   sched/            — scheduler (C)
     process.h       — process struct (impl ported to kernel/process.mc)
-    scheduler.c/h   — FIFO ready queue (queue64), waitpid/sleep queues (set64 keyed by pid), scheduler_enqueue/dequeue, scheduler_handler, waitpid/sleep/msleep handlers, _notify_waiters; exit/yield/getpid/fork/spawn ported to kernel/scheduler.mc
+    scheduler.h     — C interface (scheduler_init/spawn/enqueue, handler prototypes) for kernel.c; the implementation is ported to kernel/scheduler.mc
 
   fs/               — filesystem driver (C)
     filesystem.h, vfs.h — shared fs_node / VFS interface headers (impls in kernel/filesystem/)

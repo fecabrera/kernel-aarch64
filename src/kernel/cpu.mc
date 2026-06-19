@@ -17,6 +17,7 @@ const CNTP_CTL_ENABLE = (1 << 0);  // Timer enabled
 const CNTP_CTL_IMASK = (1 << 1);   // Interrupt masked (suppress IRQ)
 const CNTP_CTL_ISTATUS = (1 << 2); // Interrupt status (read-only, 1 = condition met)
 
+@volatile
 struct cpu_context {
     x: uint64[30];
     lr: uint64;
@@ -32,7 +33,9 @@ struct cpu_context {
  *
  * @return x with its two bytes reversed
  */
-@extern fn bswap16(x: uint16) -> uint16;
+@inline @asm fn bswap16(value: uint16) -> uint16 {
+    "rev16 $out, $0"
+}
 
 /**
  * Reverses the byte order of a 32-bit value, converting between big-endian
@@ -42,7 +45,9 @@ struct cpu_context {
  *
  * @return x with its four bytes reversed
  */
-@extern fn bswap32(x: uint32) -> uint32;
+@inline @asm fn bswap32(value: uint32) -> uint32 {
+    "rev ${out:w}, ${0:w}"
+}
 
 /**
  * Reverses the byte order of a 64-bit value, converting between big-endian
@@ -52,7 +57,9 @@ struct cpu_context {
  *
  * @return x with its eight bytes reversed
  */
-@extern fn bswap64(x: uint64) -> uint64;
+@inline @asm fn bswap64(value: uint64) -> uint64 {
+    "rev ${out:x}, ${0:x}"
+}
 
 /**
  * Converts a 16-bit value between host and big-endian byte order. On the
@@ -122,23 +129,31 @@ struct cpu_context {
  * event or interrupt is signalled. Less aggressive than WFI — wakes on SEV
  * (send event) from another core as well as interrupts.
  */
-@extern fn wfe();
+@asm fn wfe() {
+    "wfe"
+}
 
 /**
  * Executes the WFI (Wait For Interrupt) instruction, suspending the CPU until
  * an interrupt is pending. Used in spin loops to avoid busy-waiting.
  */
-@extern fn wfi();
+@asm fn wfi() {
+    "wfi"
+}
 
 /**
  * Clears the DAIF I-bit, unmasking IRQ exceptions at the current EL.
  */
-@extern fn irq_enable();
+@asm fn irq_enable() {
+    "msr daifclr, #2"
+}
 
 /**
  * Sets the DAIF I-bit, masking IRQ exceptions at the current EL.
  */
-@extern fn irq_disable();
+@asm fn irq_disable() {
+    "msr daifset, #2"
+}
 
 /**
  * Halts the CPU in a low-power loop using wfi, waking only to service
@@ -159,14 +174,18 @@ struct cpu_context {
  *
  * @return Current 64-bit physical counter value.
  */
-@extern fn get_cntpct_el0() -> uint64;
+@asm fn get_cntpct_el0() -> uint64 {
+    "mrs $out, cntpct_el0"
+}
 
 /**
  * Reads the timer frequency register (cntfrq_el0).
  *
  * @return Timer frequency in Hz as set by firmware.
  */
-@extern fn get_cntfrq_el0() -> uint64;
+@asm fn get_cntfrq_el0() -> uint64 {
+    "mrs $out, cntfrq_el0"
+}
 
 /**
  * Writes the EL1 physical timer value register (cntp_tval_el0).
@@ -175,7 +194,9 @@ struct cpu_context {
  *
  * @param value: number of timer ticks until the next interrupt
  */
-@extern fn set_cntp_tval_el0(value: uint64);
+@asm fn set_cntp_tval_el0(value: uint64) {
+    "msr cntp_tval_el0, $0"
+}
 
 /**
  * Reads the EL1 physical timer control register (cntp_ctl_el0).
@@ -183,7 +204,9 @@ struct cpu_context {
  *
  * @return Current value of cntp_ctl_el0.
  */
-@extern fn get_cntp_ctl_el0() -> uint64;
+@asm fn get_cntp_ctl_el0() -> uint64 {
+    "mrs $out, cntp_ctl_el0"
+}
 
 /**
  * Writes the EL1 physical timer control register (cntp_ctl_el0).
@@ -191,7 +214,9 @@ struct cpu_context {
  *
  * @param value: value to write (combination of CNTP_CTL_* flags)
  */
-@extern fn set_cntp_ctl_el0(value: uint64);
+@asm fn set_cntp_ctl_el0(value: uint64) {
+    "msr cntp_ctl_el0, $0"
+}
 
 /**
  * Sets the EL1 exception vector base register (vbar_el1) to the given table
@@ -199,4 +224,7 @@ struct cpu_context {
  *
  * @param table: address of the exception vector table to install
  */
-@extern fn set_vbar_el1(table: uint64);
+@asm fn set_vbar_el1(table: uint64) {
+    "msr vbar_el1, $0"
+    "isb"
+}

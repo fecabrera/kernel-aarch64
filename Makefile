@@ -34,7 +34,6 @@ SRCS := $(wildcard \
 		  src/drivers/*.c \
 		  src/arch/*.c \
 		  src/mm/*.c \
-		  src/sched/*.c \
 		  src/fs/*.c \
 		  src/io/*.c \
 		  src/*.mc \

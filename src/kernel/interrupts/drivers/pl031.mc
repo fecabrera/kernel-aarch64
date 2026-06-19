@@ -114,7 +114,7 @@ fn pl031_irq_handler(irq: uint32, ctx: struct cpu_context*) -> struct cpu_contex
  * @return ctx unchanged, with ctx->x0 set to the current Unix timestamp
  */
 fn syscall_time_handler(ctx: struct cpu_context*) -> struct cpu_context* {
-    dprintk("[pl031] time()\n");
+    dprintk("[pl031] time(), ctx->x0 = %u\n", ctx->x[0]);
 
     ctx->x[0] = pl031_get_time() as uint64;
     return ctx;

@@ -5,15 +5,15 @@ import "set";
 
 const NUM_SYSCALLS = 256;
 
-const SYSCALL_EXIT = 0;
-const SYSCALL_YIELD = 1;
-const SYSCALL_GETPID = 2;
-const SYSCALL_WAITPID = 3;
-const SYSCALL_FORK = 4;
-const SYSCALL_SLEEP = 5;
-const SYSCALL_MSLEEP = 6;
-const SYSCALL_TIME = 7;
-const SYSCALL_UPTIME = 8;
+const SYSCALL_EXIT: uint64 = 0;
+const SYSCALL_YIELD: uint64 = 1;
+const SYSCALL_GETPID: uint64 = 2;
+const SYSCALL_WAITPID: uint64 = 3;
+const SYSCALL_FORK: uint64 = 4;
+const SYSCALL_SLEEP: uint64 = 5;
+const SYSCALL_MSLEEP: uint64 = 6;
+const SYSCALL_TIME: uint64 = 7;
+const SYSCALL_UPTIME: uint64 = 8;
 
 @static let _syscall_table: struct set<uint64, fn (struct cpu_context *) -> struct cpu_context*>;
 
@@ -68,6 +68,8 @@ fn syscall_unregister_handler(syscall_id: uint64) {
 fn syscall_handler(ctx: struct cpu_context *) -> struct cpu_context* {
     let syscall_id = ctx->x[0];
     let fnc = get_syscall_handler(syscall_id);
+
+    dprintk("[syscall] ctx->x0=%llu, ctx->x1=%llu\n", ctx->x[0], ctx->x[1]);
     
     if (fnc == null)
         dprintk("[syscall] Handler not found for syscall %i!\n", syscall_id);

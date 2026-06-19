@@ -16,6 +16,8 @@ let available_commands: uint8*[][2] = [
     ["cd <path>", "change the working directory"],
     ["cat <path>", "print a file"],
     ["echo [args...]", "print arguments"],
+    ["sleep <seconds>", "sleep for the given number of seconds"],
+    ["msleep <seconds>", "sleep for the given number of milliseconds"],
     ["mount <device> [mountpoint]", "mount a FAT32 block device"],
     ["exit [status]", "exit with status code"],
     ["help", "show this message"],
@@ -151,6 +153,44 @@ fn command_ls(argc: int64, argv: uint8**) -> int64 {
             continue;
         
         printk("%s\n", current->name);
+    }
+
+    return 0;
+}
+
+@private
+fn command_sleep(argc: int64, argv: uint8**) -> int64 {
+    if (argc < 2) {
+        printk("usage: %s <seconds>\n", argv[0]);
+        return -1;
+    }
+
+    dprintk("argc = %d, argv[0] = %s, argv[1] = %s\n", argc, argv[0], argv[1]);
+    dprintk("sleep(%d)\n", atoll(argv[1]) as uint64);
+
+    let ret: int64 = sleep(atoll(argv[1]) as uint64);
+    if (ret < 0) {
+        printk("failed to sleep\n");
+        return ret;
+    }
+
+    return 0;
+}
+
+@private
+fn command_msleep(argc: int64, argv: uint8**) -> int64 {
+    if (argc < 2) {
+        printk("usage: %s <seconds>\n", argv[0]);
+        return -1;
+    }
+
+    dprintk("argc = %d, argv[0] = %s, argv[1] = %s\n", argc, argv[0], argv[1]);
+    dprintk("msleep(%d)\n", atoll(argv[1]) as uint64);
+
+    let ret: int64 = msleep(atoll(argv[1]) as uint64);
+    if (ret < 0) {
+        printk("failed to sleep\n");
+        return ret;
     }
 
     return 0;
@@ -304,6 +344,7 @@ fn console_run_command(fnc: fn (int64, uint8**) -> int64, argc: int64, argv: uin
  * directly so it can mutate the console process's own cwd. Built-in commands:
  * ls [path] (list a folder's entries), cd <path> (change the working
  * directory), cat <path> (print a file), echo [args...] (print first arg),
+ * sleep <seconds> (block for N seconds via the sleep syscall),
  * mount <device> [mountpoint] (fat32_mount; mountpoint defaults to
  * /volumes/<label>), exit [status] (exit), help (list commands).
  * Unknown commands print a "not found!" message. Empty input is ignored.
@@ -324,6 +365,10 @@ fn console_parse_command(argc: int64, argv: uint8**) {
         console_run_command(command_exit, argc, argv);
     } else if (strcmp(argv[0], "echo") == 0) {
         console_run_command(command_echo, argc, argv);
+    } else if (strcmp(argv[0], "sleep") == 0) {
+        console_run_command(command_sleep, argc, argv);
+    } else if (strcmp(argv[0], "msleep") == 0) {
+        console_run_command(command_msleep, argc, argv);
     } else if (strcmp(argv[0], "cat") == 0) {
         console_run_command(command_cat, argc, argv);
     } else if (strcmp(argv[0], "mount") == 0) {

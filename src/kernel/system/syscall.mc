@@ -1,3 +1,6 @@
+import "debug";
+import "../syscall";
+
 /**
  * Voluntarily yields the CPU to the scheduler via SYSCALL_YIELD (svc #0).
  * Traps into EL1, where syscall_yield_handler sets the return value to 0 in ctx->x0 and calls
@@ -6,7 +9,14 @@
  *
  * @return 0 on return from the scheduler.
  */
-@extern fn yield() -> int64;
+@inline fn yield() -> int64 {
+    dprintk("[syscall] yield()\n");
+    return @asm (SYSCALL_YIELD) -> int64 {
+        "mov x0, $0"
+        "svc #0"
+        "mov $out, x0"
+    };
+}
 
 /**
  * Terminates the calling process via SYSCALL_EXIT (svc #0).
@@ -15,7 +25,14 @@
  *
  * @param status: exit status passed in x1 (logged by syscall_exit_handler).
  */
-@extern fn exit(status: int64);
+@inline fn exit(status: int64) {
+    dprintk("[syscall] exit(%lld)\n", status);
+    @asm (SYSCALL_EXIT, status) {
+        "mov x0, $0"
+        "mov x1, $1"
+        "svc #0"
+    };
+}
 
 /**
  * Returns the PID of the calling process via SYSCALL_GETPID (svc #0).
@@ -24,7 +41,14 @@
  *
  * @return PID of the current process, or -1 if no process is currently scheduled.
  */
-@extern fn getpid() -> int64;
+@inline fn getpid() -> int64 {
+    dprintk("[syscall] getpid()\n");
+    return @asm (SYSCALL_GETPID) -> int64 {
+        "mov x0, $0"
+        "svc #0"
+        "mov $out, x0"
+    };
+}
 
 /**
  * Blocks the calling process until the process with the given PID exits via SYSCALL_WAITPID (svc
@@ -36,7 +60,15 @@
  * @return exit status of the terminated process, or -1 if no process is
  *         currently scheduled.
  */
-@extern fn waitpid(pid: int64) -> int64;
+@inline fn waitpid(pid: int64) -> int64 {
+    dprintk("[syscall] waitpid(%lld)\n", pid);
+    return @asm (SYSCALL_WAITPID, pid) -> int64 {
+        "mov x0, $0"
+        "mov x1, $1"
+        "svc #0"
+        "mov $out, x0"
+    };
+}
 
 /**
  * Forks the calling process via SYSCALL_FORK (svc #0). Traps into EL1, where syscall_fork_handler
@@ -45,7 +77,14 @@
  *
  * @return child PID in the parent, 0 in the child, or -1 on failure.
  */
-@extern fn fork() -> int64;
+@inline fn fork() -> int64 {
+    dprintk("[syscall] fork()\n");
+    return @asm (SYSCALL_FORK) -> int64 {
+        "mov x0, $0"
+        "svc #0"
+        "mov $out, x0"
+    };
+}
 
 /**
  * Blocks the calling process for the given number of seconds via SYSCALL_SLEEP (svc #0). Traps into
@@ -56,7 +95,15 @@
  *
  * @return 0 on wakeup, or -1 if no process is currently scheduled.
  */
-@extern fn sleep(s: uint64) -> int64;
+@inline fn sleep(seconds: uint64) -> int64 {
+    dprintk("[syscall] sleep(%llu)\n", seconds);
+    return @asm (SYSCALL_SLEEP, seconds) -> int64 {
+        "mov x0, $0"
+        "mov x1, $1"
+        "svc #0"
+        "mov $out, x0"
+    };
+}
 
 /**
  * Blocks the calling process for the given number of milliseconds via SYSCALL_MSLEEP (svc #0).
@@ -68,7 +115,15 @@
  *
  * @return 0 on wakeup, or -1 if no process is currently scheduled.
  */
-@extern fn msleep(ms: uint64) -> int64;
+@inline fn msleep(mseconds: uint64) -> int64 {
+    dprintk("[syscall] msleep(%llu)\n", mseconds);
+    return @asm (SYSCALL_MSLEEP, mseconds) -> int64 {
+        "mov x0, $0"
+        "mov x1, $1"
+        "svc #0"
+        "mov $out, x0"
+    };
+}
 
 /**
  * Returns the current Unix timestamp via SYSCALL_TIME (svc #0).
@@ -76,7 +131,13 @@
  *
  * @return current Unix timestamp, or -1 on failure.
  */
-@extern fn time() -> uint64;
+@inline fn time() -> uint64 {
+    return @asm (SYSCALL_TIME) -> uint64 {
+        "mov x0, $0"
+        "svc #0"
+        "mov $out, x0"
+    };
+}
 
 /**
  * Returns the system uptime in milliseconds via SYSCALL_UPTIME (svc #0).
@@ -85,4 +146,10 @@
  *
  * @return system uptime in milliseconds
  */
-@extern fn uptime() -> uint64;
+@inline fn uptime() -> uint64 {
+    return @asm (SYSCALL_UPTIME) -> uint64 {
+        "mov x0, $0\n"
+        "svc #0\n"
+        "mov $out, x0"
+    };
+}

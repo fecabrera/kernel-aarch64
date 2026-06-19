@@ -61,6 +61,7 @@ fn timer_init() {
  */
 fn timer_get_uptime() -> uint64 {
     let ticks = get_cntpct_el0();
+    dprintk("ticks = %llu, initial_ticks = %llu, uptime = %llu ms\n", ticks, tinfo.initial_ticks, hz_to_ms(ticks - tinfo.initial_ticks));
     return hz_to_ms(ticks - tinfo.initial_ticks);
 }
 
@@ -112,6 +113,8 @@ fn timer_irq_handler(irq: uint32, ctx: struct cpu_context*) -> struct cpu_contex
  * @return ctx with x0 set to the system uptime in milliseconds
  */
 fn syscall_uptime_handler(ctx: struct cpu_context*) -> struct cpu_context* {
+    dprintk("[timer] uptime(), ctx->x0 = %u\n", ctx->x[0]);
+
     let uptime = timer_get_uptime();
     dprintk("[timer] uptime = %d ms\n", uptime);
 
