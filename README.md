@@ -66,7 +66,8 @@ boilerplate for type-safe, reusable code. mc code links against C through
 - Syscall dispatch table + `svc` wrappers (`syscall.mc`, `system/syscall.mc`; wrappers emit `svc #0` via inline `@asm`)
 - Exception/IRQ dispatch — sync/irq/fiq/serr handlers, IRQ registry, vbar_el1 setup (`interrupts/irq.mc`)
 - Scheduler — ready/wait/sleep queues, scheduler_handler, spawn/enqueue/dequeue, and all syscall handlers (exit/yield/getpid/waitpid/fork/sleep/msleep) (`scheduler.mc`)
-- Drivers — GIC, PL031 RTC, ARM generic timer, PL011 UART, virtio MMIO (`interrupts/gic.mc`, `interrupts/drivers/pl031.mc`, `interrupts/drivers/timer.mc`, `interrupts/drivers/pl011.mc`, `interrupts/drivers/virtio_mmio.mc`); only `pl011_vprintf` remains in C
+- Drivers — GIC, PL031 RTC, ARM generic timer, PL011 UART, virtio MMIO (`interrupts/gic.mc`, `interrupts/drivers/pl031.mc`, `interrupts/drivers/timer.mc`, `interrupts/drivers/pl011.mc`, `interrupts/drivers/virtio_mmio.mc`)
+- Kernel log — `printk`/`dprintk` (`debug.mc`) and the PL011 print path (`pl011_vprintf`), formatting via stb_sprintf bound through `libc/stdio.mc`
 - Device handlers — serial, storage (`devices/`)
 - DTB memory probe (`mm/mem.mc`)
 - Interactive console / shell (`console.mc`)
@@ -74,7 +75,7 @@ boilerplate for type-safe, reusable code. mc code links against C through
 
 **Still C, wrapped via `@extern`** (port targets, low-level first):
 
-- PL011 `printf` core — `pl011_vprintf` (`src/drivers/pl011.c`); the rest of the PL011 driver is ported to `kernel/interrupts/drivers/pl011.mc`
+- printf formatter — stb_sprintf (`src/lib/stb_sprintf.h`, compiled via `src/lib/stdio.c`); the kernel print path is mc and binds to it through `libc/stdio.mc`
 - Arch glue — `halt`/`hang` (`arch/cpu.c`); register accessors and `svc` trampolines ported to mc (`cpu.mc`, `system/syscall.mc`)
 - Memory — heap allocator (`src/mm/heap.c`); DTB memory probe ported to `kernel/mm/mem.mc`
 - FAT32 driver (`src/fs/fat32.c`)
@@ -256,7 +257,7 @@ src/
     process.mc      — process struct, create/duplicate/config/destroy_process
     scheduler.mc    — full scheduler: idle ctx+stack, ready/wait/sleep queues, scheduler_init/enqueue/dequeue/spawn/handler, notify_sleepers/waiters, all syscall handlers, scheduler_get/set_current_process
     io.mc           — I/O module registry: io_init, io_register/unregister_module, io_read/io_write
-    debug.mc        — printk/dprintk bindings
+    debug.mc        — printk (always on) / dprintk (DEBUG-gated via @if), thin wrappers over pl011_vprintf
     uchar.mc        — utf16lencpy/utf16bencpy bindings
     devices/
       serial.mc     — /dev/serial driver: serial_init, serial_read (pl011_getc+wfi), serial_write (pl011_putc)
@@ -265,7 +266,7 @@ src/
       irq.mc        — exception/IRQ dispatch: sync/irq/fiq/serr handlers, ESR_EC decode, generic-set IRQ registry, irq_init (vbar_el1), irq_register/unregister_handler
       gic.mc        — GIC impl: gicd_regs/gicc_regs register structs, gic_init/enable_irq/trigger_sgi/acknowledge/end_of_interrupt
       drivers/      — mc peripheral drivers (full impls)
-        pl011.mc    — PL011 UART impl: pl011_regs struct, pl011_init/getc/putc/printf, pl011_irq_handler (pl011_vprintf still @extern from src/drivers/pl011.c)
+        pl011.mc    — PL011 UART impl: pl011_regs struct, pl011_init/getc/putc/printf/vprintf, pl011_irq_handler; pl011_vprintf streams to the UART via stb_sprintf's vsprintfcb (pl011_cb callback)
         virtio_mmio.mc — virtio MMIO impl: virtio_mmio_regs/virtq structs, virtio_mmio_init/probe_device/read/find_next_slot, virtio_mmio_irq_handler
         pl031.mc    — PL031 RTC impl: pl031_regs struct, pl031_init/get_time/set_time/set_alarm, pl031_irq_handler, syscall_time_handler
         timer.mc    — ARM generic timer impl: timer_init/get_uptime/set_interval, timer_irq_handler, syscall_uptime_handler
@@ -289,7 +290,7 @@ src/
     ascii.mc, uchar.mc
     hashing/        — splitmix64, fnv1a, crc32, murmur3
     iteration/      — pair
-    libc/           — freestanding ctype, stdio, stdlib, string, limits
+    libc/           — freestanding ctype, stdlib, string, limits; stdio binds the stb_sprintf family (vsprintf/snprintf/vsprintfcb, stbsp__context)
 
   arch/             — AArch64-specific (C)
     cpu.c/h         — halt/hang + _wfi_while/_wfe_while spin macros; the register accessors (cntpct/cntfrq/cntp/vbar_el1/DAIF) are ported to kernel/cpu.mc (inline @asm)
@@ -297,7 +298,7 @@ src/
     syscall.h       — SYSCALL_* numbers + time/uptime prototypes; syscall.c is gone — the svc wrappers and dispatch table are ported to kernel/system/syscall.mc and kernel/syscall.mc
 
   drivers/          — MMIO peripheral driver interfaces (C); impls ported to kernel/interrupts/
-    pl011.c/h       — PL011 UART: only pl011_vprintf remains in C; rest ported to kernel/interrupts/drivers/pl011.mc
+    pl011.h         — PL011 register/flag definitions and prototypes (impl fully ported to kernel/interrupts/drivers/pl011.mc; pl011.c is gone)
     gic.h           — GIC-400 interface (impl ported to kernel/interrupts/gic.mc)
     timer.h         — ARM generic timer interface (impl ported to kernel/interrupts/drivers/timer.mc)
     pl031.h         — PL031 RTC interface (impl ported to kernel/interrupts/drivers/pl031.mc)
@@ -319,10 +320,12 @@ src/
     module.h        — io_module / io_file structs (impl ported to kernel/io.mc)
 
   lib/              — legacy freestanding C libraries (being replaced by libmc/libc)
-    debug.c/h       — printk (always on) and dprintk (DEBUG=1 only), both backed by pl011_vprintf
+    debug.h         — printk/dprintk prototypes for C callers (impl ported to kernel/debug.mc; debug.c is gone)
     dtb.c/h         — FDT parser (node/property walker); IRQ number lookup for timer, RTC, and virtio MMIO slots
-    string.c/h, ctype.c/h, stdlib.c/h, stdio.c/h, uchar.c/h
-    stdint.h, stddef.h, stdbool.h, limits.h, time.h, ascii.h, sys/types.h
+    stb_sprintf.h   — vendored printf-family formatter; STB_SPRINTF_IMPLEMENTATION is compiled in stdio.c
+    stdio.c/h       — pulls in stb_sprintf (vsprintf/snprintf/vsprintfcb); NOFLOAT/NOUNALIGNED configured
+    string.c/h, ctype.c/h, stdlib.c/h, uchar.c/h
+    stdint.h, stdarg.h, stddef.h, stdbool.h, limits.h, time.h, ascii.h, sys/types.h
 
   dsa/              — legacy type-specialized C data structures (superseded by libmc)
     queue/, stack/, deque/, hashmap/, set/, ordered_set/, vector/ (uint64/32/16/8 variants)

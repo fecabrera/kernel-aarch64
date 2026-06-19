@@ -169,10 +169,10 @@ fn pl011_putc(c: uint8) {
 }
 
 /**
- * Formats a string and writes it to the UART.
- * Supports: %d/%i (signed int), %u (unsigned int), %x/%X (hex lower/upper), %s (string),
- * %c (char), %%. Width modifier N supported for all specifiers (e.g. %8d, %08x). For strings,
- * %-Ns left-aligns within width N (padding on the right); %Ns right-aligns (padding on the left).
+ * Formats a string and writes it to the UART. Thin variadic wrapper around
+ * pl011_vprintf; see vsprintfcb/stb_sprintf for the supported format grammar
+ * (full printf flags/width/precision/length and d/i/u/o/x/X/c/s/p/b; floats
+ * disabled).
  *
  * @param format: printf-style format string
  * @param ...: variadic arguments matching the format specifiers
@@ -186,9 +186,10 @@ fn pl011_printf(format: uint8*, ...) {
 
 /**
  * Formats a string and writes it to the UART using a pre-initialized va_list.
- * Supports: %d/%i (signed int), %u (unsigned int), %x/%X (hex lower/upper), %s (string),
- * %c (char), %%. Width modifier N supported for all specifiers (e.g. %8d, %08x). For strings,
- * %-Ns left-aligns within width N (padding on the right); %Ns right-aligns (padding on the left).
+ * Drives stb_sprintf's vsprintfcb with pl011_cb, so output is streamed to the
+ * UART in STB_SPRINTF_MIN chunks without a full output buffer. Supports the full
+ * stb_sprintf grammar (flags, width, precision, length modifiers, and the
+ * d/i/u/o/x/X/c/s/p/b conversions); %f/%e/%g/%a are disabled in this build.
  *
  * @param format: printf-style format string
  * @param args:   variadic argument list (must be initialized by the caller)
@@ -201,6 +202,17 @@ fn pl011_vprintf(format: uint8*, args: va_list) {
     vsprintfcb(pl011_cb, &c, c.tmp, format, args);
 }
 
+/**
+ * vsprintfcb callback for pl011_vprintf. Writes the count formatted bytes in buf
+ * to the UART via pl011_putc, accumulates the total in c->length, and returns
+ * c->tmp so stb keeps formatting into the same scratch buffer.
+ *
+ * @param buf:   chunk of formatted output to flush
+ * @param c:     context whose tmp buffer is reused for the next chunk
+ * @param count: number of valid bytes in buf
+ *
+ * @return c->tmp, the scratch buffer for stb's next chunk
+ */
 @private
 fn pl011_cb(buf: uint8*, c: struct stbsp__context*, count: int32) -> uint8* {
     let i: int32 = 0;
@@ -209,7 +221,7 @@ fn pl011_cb(buf: uint8*, c: struct stbsp__context*, count: int32) -> uint8* {
         i = i + 1;
     }
     c->length = c->length + count;
-    return c->tmp; // go direct into buffer if you can
+    return c->tmp;
 }
 
 /**
