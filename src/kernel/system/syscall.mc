@@ -11,7 +11,7 @@ import "../syscall";
  */
 @inline fn yield() -> int64 {
     dprintk("[syscall] yield()\n");
-    return @asm (SYSCALL_YIELD) -> int64 {
+    return @asm @clobbers("x0", "memory") (SYSCALL_YIELD) -> int64 {
         "mov x0, $0"
         "svc #0"
         "mov $out, x0"
@@ -27,7 +27,7 @@ import "../syscall";
  */
 @inline fn exit(status: int64) {
     dprintk("[syscall] exit(%lld)\n", status);
-    @asm (SYSCALL_EXIT, status) {
+    @asm @clobbers("x0", "x1", "memory") (SYSCALL_EXIT, status) {
         "mov x0, $0"
         "mov x1, $1"
         "svc #0"
@@ -43,7 +43,7 @@ import "../syscall";
  */
 @inline fn getpid() -> int64 {
     dprintk("[syscall] getpid()\n");
-    return @asm (SYSCALL_GETPID) -> int64 {
+    return @asm @clobbers("x0") (SYSCALL_GETPID) -> int64 {
         "mov x0, $0"
         "svc #0"
         "mov $out, x0"
@@ -62,7 +62,7 @@ import "../syscall";
  */
 @inline fn waitpid(pid: int64) -> int64 {
     dprintk("[syscall] waitpid(%lld)\n", pid);
-    return @asm (SYSCALL_WAITPID, pid) -> int64 {
+    return @asm @clobbers("x0", "x1", "memory") (SYSCALL_WAITPID, pid) -> int64 {
         "mov x0, $0"
         "mov x1, $1"
         "svc #0"
@@ -79,7 +79,7 @@ import "../syscall";
  */
 @inline fn fork() -> int64 {
     dprintk("[syscall] fork()\n");
-    return @asm (SYSCALL_FORK) -> int64 {
+    return @asm @clobbers("x0", "memory") (SYSCALL_FORK) -> int64 {
         "mov x0, $0"
         "svc #0"
         "mov $out, x0"
@@ -97,7 +97,7 @@ import "../syscall";
  */
 @inline fn sleep(seconds: uint64) -> int64 {
     dprintk("[syscall] sleep(%llu)\n", seconds);
-    return @asm (SYSCALL_SLEEP, seconds) -> int64 {
+    return @asm @clobbers("x0", "x1", "memory") (SYSCALL_SLEEP, seconds) -> int64 {
         "mov x0, $0"
         "mov x1, $1"
         "svc #0"
@@ -117,7 +117,7 @@ import "../syscall";
  */
 @inline fn msleep(mseconds: uint64) -> int64 {
     dprintk("[syscall] msleep(%llu)\n", mseconds);
-    return @asm (SYSCALL_MSLEEP, mseconds) -> int64 {
+    return @asm @clobbers("x0", "x1", "memory") (SYSCALL_MSLEEP, mseconds) -> int64 {
         "mov x0, $0"
         "mov x1, $1"
         "svc #0"
@@ -132,7 +132,7 @@ import "../syscall";
  * @return current Unix timestamp, or -1 on failure.
  */
 @inline fn time() -> uint64 {
-    return @asm (SYSCALL_TIME) -> uint64 {
+    return @asm @clobbers("x0", "memory") (SYSCALL_TIME) -> uint64 {
         "mov x0, $0"
         "svc #0"
         "mov $out, x0"
@@ -147,7 +147,7 @@ import "../syscall";
  * @return system uptime in milliseconds
  */
 @inline fn uptime() -> uint64 {
-    return @asm (SYSCALL_UPTIME) -> uint64 {
+    return @asm @clobbers("x0", "memory") (SYSCALL_UPTIME) -> uint64 {
         "mov x0, $0\n"
         "svc #0\n"
         "mov $out, x0"
