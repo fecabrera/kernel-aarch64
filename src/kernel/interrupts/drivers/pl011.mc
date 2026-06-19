@@ -1,6 +1,7 @@
 import "debug";
 import "cpu";
 import "dtb";
+import "libc/stdio";
 import "interrupts/irq";
 import "interrupts/gic";
 
@@ -192,7 +193,24 @@ fn pl011_printf(format: uint8*, ...) {
  * @param format: printf-style format string
  * @param args:   variadic argument list (must be initialized by the caller)
  */
-@extern fn pl011_vprintf(format: uint8*, args: va_list);
+fn pl011_vprintf(format: uint8*, args: va_list) {
+    let c: struct stbsp__context;
+    c.length = 0;
+    // stb writes into c.tmp (the STB_SPRINTF_MIN scratch buffer) and hands &c
+    // back to pl011_cb as `user`; pl011_cb flushes c.tmp to the UART.
+    vsprintfcb(pl011_cb, &c, c.tmp, format, args);
+}
+
+@private
+fn pl011_cb(buf: uint8*, c: struct stbsp__context*, count: int32) -> uint8* {
+    let i: int32 = 0;
+    while (i < count) {
+        pl011_putc(buf[i]);
+        i = i + 1;
+    }
+    c->length = c->length + count;
+    return c->tmp; // go direct into buffer if you can
+}
 
 /**
  * IRQ handler for UART RX and receive-timeout interrupts.

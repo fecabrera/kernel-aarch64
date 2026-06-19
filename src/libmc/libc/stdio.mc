@@ -1,3 +1,12 @@
+const STB_SPRINTF_MIN = 512;
+
+struct stbsp__context {
+    buf: uint8*;
+    count: int32;
+    length: int32;
+    tmp: uint8[STB_SPRINTF_MIN];
+}
+
 /**
  * Formats a string into str using a printf-style format and a pre-initialized va_list.
  * Supports: %d/%i (signed int), %u (unsigned int), %x (lowercase hex), %X (uppercase hex),
@@ -12,6 +21,7 @@
  * @return number of characters written, not including the null terminator
  */
 @extern fn vsprintf(str: uint8*, format: uint8*, args: va_list) -> int32;
+@extern fn vsnprintf(str: uint8*, count: int32, format: uint8*, args: va_list) -> int32;
 
 /**
  * Formats a string into str using a printf-style format.
@@ -27,3 +37,8 @@
  * @return number of characters written, not including the null terminator
  */
 @extern fn sprintf(str: uint8*, format: uint8*, ...) -> int32;
+@extern fn snprintf(str: uint8*, count: int32, format: uint8*, ...) -> int32;
+
+@extern fn vsprintfcb(callback: fn (uint8*, struct stbsp__context*, int32) -> uint8*,
+                      user: struct stbsp__context*, str: uint8*,
+                      format: uint8*, args: va_list) -> int32;

@@ -9,7 +9,8 @@ MCFLAGS = --target aarch64-unknown-none-elf \
 		  --nostdlib \
 		  -O3 \
 		  -I src/kernel \
-		  -I src/libmc
+		  -I src/libmc \
+          $(CFLAGS_EXTRA)
 
 CFLAGS  = -ffreestanding -nostdlib -nostdinc \
           -mgeneral-regs-only \
