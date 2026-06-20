@@ -10,19 +10,6 @@
 const STB_SPRINTF_MIN = 512;
 
 /**
- * Callback state used by vsprintfcb. stb writes formatted output into tmp (the
- * STB_SPRINTF_MIN scratch buffer) and flushes it through the callback; count and
- * buf are used by stb's own snprintf clamping callbacks, while length lets a
- * custom callback accumulate the total number of characters emitted.
- */
-struct stbsp__context {
-    buf: uint8*;                // destination buffer (clamping callbacks only)
-    count: int32;              // remaining capacity (clamping callbacks only)
-    length: int32;             // running count of characters emitted
-    tmp: uint8[STB_SPRINTF_MIN]; // scratch buffer stb formats into
-}
-
-/**
  * Formats into str using a printf-style format and a pre-initialized va_list.
  * Accepts the full stb_sprintf grammar — flags (-, +, space, 0, #), width and
  * precision (including * from the args), length modifiers (e.g. l/ll for 64-bit),
@@ -85,19 +72,22 @@ struct stbsp__context {
  * Streaming formatter: formats according to format/args and, every time its
  * internal buffer reaches STB_SPRINTF_MIN characters (and once more at the end),
  * invokes callback to drain the chars. callback receives the filled buffer, the
- * user context, and the number of valid bytes, and must return a buffer of at
- * least STB_SPRINTF_MIN bytes for stb to keep writing into (typically user->tmp).
- * Used to format directly to a device — e.g. pl011_vprintf flushes each chunk to
- * the UART — without allocating a full output buffer.
+ * opaque user pointer, and the number of valid bytes, and must return a buffer of
+ * at least STB_SPRINTF_MIN bytes for stb to keep writing into. Used to format
+ * directly to a device — e.g. pl011_vprintf flushes each chunk to the UART —
+ * without allocating a full output buffer.
+ *
+ * `user` is opaque to stb: it is passed through to callback unchanged, so callers
+ * point it at their own context struct (carrying the scratch buffer plus any
+ * state the callback needs) and cast it back inside the callback.
  *
  * @param callback: invoked per chunk; returns the next scratch buffer to use
- * @param user:     context passed through to callback (its tmp serves as scratch)
+ * @param user:     opaque pointer passed through to callback (caller-defined)
  * @param str:      initial scratch buffer stb writes into (at least STB_SPRINTF_MIN)
  * @param format:   printf-style format string
  * @param args:     variadic argument list (must be initialized by the caller)
  *
  * @return total number of characters formatted
  */
-@extern fn vsprintfcb(callback: fn (uint8*, struct stbsp__context*, int32) -> uint8*,
-                      user: struct stbsp__context*, str: uint8*,
-                      format: uint8*, args: va_list) -> int32;
+@extern fn vsprintfcb(callback: fn (uint8*, uint8*, int32) -> uint8*, user: uint8*,
+                      str: uint8*, format: uint8*, args: va_list) -> int32;

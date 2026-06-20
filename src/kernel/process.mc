@@ -13,7 +13,7 @@ const PROC_BLOCKED = 2;
 
 /**
  * Represents a schedulable process. Created by create_process, configured by
- * process_config, and destroyed by destroy_process.
+ * process_set_entry, and destroyed by destroy_process.
  *
  * @field pid:         (pid_t) unique process identifier, assigned at creation
  * @field state:       current lifecycle state (PROC_CREATED, PROC_READY, PROC_BLOCKED, or
@@ -37,12 +37,13 @@ struct process {
     wait_pid: int64;
     sleep_until: uint64;
     cwd: struct fs_node*;
+    stdio: struct fs_node*;
 }
 
 /**
  * Allocates a stack and initializes the process struct with a zeroed context
  * frame. The current working directory defaults to the VFS root. The process
- * is left in PROC_CREATED state; call process_config before enqueueing.
+ * is left in PROC_CREATED state; call process_set_entry before enqueueing.
  *
  * @param proc: caller-allocated process struct to initialize
  * @param stack_size: size in bytes of the task stack to allocate
@@ -69,6 +70,7 @@ fn create_process(proc: struct process*, stack_size: uint64) -> int32 {
     proc->stack = stack;
     proc->stack_size = stack_size;
     proc->cwd = vfs_root();
+    proc->stdio = null;
 
     next_pid = next_pid + 1;
 
@@ -79,7 +81,7 @@ fn create_process(proc: struct process*, stack_size: uint64) -> int32 {
  * Allocates a new stack for dest and copies src's stack contents and context
  * frame into it, preserving the ctx offset within the stack. Assigns dest a
  * new PID, sets its state to PROC_CREATED, and inherits src's current working
- * directory. Call process_config or adjust dest->ctx->x0 before enqueueing.
+ * directory. Call process_set_entry or adjust dest->ctx->x0 before enqueueing.
  *
  * @param dest: caller-allocated process struct to initialize
  * @param src:  process to copy from
@@ -103,6 +105,7 @@ fn duplicate_process(dest: struct process*, src: struct process*) -> int32 {
     dest->stack = stack;
     dest->stack_size = stack_size;
     dest->cwd = src->cwd;
+    dest->stdio = null;
 
     next_pid = next_pid + 1;
 
@@ -116,7 +119,7 @@ fn duplicate_process(dest: struct process*, src: struct process*) -> int32 {
  * @param proc:  process to configure
  * @param entry: function the process will execute after its first eret
  */
-fn process_config(proc: struct process*, entry: fn ()) {
+fn process_set_entry(proc: struct process*, entry: fn ()) {
     let ctx: struct cpu_context* = proc->ctx;
     ctx->elr = entry as uint64;
     ctx->spsr = SPSR_EL1h;

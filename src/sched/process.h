@@ -21,7 +21,7 @@ typedef int64_t proc_state_t;
 
 /**
  * Represents a schedulable process. Created by create_process, configured by
- * process_config, and destroyed by destroy_process.
+ * process_set_entry, and destroyed by destroy_process.
  *
  * @field pid:         (pid_t) unique process identifier, assigned at creation
  * @field state:       current lifecycle state (PROC_CREATED, PROC_READY, PROC_BLOCKED, or
@@ -50,7 +50,7 @@ struct process {
 /**
  * Allocates a stack and initializes the process struct with a zeroed context
  * frame. The current working directory defaults to the VFS root. The process
- * is left in PROC_CREATED state; call process_config before enqueueing.
+ * is left in PROC_CREATED state; call process_set_entry before enqueueing.
  *
  * @param proc: caller-allocated process struct to initialize
  * @param stack_size: size in bytes of the task stack to allocate
@@ -63,7 +63,7 @@ int create_process(struct process *proc, size_t stack_size);
  * Allocates a new stack for dest and copies src's stack contents and context
  * frame into it, preserving the ctx offset within the stack. Assigns dest a
  * new PID, sets its state to PROC_CREATED, and inherits src's current working
- * directory. Call process_config or adjust dest->ctx->x0 before enqueueing.
+ * directory. Call process_set_entry or adjust dest->ctx->x0 before enqueueing.
  *
  * @param dest: caller-allocated process struct to initialize
  * @param src:  process to copy from
@@ -79,7 +79,7 @@ int duplicate_process(struct process *dest, struct process *src);
  * @param proc:  process to configure
  * @param entry: function the process will execute after its first eret
  */
-void process_config(struct process *proc, proc_entry entry);
+void process_set_entry(struct process *proc, proc_entry entry);
 
 /**
  * Frees the task stack and nulls out stack and ctx pointers.

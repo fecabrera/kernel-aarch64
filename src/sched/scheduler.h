@@ -38,7 +38,7 @@ void scheduler_set_current_process(struct process *proc);
  * Sets proc->state to PROC_READY and pushes it onto the tail of the ready queue.
  *
  * @param proc: process to enqueue; must be fully initialized (create_process
- *              and process_config called)
+ *              and process_set_entry called)
  *
  * @return 0 on success
  */
@@ -55,7 +55,7 @@ struct process *scheduler_dequeue();
 /**
  * Allocates a process, configures it with the given entry point, and enqueues
  * it on the ready queue. Convenience wrapper around create_process,
- * process_config, and scheduler_enqueue.
+ * process_set_entry, and scheduler_enqueue.
  *
  * @param entry: function to run as the process entry point
  *

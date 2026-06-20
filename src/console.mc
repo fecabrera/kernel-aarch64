@@ -3,6 +3,7 @@ import "array";
 import "string";
 import "memory";
 import "scheduler";
+import "filesystem/fs";
 import "filesystem/vfs";
 import "filesystem/fat32";
 import "libc/ctype";
@@ -398,11 +399,11 @@ fn console(pathname: uint8*) {
         let i: uint64;
 
         if (cwd == vfs_root())
-            vfs_write(pathname, "/", 1, 0);
+            vfs_printf(pathname, 0, "/");
         else
-            vfs_write(pathname, cwd->name, strlen(cwd->name), 0);
+            vfs_printf(pathname, 0, "%s", cwd->name);
 
-        vfs_write(pathname, " > ", 3, 0);
+        vfs_printf(pathname, 0, " > ");
 
         let buffer: uint8* = alloc<uint8*>(1024);
         defer dealloc(buffer);
@@ -477,14 +478,14 @@ fn console(pathname: uint8*) {
             }
         }
 
-        printk("[console] argc=%d, argv=[", args.length);
+        vfs_printf(pathname, 0, "[console] argc=%d, argv=[", args.length);
         for arg in &args {
-            printk(" \"%s\",", arg);
+            vfs_printf(pathname, 0, " \"%s\",", arg);
         }
-        printk(" ]\n");
+        vfs_printf(pathname, 0, " ]\n");
 
         if (_quotes or _backslash)
-            printk("[console] invalid input!, _quotes=%d, _backslash=%d\n", _quotes, _backslash);
+            vfs_printf(pathname, 0, "[console] invalid input!, _quotes=%d, _backslash=%d\n", _quotes, _backslash);
         else
             console_parse_command(args.length as int64, args.data);
     }

@@ -99,7 +99,15 @@ const PL011_INT_RT = (1 << 6); // Receive timeout
 // DR masks
 const PL011_DR_DATA_MASK = 0xFF;
 
-// const RX_BUF_SIZE = 1024;
+/**
+ * Callback state for pl011_vprintf, passed through stb_sprintf's opaque `user`
+ * pointer. Holds the running character count and the scratch buffer stb formats
+ * into before each chunk is flushed to the UART.
+ */
+struct pl011_printf_ctx {
+    length: int32;             // running count of characters emitted
+    tmp: uint8[STB_SPRINTF_MIN]; // scratch buffer stb formats into
+}
 
 @static let PL011 = UART0_BASE as struct pl011_regs*;
 
@@ -186,7 +194,7 @@ fn pl011_printf(format: uint8*, ...) {
 
 /**
  * Formats a string and writes it to the UART using a pre-initialized va_list.
- * Drives stb_sprintf's vsprintfcb with pl011_cb, so output is streamed to the
+ * Drives stb_sprintf's vsprintfcb with pl011_printf_cb, so output is streamed to the
  * UART in STB_SPRINTF_MIN chunks without a full output buffer. Supports the full
  * stb_sprintf grammar (flags, width, precision, length modifiers, and the
  * d/i/u/o/x/X/c/s/p/b conversions); %f/%e/%g/%a are disabled in this build.
@@ -195,33 +203,35 @@ fn pl011_printf(format: uint8*, ...) {
  * @param args:   variadic argument list (must be initialized by the caller)
  */
 fn pl011_vprintf(format: uint8*, args: va_list) {
-    let c: struct stbsp__context;
-    c.length = 0;
-    // stb writes into c.tmp (the STB_SPRINTF_MIN scratch buffer) and hands &c
-    // back to pl011_cb as `user`; pl011_cb flushes c.tmp to the UART.
-    vsprintfcb(pl011_cb, &c, c.tmp, format, args);
+    let ctx: struct pl011_printf_ctx;
+    ctx.length = 0;
+    // stb formats into ctx.tmp (the STB_SPRINTF_MIN scratch buffer) and hands
+    // &ctx back to pl011_printf_cb as `user`, which flushes each chunk to the UART.
+    vsprintfcb(pl011_printf_cb, &ctx as uint8*, ctx.tmp, format, args);
 }
 
 /**
- * vsprintfcb callback for pl011_vprintf. Writes the count formatted bytes in buf
- * to the UART via pl011_putc, accumulates the total in c->length, and returns
- * c->tmp so stb keeps formatting into the same scratch buffer.
+ * vsprintfcb callback for pl011_vprintf. Casts user back to pl011_printf_ctx,
+ * writes the count formatted bytes in buf to the UART via pl011_putc, accumulates
+ * the total in ctx->length, and returns ctx->tmp so stb keeps formatting into the
+ * same scratch buffer.
  *
  * @param buf:   chunk of formatted output to flush
- * @param c:     context whose tmp buffer is reused for the next chunk
+ * @param user:  opaque pointer to the pl011_printf_ctx passed to vsprintfcb
  * @param count: number of valid bytes in buf
  *
- * @return c->tmp, the scratch buffer for stb's next chunk
+ * @return ctx->tmp, the scratch buffer for stb's next chunk
  */
 @private
-fn pl011_cb(buf: uint8*, c: struct stbsp__context*, count: int32) -> uint8* {
+fn pl011_printf_cb(buf: uint8*, user: uint8*, count: int32) -> uint8* {
+    let ctx = user as struct pl011_printf_ctx*;
     let i: int32 = 0;
     while (i < count) {
         pl011_putc(buf[i]);
         i = i + 1;
     }
-    c->length = c->length + count;
-    return c->tmp;
+    ctx->length = ctx->length + count;
+    return ctx->tmp;
 }
 
 /**

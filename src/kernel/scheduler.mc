@@ -47,7 +47,7 @@ fn scheduler_init() {
  * Sets proc->state to PROC_READY and pushes it onto the tail of the ready queue.
  *
  * @param proc: process to enqueue; must be fully initialized (create_process
- *              and process_config called)
+ *              and process_set_entry called)
  *
  * @return 0 on success
  */
@@ -111,7 +111,7 @@ fn scheduler_set_current_process(proc: struct process*) {
 /**
  * Allocates a process, configures it with the given entry point, and enqueues
  * it on the ready queue. Convenience wrapper around create_process,
- * process_config, and scheduler_enqueue.
+ * process_set_entry, and scheduler_enqueue.
  *
  * @param entry: function to run as the process entry point
  *
@@ -126,7 +126,7 @@ fn scheduler_spawn(entry: fn ()) -> int64 {
     create_process(proc, DEFAULT_STACK_SIZE);
 
     dprintk("[scheduler] configuring process\n");
-    process_config(proc, entry);
+    process_set_entry(proc, entry);
 
     dprintk("[scheduler] enqueueing process\n");
     scheduler_enqueue(proc);
