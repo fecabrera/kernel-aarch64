@@ -14,6 +14,10 @@ const SYSCALL_SLEEP: uint64 = 5;
 const SYSCALL_MSLEEP: uint64 = 6;
 const SYSCALL_TIME: uint64 = 7;
 const SYSCALL_UPTIME: uint64 = 8;
+const SYSCALL_OPEN: uint64 = 9;
+const SYSCALL_CLOSE: uint64 = 10;
+const SYSCALL_READ: uint64 = 11;
+const SYSCALL_WRITE: uint64 = 12;
 
 @static let _syscall_table: struct set<uint64, fn (struct cpu_context *) -> struct cpu_context*>;
 

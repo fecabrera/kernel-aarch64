@@ -25,7 +25,7 @@ fn serial_init() {
  *
  * @return count
  */
-fn serial_read(buffer: uint8*, count: uint64, offset: uint64, drv_info: uint64) -> int32 {
+fn serial_read(buffer: uint8*, count: uint64, offset: uint64, drv_info: uint64) -> int64 {
     let c: uint8;
     let i: uint64 = 0;
     while (i < count) {
@@ -35,7 +35,7 @@ fn serial_read(buffer: uint8*, count: uint64, offset: uint64, drv_info: uint64) 
             wfi();
         buffer[i] = c;
     }
-    return count as int32;
+    return count as int64;
 }
 
 /**
@@ -49,11 +49,11 @@ fn serial_read(buffer: uint8*, count: uint64, offset: uint64, drv_info: uint64) 
  *
  * @return count
  */
-fn serial_write(buffer: uint8*, count: uint64, offset: uint64, drv_info: uint64) -> int32 {
+fn serial_write(buffer: uint8*, count: uint64, offset: uint64, drv_info: uint64) -> int64 {
     let i: uint64 = 0;
     while (i < count) {
         defer i = i + 1;
         pl011_putc(buffer[i]);
     }
-    return count as int32;
+    return count as int64;
 }

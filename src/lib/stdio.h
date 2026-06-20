@@ -1,5 +1,7 @@
 #pragma once
 
+#include "stdarg.h"
+
 #ifndef STB_SPRINTF_DECORATE
 #define STB_SPRINTF_DECORATE(name) name
 #endif
@@ -13,3 +15,6 @@
 #endif
 
 #include "stb_sprintf.h"
+
+int printf(const char *format, ...);
+int vprintf(const char *format, va_list args);

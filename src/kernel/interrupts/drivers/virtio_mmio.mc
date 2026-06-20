@@ -336,10 +336,12 @@ fn virtio_mmio_find_next_slot(device_id: uint32, start: int8) -> int8 {
  * @param sector_number: 512-byte sector to read from
  * @param data:          output buffer of at least VIRTIO_MMIO_BLK_SECTOR_SIZE bytes
  *
- * @return VIRTIO_BLK_S_OK (0) on success, VIRTIO_BLK_S_IOERR or VIRTIO_BLK_S_UNSUPP on device
- *         error, VIRTIO_MMIO_INVALID_DEVICE if the slot has no initialized device
+ * @return the number of bytes read (VIRTIO_MMIO_BLK_SECTOR_SIZE) on success; the
+ *         negated device status (-VIRTIO_BLK_S_IOERR / -VIRTIO_BLK_S_UNSUPP) on a
+ *         device error, or VIRTIO_MMIO_INVALID_DEVICE if the slot has no
+ *         initialized device
  */
-fn virtio_mmio_read(slot: int8, sector_number: uint64, data: uint8*) -> int32 {
+fn virtio_mmio_read(slot: int8, sector_number: uint64, data: uint8*) -> int64 {
     let device = &_devices[slot];
 
     if (device->device_id == VIRTIO_DEVICE_ID_INVALID) {
@@ -387,7 +389,10 @@ fn virtio_mmio_read(slot: int8, sector_number: uint64, data: uint8*) -> int32 {
 
     dprintk("[virtio_mmio@%lx] status = %u\n", virtio, status);
 
-    return status as int32;
+    if (status != VIRTIO_BLK_S_OK)
+        return -(status as int64);
+
+    return VIRTIO_MMIO_BLK_SECTOR_SIZE as int64;
 }
 
 /**

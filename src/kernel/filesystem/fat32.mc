@@ -296,7 +296,7 @@ fn fat32_unmount(device_path: uint8*) -> int64 {
  *
  * @return number of bytes read on success, negative on error
  */
-fn fat32_read(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint64) -> int32 {
+fn fat32_read(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint64) -> int64 {
     let entry_ref = node->info as struct fat32_entry_reference*;
     let fs_mp = node->mount;
     let bs_info = fs_mp->info as struct fat32_bs_info*;
@@ -399,7 +399,7 @@ fn fat32_read(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint
  *
  * @return number of bytes written on success, negative on error
  */
-fn fat32_write(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint64) -> int32 {
+fn fat32_write(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint64) -> int64 {
     let entry_ref = node->info as struct fat32_entry_reference*;
     let fs_mp = node->mount;
     let bs_info = fs_mp->info as struct fat32_bs_info*;

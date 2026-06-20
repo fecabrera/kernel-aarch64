@@ -5,8 +5,8 @@ LD      = aarch64-elf-ld
 OBJCOPY = aarch64-elf-objcopy
 
 MCFLAGS = --target aarch64-unknown-none-elf \
+		  --nostdlib --freestanding \
           --general-regs-only \
-		  --nostdlib \
 		  -O3 \
 		  -I src/kernel \
 		  -I src/libmc \

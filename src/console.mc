@@ -3,12 +3,14 @@ import "array";
 import "string";
 import "memory";
 import "scheduler";
+import "filesystem/file";
 import "filesystem/fs";
 import "filesystem/vfs";
 import "filesystem/fat32";
 import "libc/ctype";
 import "libc/stdlib";
 import "libc/string";
+import "libc/stdio";
 import "system/syscall";
 
 @static
@@ -26,13 +28,13 @@ let available_commands: uint8*[][2] = [
 
 @private
 fn command_help(argc: int64, argv: uint8**) -> int64 {
-    printk("available commands:\n");
+    printf("available commands:\n");
 
     let i: uint64 = 0;
     while (i < len(available_commands)) {
         defer i = i + 1;
         let command = available_commands[i];
-        printk("    %-28s %s\n", command[0], command[1]);
+        printf("    %-28s %s\n", command[0], command[1]);
     }
     
     return 0;
@@ -44,14 +46,14 @@ fn command_exit(argc: int64, argv: uint8**) -> int64 {
     if (argc > 1) {
         status = atoll(argv[1]);
     }
-    printk("exiting with status %d\n", status);
+    printf("exiting with status %d\n", status);
     return status;
 }
 
 @private
 fn command_mount(argc: int64, argv: uint8**) -> int64 {
     if (argc < 2) {
-        printk("usage: %s <device> [mountpoint]\n", argv[0]);
+        printf("usage: %s <device> [mountpoint]\n", argv[0]);
         return -1;
     }
 
@@ -61,19 +63,19 @@ fn command_mount(argc: int64, argv: uint8**) -> int64 {
 
     let status: int64 = fat32_mount(argv[1], moutpoint);
     if (status < 0) {
-        printk("fat32_mount() returned %d!\n", status);
+        printf("fat32_mount() returned %d!\n", status);
         return -2;
     }
 
-    printk("block device \"%s\" mounted!\n", argv[1]);
+    printf("block device \"%s\" mounted!\n", argv[1]);
     return 0;
 }
 
 @private
 fn command_echo(argc: int64, argv: uint8**) -> int64 {
     if (argc > 1)
-        printk("%s", argv[1]);
-    printk("\n");
+        printf("%s", argv[1]);
+    printf("\n");
 
     return 0;
 }
@@ -81,45 +83,45 @@ fn command_echo(argc: int64, argv: uint8**) -> int64 {
 @private
 fn command_cat(argc: int64, argv: uint8**) -> int64 {
     if (argc < 2) {
-        printk("usage: %s <path>\n", argv[0]);
+        printf("usage: %s <path>\n", argv[0]);
         return -1;
     }
     
     let proc = scheduler_get_current_process();
     let node = vfs_get_node_for_path(argv[1], proc->cwd);
     if (node == null) {
-        printk("\"%s\" not found!\n", argv[1]);
+        printf("\"%s\" not found!\n", argv[1]);
         return -2;
     }
 
     if ((node->attrs & FS_NODE_ATTRS_TYPE_MASK) != FS_NODE_ATTRS_TYPE_FILE) {
-        printk("\"%s\" is not a file!\n", argv[1]);
+        printf("\"%s\" is not a file!\n", argv[1]);
         return -3;
     }
 
-    let f_size: uint64 = fs_get_node_file_size(node);
+    let f_size = fs_get_node_file_size(node);
     let buffer: uint8* = alloc<uint8>(f_size + 1);
     defer dealloc(buffer);
 
-    let status: int32 = fs_read(node, buffer, f_size, 0);
+    let status = fs_read(node, buffer, f_size, 0);
     if (status < 0) {
         case (status) {
         when FS_IO_ERROR_FILE_NOT_FOUND:
-            printk("file not found!\n");
+            printf("file not found!\n");
         when FS_IO_ERROR_NOT_A_FILE:
-            printk("not a file!\n");
+            printf("not a file!\n");
         when FS_IO_ERROR_MOUNTPOINT_NOT_FOUND:
-            printk("mountpoint not found!\n");
+            printf("mountpoint not found!\n");
         when FS_IO_ERROR_HANDLER_NOT_PROVIDED:
-            printk("handler not provided!\n");
+            printf("handler not provided!\n");
         else:
-            printk("unknown error %d!\n", status);
+            printf("unknown error %d!\n", status);
         }
         return -4;
     }
 
     buffer[f_size] = '\0';
-    printk("%s\n", buffer);
+    printf("%s\n", buffer);
 
     return 0;
 }
@@ -135,12 +137,12 @@ fn command_ls(argc: int64, argv: uint8**) -> int64 {
     let proc = scheduler_get_current_process();
     let node = vfs_get_node_for_path(filename, proc->cwd);
     if (node == null) {
-        printk("\"%s\" not found!\n", filename);
+        printf("\"%s\" not found!\n", filename);
         return -1;
     }
 
     if ((node->attrs & FS_NODE_ATTRS_TYPE_MASK) != FS_NODE_ATTRS_TYPE_FOLDER) {
-        printk("\"%s\" is not a folder!\n", filename);
+        printf("\"%s\" is not a folder!\n", filename);
         return -2;
     }
 
@@ -153,7 +155,7 @@ fn command_ls(argc: int64, argv: uint8**) -> int64 {
         if ((current->attrs & FS_NODE_ATTRS_FLAG_HIDDEN) != 0)
             continue;
         
-        printk("%s\n", current->name);
+        printf("%s\n", current->name);
     }
 
     return 0;
@@ -162,16 +164,16 @@ fn command_ls(argc: int64, argv: uint8**) -> int64 {
 @private
 fn command_sleep(argc: int64, argv: uint8**) -> int64 {
     if (argc < 2) {
-        printk("usage: %s <seconds>\n", argv[0]);
+        printf("usage: %s <seconds>\n", argv[0]);
         return -1;
     }
 
-    dprintk("argc = %d, argv[0] = %s, argv[1] = %s\n", argc, argv[0], argv[1]);
-    dprintk("sleep(%d)\n", atoll(argv[1]) as uint64);
+    printf("argc = %d, argv[0] = %s, argv[1] = %s\n", argc, argv[0], argv[1]);
+    printf("sleep(%d)\n", atoll(argv[1]) as uint64);
 
     let ret: int64 = sleep(atoll(argv[1]) as uint64);
     if (ret < 0) {
-        printk("failed to sleep\n");
+        printf("failed to sleep\n");
         return ret;
     }
 
@@ -181,16 +183,16 @@ fn command_sleep(argc: int64, argv: uint8**) -> int64 {
 @private
 fn command_msleep(argc: int64, argv: uint8**) -> int64 {
     if (argc < 2) {
-        printk("usage: %s <seconds>\n", argv[0]);
+        printf("usage: %s <seconds>\n", argv[0]);
         return -1;
     }
 
-    dprintk("argc = %d, argv[0] = %s, argv[1] = %s\n", argc, argv[0], argv[1]);
-    dprintk("msleep(%d)\n", atoll(argv[1]) as uint64);
+    printf("argc = %d, argv[0] = %s, argv[1] = %s\n", argc, argv[0], argv[1]);
+    printf("msleep(%d)\n", atoll(argv[1]) as uint64);
 
     let ret: int64 = msleep(atoll(argv[1]) as uint64);
     if (ret < 0) {
-        printk("failed to sleep\n");
+        printf("failed to sleep\n");
         return ret;
     }
 
@@ -214,19 +216,19 @@ fn command_msleep(argc: int64, argv: uint8**) -> int64 {
 @private
 fn console_cd(argc: int64, argv: uint8**) -> int64 {
     if (argc < 2) {
-        printk("usage: %s <path>\n", argv[0]);
+        printf("usage: %s <path>\n", argv[0]);
         return -1;
     }
     
     let proc = scheduler_get_current_process();
     let node = vfs_get_node_for_path(argv[1], proc->cwd);
     if (node == null) {
-        printk("\"%s\" not found!\n", argv[1]);
+        printf("\"%s\" not found!\n", argv[1]);
         return -2;
     }
 
     if ((node->attrs & FS_NODE_ATTRS_TYPE_MASK) != FS_NODE_ATTRS_TYPE_FOLDER) {
-        printk("\"%s\" is not a folder!\n", argv[1]);
+        printf("\"%s\" is not a folder!\n", argv[1]);
         return -2;
     }
 
@@ -329,10 +331,10 @@ fn console_getline(pathname: uint8*, buffer: uint8*) -> int32 {
 fn console_run_command(fnc: fn (int64, uint8**) -> int64, argc: int64, argv: uint8**) {
     let pid: int64 = fork();
     if (pid < 0) {
-        printk("[console] fork() returned %d!\n", pid);
+        printf("[console] fork() returned %d!\n", pid);
     } else if (pid > 0) {
         let status: int64 = waitpid(pid);
-        printk("[console] process %d returned %d!\n", pid, status);
+        printf("[console] process %d returned %d!\n", pid, status);
     } else {
         let status: int64 = fnc(argc, argv);
         exit(status);
@@ -377,7 +379,7 @@ fn console_parse_command(argc: int64, argv: uint8**) {
     } else if (strcmp(argv[0], "help") == 0) {
         console_run_command(command_help, argc, argv);
     } else {
-        printk("command \"%s\" not found!\n", argv[0]);
+        printf("command \"%s\" not found!\n", argv[0]);
     }
 }
 
@@ -393,17 +395,22 @@ fn console_parse_command(argc: int64, argv: uint8**) {
  */
 fn console(pathname: uint8*) {
     printk("[console] starting console at \"%s\"...\n", pathname);
+
+    let proc = scheduler_get_current_process();
+    proc->stdin = open(pathname, FS_FILE_ATTRS_READ);
+    proc->stdout = open(pathname, FS_FILE_ATTRS_WRITE);
+
     while (true) {
-        let proc = scheduler_get_current_process();
         let cwd = proc->cwd;
         let i: uint64;
 
+        let path: uint8*;
         if (cwd == vfs_root())
-            vfs_printf(pathname, 0, "/");
+            path = "/";
         else
-            vfs_printf(pathname, 0, "%s", cwd->name);
+            path = cwd->name;
 
-        vfs_printf(pathname, 0, " > ");
+        printf("%s# ", path);
 
         let buffer: uint8* = alloc<uint8*>(1024);
         defer dealloc(buffer);
@@ -478,14 +485,14 @@ fn console(pathname: uint8*) {
             }
         }
 
-        vfs_printf(pathname, 0, "[console] argc=%d, argv=[", args.length);
+        dprintk("[console] argc=%d, argv=[", args.length);
         for arg in &args {
-            vfs_printf(pathname, 0, " \"%s\",", arg);
+            dprintk(" \"%s\",", arg);
         }
-        vfs_printf(pathname, 0, " ]\n");
+        dprintk(" ]\n");
 
         if (_quotes or _backslash)
-            vfs_printf(pathname, 0, "[console] invalid input!, _quotes=%d, _backslash=%d\n", _quotes, _backslash);
+            dprintk("[console] invalid input!, _quotes=%d, _backslash=%d\n", _quotes, _backslash);
         else
             console_parse_command(args.length as int64, args.data);
     }

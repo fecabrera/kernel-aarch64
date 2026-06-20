@@ -22,6 +22,22 @@ fn array_init<T>(self: struct array<T>*, capacity: uint64) {
 }
 
 /**
+ * Initializes dst and shallow-copies every element of src into it. Elements are
+ * copied by value, so for arrays of pointers dst and src end up referencing the
+ * same pointed-to objects.
+ *
+ * @param dst: uninitialized array to populate (initialized by this call)
+ * @param src: array to copy elements from
+ */
+fn array_duplicate<T>(dst: struct array<T>*, src: struct array<T>*) {
+    array_init(dst, src->capacity);
+
+    for entry in src {
+        array_append(dst, entry);
+    }
+}
+
+/**
  * Releases the array's storage. The array must be re-initialized with
  * array_init before being used again.
  *

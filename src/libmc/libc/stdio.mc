@@ -1,3 +1,5 @@
+import "system/syscall";
+
 // Bindings to the bundled stb_sprintf (src/lib/stb_sprintf.h). The build defines
 // STB_SPRINTF_NOFLOAT, so the float conversions (%f/%e/%g/%a) are disabled; all
 // integer/string/pointer conversions and the full flag/width/precision/length
@@ -8,6 +10,76 @@
  * callback. Also the minimum size of the scratch buffer such a callback returns.
  */
 const STB_SPRINTF_MIN = 512;
+
+// Conventional file descriptors, opened on the process at startup.
+const STDIN_FILENO = 0;
+const STDOUT_FILENO = 1;
+
+/**
+ * Callback state for vprintf, passed through stb_sprintf's opaque `user` pointer.
+ * Holds the destination fd, the running character count, and the scratch buffer
+ * stb formats into before each chunk is flushed via the write syscall.
+ */
+struct printf_ctx {
+    fd: int64;                    // destination file descriptor
+    length: int32;               // running count of characters written
+    tmp: uint8[STB_SPRINTF_MIN];  // scratch buffer stb formats into
+}
+
+/**
+ * Formats according to format and writes the result to STDOUT_FILENO. Thin
+ * variadic wrapper around vprintf.
+ *
+ * @param format: printf-style format string (stb_sprintf grammar; floats disabled)
+ * @param ...:    variadic arguments matching the format specifiers
+ *
+ * @return number of characters written
+ */
+fn printf(format: uint8*, ...) -> int32 {
+    let args: va_list;
+    va_start(args, format);
+    let n = vprintf(format, args);
+    va_end(args);
+    return n;
+}
+
+/**
+ * Formats according to format/args and streams the result to STDOUT_FILENO via
+ * the write syscall, in STB_SPRINTF_MIN chunks (vsprintfcb + vprintf_cb), without
+ * a full output buffer. Requires the calling process to have fd STDOUT_FILENO open.
+ *
+ * @param format: printf-style format string (stb_sprintf grammar; floats disabled)
+ * @param args:   variadic argument list (must be initialized by the caller)
+ *
+ * @return number of characters written
+ */
+fn vprintf(format: uint8*, args: va_list) -> int32 {
+    let ctx: struct printf_ctx;
+    ctx.fd = STDOUT_FILENO;
+    ctx.length = 0;
+    vsprintfcb(vprintf_cb, &ctx as uint8*, ctx.tmp, format, args);
+    return ctx.length;
+}
+
+/**
+ * vsprintfcb callback for vprintf. Casts c back to printf_ctx, writes the count
+ * formatted bytes in buf to ctx->fd via the write syscall, accumulates the total
+ * in ctx->length, and returns ctx->tmp so stb keeps formatting into the same
+ * scratch buffer.
+ *
+ * @param buf:   chunk of formatted output to flush
+ * @param c:     opaque pointer to the printf_ctx passed to vsprintfcb
+ * @param count: number of valid bytes in buf
+ *
+ * @return ctx->tmp, the scratch buffer for stb's next chunk
+ */
+@private
+fn vprintf_cb(buf: uint8*, c: uint8*, count: int32) -> uint8* {
+    let ctx = c as struct printf_ctx*;
+    write(ctx->fd, buf, count as uint64);
+    ctx->length = ctx->length + count;
+    return ctx->tmp;
+}
 
 /**
  * Formats into str using a printf-style format and a pre-initialized va_list.

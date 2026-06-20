@@ -41,6 +41,10 @@ fn scheduler_init() {
     syscall_register_handler(SYSCALL_FORK, syscall_fork_handler);
     syscall_register_handler(SYSCALL_SLEEP, syscall_sleep_handler);
     syscall_register_handler(SYSCALL_MSLEEP, syscall_msleep_handler);
+    syscall_register_handler(SYSCALL_OPEN, syscall_open_handler);
+    syscall_register_handler(SYSCALL_CLOSE, syscall_close_handler);
+    syscall_register_handler(SYSCALL_READ, syscall_read_handler);
+    syscall_register_handler(SYSCALL_WRITE, syscall_write_handler);
 }
 
 /**
@@ -274,7 +278,7 @@ fn syscall_exit_handler(ctx: struct cpu_context*) -> struct cpu_context* {
         return ctx;
     }
 
-    dprintk("[scheduler] exit(%i), ctx->x0 = %u, ctx->x1 = %u\n", proc->pid, ctx->x[0], ctx->x[1]);
+    dprintk("[scheduler] exit(%i), ctx->x0 = %llu, ctx->x1 = %llu\n", proc->pid, ctx->x[0], ctx->x[1]);
 
     proc->state = PROC_DEAD;
 
@@ -303,7 +307,7 @@ fn syscall_exit_handler(ctx: struct cpu_context*) -> struct cpu_context* {
 fn syscall_yield_handler(ctx: struct cpu_context*) -> struct cpu_context* {
     ctx->x[0] = 0;
 
-    dprintk("[scheduler] yield(), ctx->x0 = %u\n", ctx->x[0]);
+    dprintk("[scheduler] yield(), ctx->x0 = %llu\n", ctx->x[0]);
 
     return scheduler_handler(ctx, 0);
 }
@@ -325,7 +329,7 @@ fn syscall_getpid_handler(ctx: struct cpu_context*) -> struct cpu_context* {
         return ctx;
     }
 
-    dprintk("[scheduler] getpid(%i), ctx->x0 = %u, ctx->x1 = %u\n", proc->pid, ctx->x[0], ctx->x[1]);
+    dprintk("[scheduler] getpid(%i), ctx->x0 = %llu, ctx->x1 = %llu\n", proc->pid, ctx->x[0], ctx->x[1]);
 
     ctx->x[0] = proc->pid as uint64;
     return ctx;
@@ -344,7 +348,7 @@ fn syscall_getpid_handler(ctx: struct cpu_context*) -> struct cpu_context* {
 fn syscall_waitpid_handler(ctx: struct cpu_context*) -> struct cpu_context* {
     let pid = ctx->x[1] as int64;
 
-    dprintk("[scheduler] waitpid(), ctx->x0 = %u, ctx->x1 = %u\n", ctx->x[0], ctx->x[1]);
+    dprintk("[scheduler] waitpid(), ctx->x0 = %llu, ctx->x1 = %llu\n", ctx->x[0], ctx->x[1]);
 
     let proc = scheduler_get_current_process();
     if (proc == null) {
@@ -383,7 +387,7 @@ fn syscall_fork_handler(ctx: struct cpu_context*) -> struct cpu_context* {
 
     proc->ctx = ctx;
 
-    dprintk("[scheduler] fork(%i), ctx->x0 = %u\n", proc->pid, ctx->x[0]);
+    dprintk("[scheduler] fork(%i), ctx->x0 = %llu\n", proc->pid, ctx->x[0]);
 
     let child: struct process* = alloc<struct process>(1);
     duplicate_process(child, proc);
@@ -417,7 +421,7 @@ fn syscall_sleep_handler(ctx: struct cpu_context*) -> struct cpu_context* {
         return ctx;
     }
 
-    dprintk("[scheduler] sleep(), ctx->x0 = %u, ctx->x1 = %u\n", ctx->x[0], ctx->x[1]);
+    dprintk("[scheduler] sleep(), ctx->x0 = %llu, ctx->x1 = %llu\n", ctx->x[0], ctx->x[1]);
 
     let sleep_duration = seconds * 1000;
     proc->state = PROC_BLOCKED;
@@ -452,7 +456,7 @@ fn syscall_msleep_handler(ctx: struct cpu_context*) -> struct cpu_context* {
         return ctx;
     }
 
-    dprintk("[scheduler] msleep(), ctx->x0 = %u, ctx->x1 = %u\n", ctx->x[0], ctx->x[1]);
+    dprintk("[scheduler] msleep(), ctx->x0 = %llu, ctx->x1 = %llu\n", ctx->x[0], ctx->x[1]);
 
     proc->state = PROC_BLOCKED;
     proc->sleep_until = timer_get_uptime() + mseconds;
@@ -464,3 +468,114 @@ fn syscall_msleep_handler(ctx: struct cpu_context*) -> struct cpu_context* {
     return scheduler_handler(ctx, 0);
 }
 
+/**
+ * Handles SYSCALL_OPEN. Opens the path in x1 (with access mode in x2) in the
+ * current process's fd table via process_open_file and returns the descriptor in
+ * x0. No context switch.
+ *
+ * @param ctx: saved context of the calling process
+ *
+ * @return ctx with x0 set to the new fd, or -1 on failure
+ */
+fn syscall_open_handler(ctx: struct cpu_context*) -> struct cpu_context* {
+    let proc = scheduler_get_current_process();
+    if (proc == null) {
+        dprintk("[scheduler] no current process!\n");
+        ctx->x[0] = -1 as uint64;
+        return ctx;
+    }
+
+    let path = ctx->x[1] as uint8*;
+    let attrs = ctx->x[2] as uint32;
+
+    dprintk("[scheduler] open(), ctx->x0 = %llu, ctx->x1 = %llu, ctx->x2 = %llu\n",
+           ctx->x[0], ctx->x[1], ctx->x[2]);
+
+    ctx->x[0] = process_open_file(proc, path, attrs) as uint64;
+
+    return ctx;
+}
+
+/**
+ * Handles SYSCALL_CLOSE. Closes the descriptor in x1 in the current process's fd
+ * table via process_close_file and returns the result in x0. No context switch.
+ *
+ * @param ctx: saved context of the calling process
+ *
+ * @return ctx with x0 set to 0 on success, or -1 on failure
+ */
+fn syscall_close_handler(ctx: struct cpu_context*) -> struct cpu_context* {
+    let proc = scheduler_get_current_process();
+    if (proc == null) {
+        dprintk("[scheduler] no current process!\n");
+        ctx->x[0] = -1 as uint64;
+        return ctx;
+    }
+
+    let fd = ctx->x[1] as int64;
+
+    dprintk("[scheduler] close(), ctx->x0 = %llu, ctx->x1 = %llu\n",
+            ctx->x[0], ctx->x[1]);
+
+    ctx->x[0] = process_close_file(proc, fd) as uint64;
+
+    return ctx;
+}
+
+/**
+ * Handles SYSCALL_READ. Reads count (x3) bytes from descriptor fd (x1) into the
+ * buffer at x2 via process_read_file and returns the byte count in x0. No context
+ * switch.
+ *
+ * @param ctx: saved context of the calling process
+ *
+ * @return ctx with x0 set to the number of bytes read, or a negative error
+ */
+fn syscall_read_handler(ctx: struct cpu_context*) -> struct cpu_context* {
+    let proc = scheduler_get_current_process();
+    if (proc == null) {
+        dprintk("[scheduler] no current process!\n");
+        ctx->x[0] = -1 as uint64;
+        return ctx;
+    }
+
+    dprintk("[scheduler] read(), ctx->x0 = %llu, ctx->x1 = %llu, ctx->x2 = %llu, ctx->x3 = %llu\n",
+            ctx->x[0], ctx->x[1], ctx->x[2], ctx->x[3]);
+
+    let fd = ctx->x[1] as int64;
+    let buffer = ctx->x[2] as uint8*;
+    let count = ctx->x[3] as uint64;
+
+    ctx->x[0] = process_read_file(proc, fd, buffer, count) as uint64;
+
+    return ctx;
+}
+
+/**
+ * Handles SYSCALL_WRITE. Writes count (x3) bytes from the buffer at x2 to
+ * descriptor fd (x1) via process_write_file and returns the byte count in x0. No
+ * context switch.
+ *
+ * @param ctx: saved context of the calling process
+ *
+ * @return ctx with x0 set to the number of bytes written, or a negative error
+ */
+fn syscall_write_handler(ctx: struct cpu_context*) -> struct cpu_context* {
+    let proc = scheduler_get_current_process();
+    if (proc == null) {
+        dprintk("[scheduler] no current process!\n");
+        ctx->x[0] = -1 as uint64;
+        return ctx;
+    }
+
+    dprintk("[scheduler] write(), ctx->x0 = %llu, ctx->x1 = %llu, ctx->x2 = %llu, ctx->x3 = %llu\n",
+            ctx->x[0], ctx->x[1], ctx->x[2], ctx->x[3]);
+
+    let fd = ctx->x[1] as int64;
+    let buffer = ctx->x[2] as uint8*;
+    let count = ctx->x[3] as uint64;
+
+    ctx->x[0] = process_write_file(proc, fd, buffer, count) as uint64;
+
+    return ctx;
+}

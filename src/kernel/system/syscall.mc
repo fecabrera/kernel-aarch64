@@ -148,8 +148,88 @@ import "../syscall";
  */
 @inline fn uptime() -> uint64 {
     return @asm @clobbers("x0", "memory") (SYSCALL_UPTIME) -> uint64 {
-        "mov x0, $0\n"
-        "svc #0\n"
+        "mov x0, $0"
+        "svc #0"
+        "mov $out, x0"
+    };
+}
+
+/**
+ * Opens path via SYSCALL_OPEN (svc #0). Traps into EL1, where syscall_open_handler
+ * resolves the path relative to the process cwd and adds an entry to its fd table.
+ *
+ * @param path:  null-terminated path to open
+ * @param attrs: access mode (FS_FILE_ATTRS_READ/WRITE/EXEC bits)
+ *
+ * @return the new file descriptor, or -1 on failure.
+ */
+@inline fn open(path: uint8*, attrs: uint32) -> int64 {
+    return @asm @clobbers("x0", "x1", "x2", "memory") (SYSCALL_OPEN, path, attrs) -> int64 {
+        "mov x0, $0"
+        "mov x1, $1"
+        "mov x2, $2"
+        "svc #0"
+        "mov $out, x0"
+    };
+}
+
+/**
+ * Closes file descriptor fd via SYSCALL_CLOSE (svc #0). Traps into EL1, where
+ * syscall_close_handler closes the corresponding fd-table entry.
+ *
+ * @param fd: file descriptor to close
+ *
+ * @return 0 on success, -1 on failure.
+ */
+@inline fn close(fd: int64) -> int64 {
+    return @asm @clobbers("x0", "x1", "memory") (SYSCALL_CLOSE, fd) -> int64 {
+        "mov x0, $0"
+        "mov x1, $1"
+        "svc #0"
+        "mov $out, x0"
+    };
+}
+
+/**
+ * Reads up to count bytes from fd into buffer via SYSCALL_READ (svc #0). Traps
+ * into EL1, where syscall_read_handler dispatches to the process fd table.
+ *
+ * @param fd:     file descriptor to read from
+ * @param buffer: output buffer
+ * @param count:  maximum number of bytes to read
+ *
+ * @return number of bytes read, or a negative error.
+ */
+@inline fn read(fd: int64, buffer: uint8*, count: uint64) -> int64 {
+    return @asm @clobbers("x0", "x1", "x2", "x3", "memory")
+        (SYSCALL_READ, fd, buffer, count) -> int64 {
+        "mov x0, $0"
+        "mov x1, $1"
+        "mov x2, $2"
+        "mov x3, $3"
+        "svc #0"
+        "mov $out, x0"
+    };
+}
+
+/**
+ * Writes up to count bytes from buffer to fd via SYSCALL_WRITE (svc #0). Traps
+ * into EL1, where syscall_write_handler dispatches to the process fd table.
+ *
+ * @param fd:     file descriptor to write to
+ * @param buffer: input buffer
+ * @param count:  number of bytes to write
+ *
+ * @return number of bytes written, or a negative error.
+ */
+@inline fn write(fd: int64, buffer: uint8*, count: uint64) -> int64 {
+    return @asm @clobbers("x0", "x1", "x2", "x3", "memory")
+        (SYSCALL_WRITE, fd, buffer, count) -> int64 {
+        "mov x0, $0"
+        "mov x1, $1"
+        "mov x2, $2"
+        "mov x3, $3"
+        "svc #0"
         "mov $out, x0"
     };
 }

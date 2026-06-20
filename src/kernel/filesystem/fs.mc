@@ -70,8 +70,8 @@ struct fs_mount {
     device: uint8*;
     info: uint8*;
     root: struct fs_node*;
-    read: fn (struct fs_node*, uint8*, uint64, uint64) -> int32;
-    write: fn (struct fs_node*, uint8*, uint64, uint64) -> int32;
+    read: fn (struct fs_node*, uint8*, uint64, uint64) -> int64;
+    write: fn (struct fs_node*, uint8*, uint64, uint64) -> int64;
 }
 
 /**
@@ -425,7 +425,7 @@ fn fs_dump_node(node: struct fs_node*, prefix: uint8*) {
  *         FS_IO_ERROR_MOUNTPOINT_NOT_FOUND if the node has no mount,
  *         FS_IO_ERROR_HANDLER_NOT_PROVIDED if the mount has no read handler
  */
-fn fs_read(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint64) -> int32 {
+fn fs_read(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint64) -> int64 {
     if (node == null) {
         dprintk("[fs] node is null!\n");
         return FS_IO_ERROR_FILE_NOT_FOUND;
@@ -463,7 +463,7 @@ fn fs_read(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint64)
  *         FS_IO_ERROR_MOUNTPOINT_NOT_FOUND if the node has no mount,
  *         FS_IO_ERROR_HANDLER_NOT_PROVIDED if the mount has no write handler
  */
-fn fs_write(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint64) -> int32 {
+fn fs_write(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint64) -> int64 {
     if (node == null) {
         dprintk("[fs] node is null!\n");
         return FS_IO_ERROR_FILE_NOT_FOUND;
