@@ -3,6 +3,7 @@ import "cpu";
 import "process";
 import "queue";
 import "set";
+import "filesystem/file";
 import "interrupts/drivers/timer";
 
 @static let idle_ctx: struct cpu_context* = null;
@@ -25,6 +26,11 @@ import "interrupts/drivers/timer";
  *   SYSCALL_FORK             → syscall_fork_handler
  *   SYSCALL_SLEEP            → syscall_sleep_handler
  *   SYSCALL_MSLEEP           → syscall_msleep_handler
+ *   SYSCALL_OPEN             → syscall_open_handler
+ *   SYSCALL_CLOSE            → syscall_close_handler
+ *   SYSCALL_READ             → syscall_read_handler
+ *   SYSCALL_WRITE            → syscall_write_handler
+ *   SYSCALL_FSTAT            → syscall_fstat_handler
  */
 fn scheduler_init() {
     idle_ctx = (idle_stack as uint64 + DEFAULT_STACK_SIZE - 272) as struct cpu_context*;
@@ -45,6 +51,7 @@ fn scheduler_init() {
     syscall_register_handler(SYSCALL_CLOSE, syscall_close_handler);
     syscall_register_handler(SYSCALL_READ, syscall_read_handler);
     syscall_register_handler(SYSCALL_WRITE, syscall_write_handler);
+    syscall_register_handler(SYSCALL_FSTAT, syscall_fstat_handler);
 }
 
 /**
@@ -577,5 +584,32 @@ fn syscall_write_handler(ctx: struct cpu_context*) -> struct cpu_context* {
 
     ctx->x[0] = process_write_file(proc, fd, buffer, count) as uint64;
 
+    return ctx;
+}
+
+/**
+ * Handles SYSCALL_FSTAT. Fills the file_stat at x2 with metadata for descriptor
+ * fd (x1) via process_file_stat and returns the result in x0. No context switch.
+ *
+ * @param ctx: saved context of the calling process
+ *
+ * @return ctx with x0 set to 0 on success, or a negative error
+ */
+fn syscall_fstat_handler(ctx: struct cpu_context*) -> struct cpu_context* {
+    let proc = scheduler_get_current_process();
+    if (proc == null) {
+        dprintk("[scheduler] no current process!\n");
+        ctx->x[0] = -1 as uint64;
+        return ctx;
+    }
+
+    let fd = ctx->x[1] as int64;
+    let stat = ctx->x[2] as struct file_stat*;
+
+    dprintk("[scheduler] fstat(), ctx->x0 = %llu, ctx->x1 = %llu\n",
+            ctx->x[0], ctx->x[1]);
+    
+    ctx->x[0] = process_file_stat(proc, fd, stat) as uint64;
+    
     return ctx;
 }

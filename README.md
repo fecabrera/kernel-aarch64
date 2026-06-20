@@ -222,7 +222,7 @@ boilerplate for type-safe, reusable code. mc code links against C through
 
 ### **Syscall interface**
 
-- `svc #0` dispatch (`syscall.mc`): `syscall_handler` reads the syscall number from `ctx->x[0]` and dispatches through a table backed by a generic `set<uint64, handler>`; `syscall_init()` must be called before any handler registration. The user-facing `svc` wrappers live in `system/syscall.mc` under bare names (`yield`, `exit`, `fork`, `waitpid`, `sleep`, `time`, `uptime`, `open`, `close`, `read`, `write`, …) and emit `svc #0` directly via inline `@asm` (each declaring its register/memory `@clobbers`).
+- `svc #0` dispatch (`syscall.mc`): `syscall_handler` reads the syscall number from `ctx->x[0]` and dispatches through a table backed by a generic `set<uint64, handler>`; `syscall_init()` must be called before any handler registration. The user-facing `svc` wrappers live in `system/syscall.mc` under bare names (`yield`, `exit`, `fork`, `waitpid`, `sleep`, `time`, `uptime`, `open`, `close`, `read`, `write`, `fstat`, …) and emit `svc #0` directly via inline `@asm` (each declaring its register/memory `@clobbers`).
 - `syscall_register_handler` / `syscall_unregister_handler` add and remove handlers at runtime.
 - `yield()` triggers an immediate context switch.
 - `exit(status)` terminates the calling process and schedules the next one.
@@ -233,15 +233,15 @@ boilerplate for type-safe, reusable code. mc code links against C through
 - `msleep(ms)` same as `sleep` but duration is in milliseconds.
 - `time()` returns the current Unix timestamp from the RTC.
 - `uptime()` returns system uptime in milliseconds, computed from `cntpct_el0` ticks since boot.
-- `open(path, attrs)` / `close(fd)` / `read(fd, buf, count)` / `write(fd, buf, count)` operate on the calling process's per-process fd table (see "File descriptors" below).
+- `open(path, attrs)` / `close(fd)` / `read(fd, buf, count)` / `write(fd, buf, count)` / `fstat(fd, stat)` operate on the calling process's per-process fd table (see "File descriptors" below).
 
 ### **File descriptors**
 
-- Each process owns an fd table (`process.fdtors`, an `array<file_descriptor*>`); an fd is an index into it. `stdin`/`stdout` are fds stored on the process (or `-1` if unset).
-- A `file_descriptor` (`filesystem/file.mc`) is the open-file layer: it binds an `fs_node` to a read/write position (`pos`) and an access mode (`FS_FILE_ATTRS_READ/WRITE/EXEC`). `file_read`/`file_write` check the mode, dispatch to `fs_read`/`fs_write` at `pos`, then advance `pos`.
-- The `open`/`close`/`read`/`write` syscalls resolve into `process_open/close/read/write_file`, which index the fd table and call the `file_*` layer — completing the loop syscall → `file_*` → `fs_*` → mount handler.
-- `fork` shallow-copies the fd table (parent and child share the same `file_descriptor` objects, hence the same `pos`).
-- `printf`/`vprintf` (`libc/stdio.mc`) format with stb_sprintf and stream to `STDOUT_FILENO` via the `write` syscall, so they require the caller to have that fd open. The console opens `stdin`/`stdout` on its device at startup (fds 0/1) and forked command children inherit them, so command output flows printf → `write` → fd table → `fs_write` → device.
+- Each process owns an fd table (`process.dtor_ptrs`, an `array<pointer<file_descriptor>*>`); an fd is an index into it. There are no dedicated `stdin`/`stdout` fields — fds 0/1 are stdin/stdout by convention (the root process opens them in that order at startup).
+- A `file_descriptor` (`filesystem/file.mc`) is the open-file layer: it binds an `fs_node` to a read/write position (`pos`) and an access mode (`FS_FILE_ATTRS_READ/WRITE/EXEC`). `file_read`/`file_write` check the mode, dispatch to `fs_read`/`fs_write` at `pos`, then advance `pos`; `file_stat` returns size + mode.
+- Descriptors are reference-counted via `pointer<file_descriptor>` (`kernel/pointer.mc`): `open` creates one (count 1), `close` clears the slot and `pointer_release`s it, and `fork` `pointer_acquire`s each entry so parent and child share the same descriptor (and `pos`), freed when the last owner closes/exits.
+- The `open`/`close`/`read`/`write`/`fstat` syscalls resolve into `process_open/close/read/write_file` / `process_file_stat`, which index the fd table and call the `file_*` layer — completing the loop syscall → `file_*` → `fs_*` → mount handler.
+- `printf`/`vprintf` (`libc/stdio.mc`) format with stb_sprintf and stream to `STDOUT_FILENO` via the `write` syscall, so they require the caller to have that fd open. The console opens stdin/stdout on its device at startup (fds 0/1) and forked command children inherit them, so command output flows printf → `write` → fd table → `fs_write` → device.
 
 ## Source layout
 
@@ -264,7 +264,8 @@ src/
     cpu.mc          — cpu_context, SPSR/CNTP_CTL defines; inline-@asm impls of wfe/wfi, irq_enable/disable, timer registers, set_vbar_el1, bswap; be*/le* helpers
     syscall.mc      — svc #0 dispatch table (generic set): syscall_init/register/unregister_handler, syscall_handler, SYSCALL_* numbers
     dtb.mc          — @extern bindings to the C DTB parser: dtb_init/dump/find_prop, *_irq_number lookups, fdt_header/memreg/fdt_prop structs
-    process.mc      — process struct (cwd + stdin/stdout + fd table), create/duplicate/set_entry/destroy_process, process_open/close/read/write_file
+    pointer.mc      — generic refcounted pointer<T>: create_pointer/pointer_acquire/pointer_release
+    process.mc      — process struct (cwd + refcounted fd table), create/duplicate/set_entry/destroy_process, process_open/close/read/write_file + process_file_stat
     scheduler.mc    — full scheduler: idle ctx+stack, ready/wait/sleep queues, scheduler_init/enqueue/dequeue/spawn/handler, notify_sleepers/waiters, all syscall handlers, scheduler_get/set_current_process
     io.mc           — I/O module registry: io_init, io_register/unregister_module, io_read/io_write
     debug.mc        — printk (always on) / dprintk (DEBUG-gated via @if), thin wrappers over pl011_vprintf
@@ -281,7 +282,7 @@ src/
         pl031.mc    — PL031 RTC impl: pl031_regs struct, pl031_init/get_time/set_time/set_alarm, pl031_irq_handler, syscall_time_handler
         timer.mc    — ARM generic timer impl: timer_init/get_uptime/set_interval, timer_irq_handler, syscall_uptime_handler
     filesystem/
-      file.mc       — open-file layer: file_descriptor (node + pos + access mode), file_open/close/read/write
+      file.mc       — open-file layer: file_descriptor (node + pos + access mode), file_stat; file_init/read/write/stat
       fs.mc         — fs_node tree primitives + fs_read/fs_write dispatch and fs_printf/fs_vprintf (formatted write via stb_sprintf); fs_node / fs_mount structs
       vfs.mc        — VFS mount system: vfs_init, vfs_create/destroy_mountpoint, vfs_get_node_for_path, vfs_read/write, vfs_printf/vprintf, vfs_create_dir/file, vfs_dump_fs; owns the global _fs_root tree
       fat32.mc      — fat32_mount/unmount/read/write bindings to src/fs/fat32.c
@@ -289,7 +290,7 @@ src/
       heap.mc       — kmalloc/kfree/krealloc/kmalloc_aligned bindings
       mem.mc        — mem_init: reads RAM base/size from the DTB at boot
     system/
-      syscall.mc    — user-facing svc wrappers (bare names): yield/exit/getpid/waitpid/fork/sleep/msleep/time/uptime/open/close/read/write, all emitting svc #0 via inline @asm
+      syscall.mc    — user-facing svc wrappers (bare names): yield/exit/getpid/waitpid/fork/sleep/msleep/time/uptime/open/close/read/write/fstat, all emitting svc #0 via inline @asm
 
   libmc/            — mcc standard library (generic, type-parametric)
     memory.mc       — alloc<T>/alloc_aligned<T>/resize<T>/dealloc<T>, copy_bytes/set_bytes/copy_items/set_items

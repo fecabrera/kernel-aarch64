@@ -4,10 +4,13 @@
 
 import "libc/string";
 import "libc/stdio";
+import "string";
 
 /**
  * Formats according to format and writes the result to standard output (no
  * trailing newline). Thin wrapper around vprintf.
+ *
+ * @todo: use `const format: struct string` instead.
  *
  * @param format: printf-style format string (stb_sprintf grammar; floats disabled)
  * @param ...:    variadic arguments matching the format specifiers
@@ -21,6 +24,8 @@ fn print(format: uint8*, ...) {
 
 /**
  * Like print, but appends a newline after the formatted output.
+ * 
+ * @todo: use `const format: struct string` instead.
  *
  * @param format: printf-style format string (stb_sprintf grammar; floats disabled)
  * @param ...:    variadic arguments matching the format specifiers
@@ -43,20 +48,24 @@ fn writechar(c: uint8) {
 }
 
 /**
- * Writes a null-terminated string to standard output (its terminator excluded).
+ * Writes a string's bytes to standard output (its `length` bytes from `data`).
  *
- * @param str: null-terminated string to write
+ * @todo: use `const str: struct string` instead.
+ *
+ * @param str: string to write
  */
-fn writestr(str: uint8*) {
-    write(STDOUT_FILENO, str, strlen(str));
+fn writestr(str: struct string*) {
+    write(STDOUT_FILENO, str->data, str->length);
 }
 
 /**
- * Writes a null-terminated string to standard output followed by a newline.
+ * Writes a string to standard output followed by a newline.
  *
- * @param str: null-terminated string to write
+ * @todo: use `const str: struct string` instead.
+ *
+ * @param str: string to write
  */
-fn writeln(str: uint8*) {
+fn writeline(str: struct string*) {
     writestr(str);
     writechar('\n');
 }
@@ -106,6 +115,8 @@ fn readchar() -> uint8 {
  * Returns on CR (echoing a newline); DEL erases the last character (echoing a
  * backspace); other characters are appended. The buffer is null-terminated, and
  * the caller must ensure it is large enough for the line.
+ *
+ * @todo: use `const str: struct buffer` instead..
  *
  * @param buffer: output buffer for the line (null-terminated on return)
  *

@@ -88,41 +88,30 @@ fn command_cat(argc: int64, argv: uint8**) -> int64 {
         println("usage: %s <path>", argv[0]);
         return -1;
     }
-    
-    let proc = scheduler_get_current_process();
-    let node = vfs_get_node_for_path(argv[1], proc->cwd);
-    if (node == null) {
-        println("\"%s\" not found!", argv[1]);
+
+    let fd = open(argv[1], FS_FILE_ATTRS_READ);
+    if(fd < 0) {
+        println("open() returned %lld!", fd);
         return -2;
     }
 
-    if ((node->attrs & FS_NODE_ATTRS_TYPE_MASK) != FS_NODE_ATTRS_TYPE_FILE) {
-        println("\"%s\" is not a file!", argv[1]);
+    let stat: struct file_stat;
+    let st_status = fstat(fd, &stat);
+    if (st_status < 0) {
+        println("fstat() returned %lld!", st_status);
         return -3;
     }
-
-    let f_size = fs_get_node_file_size(node);
-    let buffer: uint8* = alloc<uint8>(f_size + 1);
+    
+    let buffer: uint8* = alloc<uint8>(stat.st_size + 1);
     defer dealloc(buffer);
 
-    let status = fs_read(node, buffer, f_size, 0);
-    if (status < 0) {
-        case (status) {
-        when FS_IO_ERROR_FILE_NOT_FOUND:
-            println("file not found!");
-        when FS_IO_ERROR_NOT_A_FILE:
-            println("not a file!");
-        when FS_IO_ERROR_MOUNTPOINT_NOT_FOUND:
-            println("mountpoint not found!");
-        when FS_IO_ERROR_HANDLER_NOT_PROVIDED:
-            println("handler not provided!");
-        else:
-            println("unknown error %d!", status);
-        }
+    let r_status = read(fd, buffer, stat.st_size);
+    if (r_status < 0) {
+        println("read() returned %lld!", r_status);
         return -4;
     }
 
-    buffer[f_size] = '\0';
+    buffer[stat.st_size] = '\0';
     println("%s", buffer);
 
     return 0;
@@ -314,8 +303,8 @@ fn console(pathname: uint8*) {
     printk("[console] starting console at \"%s\"...\n", pathname);
 
     let proc = scheduler_get_current_process();
-    proc->stdin = open(pathname, FS_FILE_ATTRS_READ);
-    proc->stdout = open(pathname, FS_FILE_ATTRS_WRITE);
+    open(pathname, FS_FILE_ATTRS_READ);
+    open(pathname, FS_FILE_ATTRS_WRITE);
 
     while (true) {
         let cwd = proc->cwd;

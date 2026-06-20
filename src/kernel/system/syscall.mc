@@ -1,4 +1,5 @@
 import "debug";
+import "filesystem/file";
 import "../syscall";
 
 /**
@@ -229,6 +230,26 @@ import "../syscall";
         "mov x1, $1"
         "mov x2, $2"
         "mov x3, $3"
+        "svc #0"
+        "mov $out, x0"
+    };
+}
+
+/**
+ * Retrieves metadata for fd into stat via SYSCALL_FSTAT (svc #0). Traps into EL1,
+ * where syscall_fstat_handler fills the file_stat from the process fd table.
+ *
+ * @param fd:   file descriptor to stat
+ * @param stat: caller-allocated file_stat to fill
+ *
+ * @return 0 on success, or a negative error.
+ */
+@inline fn fstat(fd: int64, stat: struct file_stat*) -> int64 {
+    return @asm @clobbers("x0", "x1", "x2", "memory")
+        (SYSCALL_FSTAT, fd, stat) -> int64 {
+        "mov x0, $0"
+        "mov x1, $1"
+        "mov x2, $2"
         "svc #0"
         "mov $out, x0"
     };

@@ -1,6 +1,7 @@
 import "cpu";
 import "array";
 import "memory";
+import "pointer";
 import "filesystem/fs";
 import "filesystem/vfs";
 import "filesystem/file";
@@ -29,9 +30,8 @@ const PROC_BLOCKED = 2;
  * @field sleep_until: (time_t) absolute uptime in milliseconds at which the process should wake; 0
  *                     when not sleeping
  * @field cwd:         current working directory node; inherited from the parent on fork
- * @field stdin:       file descriptor used as standard input, or -1 if unset
- * @field stdout:      file descriptor used as standard output, or -1 if unset
- * @field fdtors:      per-process file-descriptor table; fd numbers index this array
+ * @field dtor_ptrs:   per-process file-descriptor table; fd numbers index this array of
+ *                     refcounted pointer<file_descriptor> (shared with children on fork)
  */
 struct process {
     pid: int64;
@@ -42,9 +42,7 @@ struct process {
     wait_pid: int64;
     sleep_until: uint64;
     cwd: struct fs_node*;
-    stdin: int64;
-    stdout: int64;
-    fdtors: struct array<struct file_descriptor*>;
+    dtor_ptrs: struct array<struct pointer<struct file_descriptor>*>;
 }
 
 /**
@@ -77,114 +75,12 @@ fn create_process(proc: struct process*, stack_size: uint64) -> int32 {
     proc->stack = stack;
     proc->stack_size = stack_size;
     proc->cwd = vfs_root();
-    proc->stdin = -1;
-    proc->stdout = -1;
 
-    array_init(&proc->fdtors, 10);
+    array_init(&proc->dtor_ptrs, 10);
 
     next_pid = next_pid + 1;
 
     return 0;
-}
-
-/**
- * Opens pathname (resolved relative to the process's cwd) as a new file in the
- * process's fd table. Allocates a file_descriptor, initializes it via file_open,
- * appends it to proc->fdtors, and returns its index as the file descriptor.
- *
- * @param proc:     process whose fd table the file is added to
- * @param pathname: path to open, resolved relative to proc->cwd
- * @param attrs:    access mode (FS_FILE_ATTRS_READ/WRITE/EXEC bits)
- *
- * @return the new file descriptor (index into the fd table), or -1 if the path
- *         does not resolve
- */
-fn process_open_file(proc: struct process*, pathname: uint8*, attrs: uint32) -> int64 {
-    dprintk("[process] open_file(%lld, \"%s\", %04X)\n", proc->pid, pathname, attrs);
-
-    let node = vfs_get_node_for_path(pathname, proc->cwd);
-    if(node == null)
-        return -1;
-
-    let fdtors = &proc->fdtors;
-    let fd = fdtors->length as int64;
-
-    let dtor = alloc<struct file_descriptor>(1);
-    file_open(dtor, node, attrs);
-
-    array_append(fdtors, dtor);
-
-    return fd;
-}
-
-/**
- * Closes the file at descriptor fd in the process's fd table via file_close.
- *
- * @param proc: process owning the fd
- * @param fd:   file descriptor to close
- *
- * @return 0 on success, -1 if fd is out of range
- */
-fn process_close_file(proc: struct process*, fd: int64) -> int64 {
-    dprintk("[process] close_file(%lld, %lld)\n", proc->pid, fd);
-
-    let fdtors = &proc->fdtors;
-
-    let dtor: struct file_descriptor*;
-    if (!array_get(fdtors, fd as uint64, &dtor))
-        return -1;
-
-    file_close(dtor);
-
-    return 0;
-}
-
-/**
- * Reads up to count bytes from descriptor fd into buffer via file_read.
- *
- * @param proc:   process owning the fd
- * @param fd:     file descriptor to read from
- * @param buffer: output buffer
- * @param count:  maximum number of bytes to read
- *
- * @return number of bytes read, -1 if fd is out of range, or a negative error
- *         from file_read
- */
-fn process_read_file(proc: struct process*, fd: int64, buffer: uint8*, count: uint64) -> int64 {
-    dprintk("[process] read_file(%lld, %lld, %p, %lld)\n",
-            proc->pid, fd, buffer, count);
-
-    let fdtors = &proc->fdtors;
-
-    let dtor: struct file_descriptor*;
-    if (!array_get(fdtors, fd as uint64, &dtor))
-        return -1;
-
-    return file_read(dtor, buffer, count);
-}
-
-/**
- * Writes up to count bytes from buffer to descriptor fd via file_write.
- *
- * @param proc:   process owning the fd
- * @param fd:     file descriptor to write to
- * @param buffer: input buffer
- * @param count:  number of bytes to write
- *
- * @return number of bytes written, -1 if fd is out of range, or a negative error
- *         from file_write
- */
-fn process_write_file(proc: struct process*, fd: int64, buffer: uint8*, count: uint64) -> int64 {
-    dprintk("[process] write_file(%lld, %lld, %p, %lld)\n",
-            proc->pid, fd, buffer, count);
-
-    let fdtors = &proc->fdtors;
-
-    let dtor: struct file_descriptor*;
-    if (!array_get(fdtors, fd as uint64, &dtor))
-        return -1;
-
-    return file_write(dtor, buffer, count);
 }
 
 /**
@@ -215,10 +111,12 @@ fn duplicate_process(dest: struct process*, src: struct process*) -> int32 {
     dest->stack = stack;
     dest->stack_size = stack_size;
     dest->cwd = src->cwd;
-    dest->stdin = src->stdin;
-    dest->stdout = src->stdout;
 
-    array_duplicate(&dest->fdtors, &src->fdtors);
+    let dtor_ptrs = &src->dtor_ptrs;
+    array_init(&dest->dtor_ptrs, dtor_ptrs->capacity);
+    for dtor in dtor_ptrs {
+        array_append(&dest->dtor_ptrs, pointer_acquire(dtor));
+    }
 
     next_pid = next_pid + 1;
 
@@ -256,5 +154,142 @@ fn destroy_process(proc: struct process*) -> int32 {
     proc->ctx = null;
     proc->cwd = null;
 
+    for dtor in &proc->dtor_ptrs {
+        pointer_release(dtor);
+    }
+
+    array_destroy(&proc->dtor_ptrs);
+
     return 0;
+}
+
+/**
+ * Opens pathname (resolved relative to the process's cwd) as a new file in the
+ * process's fd table. Allocates a refcounted pointer<file_descriptor>, initializes
+ * its value via file_init, appends it to proc->dtor_ptrs, and returns its index
+ * as the file descriptor.
+ *
+ * @param proc:     process whose fd table the file is added to
+ * @param pathname: path to open, resolved relative to proc->cwd
+ * @param attrs:    access mode (FS_FILE_ATTRS_READ/WRITE/EXEC bits)
+ *
+ * @return the new file descriptor (index into the fd table),
+ *         FILE_IO_ERROR_NOT_FOUND if the path does not resolve, or
+ *         FILE_IO_ERROR_NOT_A_FILE if it names a folder
+ */
+fn process_open_file(proc: struct process*, pathname: uint8*, attrs: uint32) -> int64 {
+    dprintk("[process] open_file(%lld, \"%s\", %04X)\n", proc->pid, pathname, attrs);
+
+    let node = vfs_get_node_for_path(pathname, proc->cwd);
+    if (node == null)
+        return FILE_IO_ERROR_NOT_FOUND;
+    
+    if ((node->attrs & FS_NODE_ATTRS_TYPE_MASK) == FS_NODE_ATTRS_TYPE_FOLDER) {
+        return FILE_IO_ERROR_NOT_A_FILE;
+    }
+
+    let dtor_ptrs = &proc->dtor_ptrs;
+    let fd = dtor_ptrs->length as int64;
+
+    let dtor = create_pointer<struct file_descriptor>();
+    array_append(dtor_ptrs, dtor);
+
+    file_init(dtor->value, node, attrs);
+
+    return fd;
+}
+
+/**
+ * Closes the file at descriptor fd: clears its fd-table slot and drops the
+ * descriptor's reference via pointer_release (freeing it once no other process
+ * shares it).
+ *
+ * @param proc: process owning the fd
+ * @param fd:   file descriptor to close
+ *
+ * @return 0 on success, FILE_IO_ERROR_INVALID_DESCRIPTOR if fd is out of range
+ */
+fn process_close_file(proc: struct process*, fd: int64) -> int64 {
+    dprintk("[process] close_file(%lld, %lld)\n", proc->pid, fd);
+
+    let dtor_ptrs = &proc->dtor_ptrs;
+
+    let dtor: struct pointer<struct file_descriptor>*;
+    if (!array_get(dtor_ptrs, fd as uint64, &dtor))
+        return FILE_IO_ERROR_INVALID_DESCRIPTOR;
+
+    array_set(dtor_ptrs, fd as uint64, null);
+    pointer_release(dtor);
+
+    return 0;
+}
+
+/**
+ * Reads up to count bytes from descriptor fd into buffer via file_read.
+ *
+ * @param proc:   process owning the fd
+ * @param fd:     file descriptor to read from
+ * @param buffer: output buffer
+ * @param count:  maximum number of bytes to read
+ *
+ * @return number of bytes read, -1 if fd is out of range, or a negative error
+ *         from file_read
+ */
+fn process_read_file(proc: struct process*, fd: int64, buffer: uint8*, count: uint64) -> int64 {
+    dprintk("[process] read_file(%lld, %lld, %p, %lld)\n",
+            proc->pid, fd, buffer, count);
+
+    let dtor_ptrs = &proc->dtor_ptrs;
+
+    let dtor: struct pointer<struct file_descriptor>*;
+    if (!array_get(dtor_ptrs, fd as uint64, &dtor) or dtor == null)
+        return FILE_IO_ERROR_INVALID_DESCRIPTOR;
+
+    return file_read(dtor->value, buffer, count);
+}
+
+/**
+ * Writes up to count bytes from buffer to descriptor fd via file_write.
+ *
+ * @param proc:   process owning the fd
+ * @param fd:     file descriptor to write to
+ * @param buffer: input buffer
+ * @param count:  number of bytes to write
+ *
+ * @return number of bytes written, -1 if fd is out of range, or a negative error
+ *         from file_write
+ */
+fn process_write_file(proc: struct process*, fd: int64, buffer: uint8*, count: uint64) -> int64 {
+    dprintk("[process] write_file(%lld, %lld, %p, %lld)\n",
+            proc->pid, fd, buffer, count);
+
+    let dtor_ptrs = &proc->dtor_ptrs;
+
+    let dtor: struct pointer<struct file_descriptor>*;
+    if (!array_get(dtor_ptrs, fd as uint64, &dtor) or dtor == null)
+        return FILE_IO_ERROR_INVALID_DESCRIPTOR;
+
+    return file_write(dtor->value, buffer, count);
+}
+
+/**
+ * Fills stat with metadata for descriptor fd via file_stat.
+ *
+ * @param proc: process owning the fd
+ * @param fd:   file descriptor to stat
+ * @param stat: caller-allocated file_stat to fill
+ *
+ * @return 0 on success, FILE_IO_ERROR_INVALID_DESCRIPTOR if fd is out of range
+ */
+fn process_file_stat(proc: struct process*, fd: int64, stat: struct file_stat*) -> int64 {
+    dprintk("[process] file_stat(%lld, %lld, %p)\n",
+            proc->pid, fd, stat);
+
+    let dtor_ptrs = &proc->dtor_ptrs;
+
+    let dtor: struct pointer<struct file_descriptor>*;
+    if (!array_get(dtor_ptrs, fd as uint64, &dtor) or dtor == null)
+        return FILE_IO_ERROR_INVALID_DESCRIPTOR;
+
+    return file_stat(dtor->value, stat);
 }
