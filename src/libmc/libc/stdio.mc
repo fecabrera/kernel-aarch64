@@ -1,3 +1,4 @@
+import "std";
 import "system/syscall";
 
 // Bindings to the bundled stb_sprintf (src/lib/stb_sprintf.h). The build defines
@@ -15,6 +16,9 @@ const STB_SPRINTF_MIN = 512;
 const STDIN_FILENO = 0;
 const STDOUT_FILENO = 1;
 
+// Returned by character I/O on end-of-input or error.
+const EOF = -1;
+
 /**
  * Callback state for vprintf, passed through stb_sprintf's opaque `user` pointer.
  * Holds the destination fd, the running character count, and the scratch buffer
@@ -24,6 +28,29 @@ struct printf_ctx {
     fd: int64;                    // destination file descriptor
     length: int32;               // running count of characters written
     tmp: uint8[STB_SPRINTF_MIN];  // scratch buffer stb formats into
+}
+
+/**
+ * Reads the next character from standard input via readchar (blocking).
+ *
+ * @return the character read, as an int32
+ */
+fn getchar() -> int32 {
+    return readchar() as int32;
+}
+
+/**
+ * Writes the low byte of c to standard output via the write syscall.
+ *
+ * @param c: character to write (low byte used)
+ *
+ * @return c on success, or EOF on write failure
+ */
+fn putchar(c: int32) -> int32 {
+    if(write(STDOUT_FILENO, &c as uint8*, 1) < 0) {
+        return EOF;
+    }
+    return c;
 }
 
 /**

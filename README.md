@@ -210,10 +210,9 @@ boilerplate for type-safe, reusable code. mc code links against C through
 - `serial_init()` registers a `/dev/serial` I/O module backed by the PL011 UART. Must be called after `io_init()`.
 - `serial_read` blocks reading `count` bytes from the UART by calling `pl011_getc` in a loop, spinning on `wfi()` until each byte arrives; returns `count`.
 - `serial_write` writes `count` bytes to the UART one byte at a time via `pl011_putc`; returns `count`.
-- `console(pathname)` in `console.mc` runs an interactive terminal loop on the given VFS device, prompting with the current working directory's name (or `/` at the root) followed by `" > "`, tokenizing each input line into `argc/argv` (whitespace-delimited; double-quoted strings are single tokens; backslash escapes any character, including `\"` inside quotes), and dispatching to `console_parse_command`. Lines with an unterminated quote or trailing backslash are rejected with an error.
+- `console(pathname)` in `console.mc` opens `pathname` as its stdin/stdout (fds 0/1), then runs an interactive terminal loop, prompting with the current working directory's name (or `/` at the root) followed by `"# "`, tokenizing each input line into `argc/argv` (whitespace-delimited; double-quoted strings are single tokens; backslash escapes any character, including `\"` inside quotes), and dispatching to `console_parse_command`. Lines with an unterminated quote or trailing backslash are rejected with an error.
 - `console_parse_command(argc, argv)` forks a child process for each command (parent waits via `waitpid`), except `cd`, which is dispatched directly so it can mutate the console process's own cwd. Built-ins: `ls [path]` (lists a folder's entries relative to the cwd, skipping hidden `.`/`..`; defaults to `/`), `cd <path>` (changes the cwd to a child folder, following `.`/`..` links), `cat <path>` (resolves relative to the cwd, validates the node is a file, then reads and prints it), `echo [args...]` (print first arg), `mount <device> [mountpoint]` (`fat32_mount`; mountpoint defaults to `/volumes/<label>`), `exit [status]` (`exit`), `help` (list commands); unknown commands print a "not found!" message.
-- `console_getc(pathname)` reads the next character from a VFS device, blocking and discarding ANSI escape sequences.
-- `console_getline(pathname, buffer)` reads one line via `console_getc`, echoing characters back and handling backspace and CR; returns character count.
+- Line input is handled by `libmc/std.mc`'s `readchar()` (blocks on stdin, discarding ANSI escape sequences) and `readline(buffer)` (reads one line via `readchar`, echoing characters and handling backspace and CR; returns character count).
 
 ### **Storage devices**
 
@@ -257,7 +256,7 @@ init/               — files bundled into init.img at build time (FAT32 ramdisk
 
 src/
   kernel.c/h        — kernel_init: subsystem bring-up (DTB, memory, IRQ, VFS, I/O, serial, storage, scheduler, timer); init(): pid 1 entry point, runs console("/dev/serial")
-  console.mc        — console()/console_getc()/console_getline()/console_parse_command(): interactive terminal loop with cwd-aware prompt and argc/argv tokenization (quoted strings, backslash escapes), fork-per-command dispatch (cd dispatched directly); built-ins: ls, cd, cat, echo, mount, exit, help
+  console.mc        — console()/console_parse_command(): interactive terminal loop with cwd-aware prompt and argc/argv tokenization (quoted strings, backslash escapes), fork-per-command dispatch (cd dispatched directly); built-ins: ls, cd, cat, echo, mount, exit, help; line input via libmc/std readline
   start.S           — AArch64 boot stub, saves DTB pointer, zeros BSS
   vectors.S         — exception vector table, save/restore_context macros
 
@@ -299,10 +298,11 @@ src/
     dict.mc         — string-keyed dict<V> (open addressing, dict_it/dict_next cursor)
     set.mc, queue.mc, stack.mc — generic containers (set_entry extends pair; set_it/set_next cursor)
     hash.mc         — hash<T> dispatch (splitmix64 for values, fnv1a for pointers)
+    std.mc          — ergonomic stdio over the fd syscalls: print/println, writechar/writestr/writeln, readchar/readline
     ascii.mc, uchar.mc
     hashing/        — splitmix64, fnv1a, crc32, murmur3
     iteration/      — pair
-    libc/           — freestanding ctype, stdlib, string, limits; stdio binds the stb_sprintf family (vsprintf/snprintf/vsprintfcb) and implements printf/vprintf to STDOUT_FILENO via the write syscall
+    libc/           — freestanding ctype, stdlib, string, limits; stdio binds the stb_sprintf family (vsprintf/snprintf/vsprintfcb) and implements printf/vprintf/getchar/putchar over the read/write syscalls
 
   arch/             — AArch64-specific (C)
     cpu.c/h         — halt/hang + _wfi_while/_wfe_while spin macros; the register accessors (cntpct/cntfrq/cntp/vbar_el1/DAIF) are ported to kernel/cpu.mc (inline @asm)
