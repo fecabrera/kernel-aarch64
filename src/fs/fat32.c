@@ -214,57 +214,6 @@ int fat32_is_boot_sector(uint8_t *buff) {
     return 1;
 }
 
-void fat32_parse_boot_sector(uint8_t *buff, struct fat32_bs_info *bs_info) {
-    struct mbr_boot_sector *bs = (struct mbr_boot_sector *)buff;
-    struct fat32_ext_bs *ext_br = (struct fat32_ext_bs *)bs->boot_code;
-
-    // extract volume label from EBR, which is more likely to be human-friendly than the OEM name in
-    // the MBR boot sector. Also trim trailing spaces.
-    strntrimend(bs_info->volume_label, (char *)ext_br->volume_label, 11);
-
-    // ARM doesn't like unaligned memory access, so we need to memcpy the fields into local
-    // variables before using them
-    uint8_t n_fat, n_sectors_per_cluster;
-    uint16_t n_reserved_sectors, n_bytes_per_sector, total_sectors_16;
-    uint32_t total_sectors_32;
-    memcpy(&n_sectors_per_cluster, &bs->n_sectors_per_cluster, 1);
-    memcpy(&n_fat, &bs->n_fat, 1);
-    memcpy(&n_reserved_sectors, &bs->n_reserved_sectors, 2);
-    memcpy(&n_bytes_per_sector, &bs->n_bytes_per_sector, 2);
-    memcpy(&total_sectors_16, &bs->total_sectors_16, 2);
-    memcpy(&total_sectors_32, &bs->total_sectors_32, 4);
-
-    // extended boot record fields
-    uint8_t drive_number;
-    uint32_t root_cluster, table_size_32;
-    memcpy(&drive_number, &ext_br->drive_number, 1);
-    memcpy(&root_cluster, &ext_br->root_cluster, 4);
-    memcpy(&table_size_32, &ext_br->table_size_32, 4);
-
-    // derived fields
-    uint32_t total_sectors = total_sectors_16 == 0 ? total_sectors_32 : total_sectors_16;
-    uint32_t first_fat_sector = n_reserved_sectors;
-    uint32_t first_data_sector = n_reserved_sectors + (table_size_32 * n_fat);
-    uint32_t data_sectors = total_sectors - first_data_sector;
-    uint32_t total_clusters = data_sectors / n_sectors_per_cluster;
-
-    // fill the bs_info struct
-    bs_info->n_fat = n_fat;
-    bs_info->n_sectors_per_cluster = n_sectors_per_cluster;
-    bs_info->n_reserved_sectors = n_reserved_sectors;
-    bs_info->n_bytes_per_sector = n_bytes_per_sector;
-    bs_info->total_sectors_16 = total_sectors_16;
-    bs_info->total_sectors_32 = total_sectors_32;
-    bs_info->drive_number = drive_number;
-    bs_info->root_cluster = root_cluster;
-    bs_info->table_size_32 = table_size_32;
-    bs_info->first_fat_sector = first_fat_sector;
-    bs_info->first_data_sector = first_data_sector;
-    bs_info->total_sectors = total_sectors;
-    bs_info->data_sectors = data_sectors;
-    bs_info->total_clusters = total_clusters;
-}
-
 uint32_t fat32_read_fat_table(struct fat32_bs_info *bs_info, uint8_t *buff,
                               uint32_t sector_offset) {
     uint16_t n_entries_per_sector = bs_info->n_bytes_per_sector / 4;

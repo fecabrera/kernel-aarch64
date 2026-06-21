@@ -52,6 +52,7 @@ fn scheduler_init() {
     syscall_register_handler(SYSCALL_READ, syscall_read_handler);
     syscall_register_handler(SYSCALL_WRITE, syscall_write_handler);
     syscall_register_handler(SYSCALL_FSTAT, syscall_fstat_handler);
+    syscall_register_handler(SYSCALL_GETCWD, syscall_getcwd_handler);
 }
 
 /**
@@ -611,5 +612,33 @@ fn syscall_fstat_handler(ctx: struct cpu_context*) -> struct cpu_context* {
     
     ctx->x[0] = process_file_stat(proc, fd, stat) as uint64;
     
+    return ctx;
+}
+
+/**
+ * Handles SYSCALL_GETCWD. Writes the absolute path of the process's current
+ * working directory into the buffer at x1 (capacity x2) via process_get_cwd and
+ * returns the result in x0. No context switch.
+ *
+ * @param ctx: saved context of the calling process
+ *
+ * @return ctx with x0 set to the path length, or -1 on failure
+ */
+fn syscall_getcwd_handler(ctx: struct cpu_context*) -> struct cpu_context* {
+    let proc = scheduler_get_current_process();
+    if (proc == null) {
+        dprintk("[scheduler] no current process!\n");
+        ctx->x[0] = -1 as uint64;
+        return ctx;
+    }
+
+    let buf = ctx->x[1] as uint8*;
+    let size = ctx->x[2] as uint64;
+
+    dprintk("[scheduler] getcwd(), ctx->x0 = %llu, ctx->x1 = %llu, ctx->x2 = %llu\n",
+            ctx->x[0], ctx->x[1], ctx->x[2]);
+
+    ctx->x[0] = process_get_cwd(proc, buf, size) as uint64;
+
     return ctx;
 }

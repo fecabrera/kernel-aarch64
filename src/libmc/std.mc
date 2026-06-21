@@ -1,9 +1,9 @@
 // Ergonomic standard I/O helpers over the fd syscalls: formatted/unformatted
 // writes to STDOUT_FILENO and line/char reads from STDIN_FILENO. The calling
 // process must have those fds open (see libc/stdio.mc).
-
 import "libc/string";
 import "libc/stdio";
+import "system/syscall";
 import "string";
 
 /**
@@ -50,22 +50,18 @@ fn writechar(c: uint8) {
 /**
  * Writes a string's bytes to standard output (its `length` bytes from `data`).
  *
- * @todo: use `const str: struct string` instead.
- *
  * @param str: string to write
  */
-fn writestr(str: struct string*) {
-    write(STDOUT_FILENO, str->data, str->length);
+fn writestr(const str: struct string) {
+    write(STDOUT_FILENO, str.data, str.length);
 }
 
 /**
  * Writes a string to standard output followed by a newline.
  *
- * @todo: use `const str: struct string` instead.
- *
  * @param str: string to write
  */
-fn writeline(str: struct string*) {
+fn writeln(const str: struct string) {
     writestr(str);
     writechar('\n');
 }

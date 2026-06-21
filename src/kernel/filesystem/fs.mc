@@ -1,5 +1,6 @@
 import "debug";
 import "memory";
+import "stack";
 import "libc/stdio";
 import "libc/string";
 
@@ -541,4 +542,60 @@ fn fs_vprintf_cb(buf: uint8*, c: uint8*, count: int32) -> uint8* {
     fs_write(ctx->node, buf, count as uint64, ctx->offset);
     ctx->offset = ctx->offset + count as uint64;
     return ctx->tmp;
+}
+
+/**
+ * Builds the absolute directory path containing node into buf. Walks up the
+ * ".." chain to the root, pushing each folder ancestor (non-folder nodes are
+ * skipped) onto a stack, then pops them back down, writing each name followed
+ * by '/'. The result always begins with '/', ends with a trailing '/', and is
+ * null-terminated; unnamed nodes (e.g. the root) contribute only their separator.
+ *
+ * @param node: node whose containing directory path is resolved
+ * @param buf:  output buffer for the null-terminated path
+ * @param size: capacity of buf in bytes
+ *
+ * @return the path length excluding the null terminator, or -1 if the path
+ *         would not fit in size bytes
+ */
+fn fs_get_absolute_dir(node: struct fs_node*, buf: uint8*, size: uint64) -> int64 {
+    let s: struct stack<struct fs_node*>;
+    stack_init(&s, 10);
+    defer stack_destroy(&s);
+
+    let current = node;
+    until (current == null) {
+        dprintk("[fs] pushing \"%s\"\n", current->name == null ? "" : current->name);
+
+        if ((current->attrs & FS_NODE_ATTRS_TYPE_MASK == FS_NODE_ATTRS_TYPE_FOLDER))
+            stack_push(&s, current);
+
+        let parent_ref = fs_get_child(current, "..");
+        current = parent_ref != null ? parent_ref->child : null;
+    }
+
+    let length: uint64 = 0;
+    buf[length] = '/';
+    length = length + 1;
+    until(stack_is_empty(&s)) {
+        current = stack_pop(&s);
+
+        dprintk("[fs] popped \"%s\"\n", current->name == null ? "" : current->name);
+
+        if (current->name == null) continue;
+            
+        let count = strlen(current->name);
+        if (length + count > size)
+            return -1; // won't copy otherwise it'd overflow
+        
+        bytecopy(&buf[length], current->name, count);
+        length = length + count;
+
+        buf[length] = '/';
+        length = length + 1;
+    }
+    
+    buf[length] = '\0';
+    
+    return length as int64;
 }

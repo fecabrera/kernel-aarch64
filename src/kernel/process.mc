@@ -1,5 +1,5 @@
 import "cpu";
-import "array";
+import "list";
 import "memory";
 import "pointer";
 import "filesystem/fs";
@@ -42,7 +42,7 @@ struct process {
     wait_pid: int64;
     sleep_until: uint64;
     cwd: struct fs_node*;
-    dtor_ptrs: struct array<struct pointer<struct file_descriptor>*>;
+    dtor_ptrs: struct list<struct pointer<struct file_descriptor>*>;
 }
 
 /**
@@ -76,7 +76,7 @@ fn create_process(proc: struct process*, stack_size: uint64) -> int32 {
     proc->stack_size = stack_size;
     proc->cwd = vfs_root();
 
-    array_init(&proc->dtor_ptrs, 10);
+    list_init(&proc->dtor_ptrs, 10);
 
     next_pid = next_pid + 1;
 
@@ -103,7 +103,7 @@ fn duplicate_process(dest: struct process*, src: struct process*) -> int32 {
 
     let ctx_offset: uint64 = (src->ctx as uint64) - (src->stack as uint64);
     let ctx = (stack as uint64 + ctx_offset) as struct cpu_context*;
-    copy_bytes(ctx, src->ctx, 1);
+    bytecopy(ctx, src->ctx, 1);
 
     dest->pid = next_pid;
     dest->state = PROC_CREATED;
@@ -113,9 +113,9 @@ fn duplicate_process(dest: struct process*, src: struct process*) -> int32 {
     dest->cwd = src->cwd;
 
     let dtor_ptrs = &src->dtor_ptrs;
-    array_init(&dest->dtor_ptrs, dtor_ptrs->capacity);
+    list_init(&dest->dtor_ptrs, dtor_ptrs->capacity);
     for dtor in dtor_ptrs {
-        array_append(&dest->dtor_ptrs, pointer_acquire(dtor));
+        list_append(&dest->dtor_ptrs, pointer_acquire(dtor));
     }
 
     next_pid = next_pid + 1;
@@ -158,7 +158,7 @@ fn destroy_process(proc: struct process*) -> int32 {
         pointer_release(dtor);
     }
 
-    array_destroy(&proc->dtor_ptrs);
+    list_destroy(&proc->dtor_ptrs);
 
     return 0;
 }
@@ -192,7 +192,7 @@ fn process_open_file(proc: struct process*, pathname: uint8*, attrs: uint32) -> 
     let fd = dtor_ptrs->length as int64;
 
     let dtor = create_pointer<struct file_descriptor>();
-    array_append(dtor_ptrs, dtor);
+    list_append(dtor_ptrs, dtor);
 
     file_init(dtor->value, node, attrs);
 
@@ -215,10 +215,10 @@ fn process_close_file(proc: struct process*, fd: int64) -> int64 {
     let dtor_ptrs = &proc->dtor_ptrs;
 
     let dtor: struct pointer<struct file_descriptor>*;
-    if (!array_get(dtor_ptrs, fd as uint64, &dtor))
+    if (!list_get(dtor_ptrs, fd as uint64, &dtor))
         return FILE_IO_ERROR_INVALID_DESCRIPTOR;
 
-    array_set(dtor_ptrs, fd as uint64, null);
+    list_set(dtor_ptrs, fd as uint64, null);
     pointer_release(dtor);
 
     return 0;
@@ -242,7 +242,7 @@ fn process_read_file(proc: struct process*, fd: int64, buffer: uint8*, count: ui
     let dtor_ptrs = &proc->dtor_ptrs;
 
     let dtor: struct pointer<struct file_descriptor>*;
-    if (!array_get(dtor_ptrs, fd as uint64, &dtor) or dtor == null)
+    if (!list_get(dtor_ptrs, fd as uint64, &dtor) or dtor == null)
         return FILE_IO_ERROR_INVALID_DESCRIPTOR;
 
     return file_read(dtor->value, buffer, count);
@@ -266,7 +266,7 @@ fn process_write_file(proc: struct process*, fd: int64, buffer: uint8*, count: u
     let dtor_ptrs = &proc->dtor_ptrs;
 
     let dtor: struct pointer<struct file_descriptor>*;
-    if (!array_get(dtor_ptrs, fd as uint64, &dtor) or dtor == null)
+    if (!list_get(dtor_ptrs, fd as uint64, &dtor) or dtor == null)
         return FILE_IO_ERROR_INVALID_DESCRIPTOR;
 
     return file_write(dtor->value, buffer, count);
@@ -288,8 +288,26 @@ fn process_file_stat(proc: struct process*, fd: int64, stat: struct file_stat*) 
     let dtor_ptrs = &proc->dtor_ptrs;
 
     let dtor: struct pointer<struct file_descriptor>*;
-    if (!array_get(dtor_ptrs, fd as uint64, &dtor) or dtor == null)
+    if (!list_get(dtor_ptrs, fd as uint64, &dtor) or dtor == null)
         return FILE_IO_ERROR_INVALID_DESCRIPTOR;
 
     return file_stat(dtor->value, stat);
+}
+
+/**
+ * Writes the absolute path of the process's current working directory into buf
+ * via fs_get_absolute_dir.
+ *
+ * @param proc: process whose cwd is resolved
+ * @param buf:  output buffer for the null-terminated path
+ * @param size: capacity of buf in bytes
+ *
+ * @return the path length excluding the null terminator, or -1 if it would not
+ *         fit in size bytes
+ */
+fn process_get_cwd(proc: struct process*, buf: uint8*, size: uint64) -> int64 {
+    dprintk("[process] get_cwd(%lld, %p, %llu)\n",
+            proc->pid, buf, size);
+
+    return fs_get_absolute_dir(proc->cwd, buf, size);
 }

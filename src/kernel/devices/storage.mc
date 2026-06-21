@@ -75,7 +75,7 @@ fn storage_read(buffer: uint8*, count: uint64, offset: uint64, slot: uint64) -> 
     }
 
     // copy data requested to temporary buffer
-    copy_bytes(buffer, (tmp as uint64 + (offset % VIRTIO_MMIO_BLK_SECTOR_SIZE)) as uint8*, count);
+    bytecopy(buffer, (tmp as uint64 + (offset % VIRTIO_MMIO_BLK_SECTOR_SIZE)) as uint8*, count);
 
     // return bytes delivered to the caller, not raw sectors read
     return count as int64;

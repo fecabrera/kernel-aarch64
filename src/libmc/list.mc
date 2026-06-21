@@ -1,0 +1,156 @@
+import "memory";
+
+/**
+ * A growable, heap-backed list of T.
+ */
+struct list<T> {
+    data: T*;
+    length: uint64;
+    capacity: uint64;
+}
+
+/**
+ * Prepares an list for use, allocating room for capacity elements.
+ *
+ * @param self:     list to initialize
+ * @param capacity: initial number of elements to reserve space for
+ */
+fn list_init<T>(self: struct list<T>*, capacity: uint64) {
+    self->data = alloc<T>(capacity);
+    self->length = 0;
+    self->capacity = capacity;
+}
+
+/**
+ * Releases the list's storage. The list must be re-initialized with
+ * list_init before being used again.
+ *
+ * @param self: list to destroy
+ */
+fn list_destroy<T>(self: struct list<T>*) {
+    dealloc(self->data);
+
+    self->data = null;
+    self->length = 0;
+    self->capacity = 0;
+}
+
+/**
+ * Empties the list without releasing its storage.
+ *
+ * @param self: list to reset
+ */
+fn list_reset<T>(self: struct list<T>*) {
+    self->length = 0;
+}
+
+/**
+ * Reads the element at index into out.
+ *
+ * @param self:  list to read from
+ * @param index: zero-based index; must be < self->length
+ * @param out:   location the element is written to
+ *
+ * @return true on success, false if index is out of bounds
+ */
+fn list_get<T>(self: struct list<T>*, index: uint64, out: T*) -> bool {
+    if (index >= self->length)
+        return false;
+
+    *out = self->data[index];
+    return true;
+}
+
+/**
+ * Overwrites the element at index with value.
+ *
+ * @param self:  list to write into
+ * @param index: zero-based index; must be < self->length
+ * @param value: value to store
+ *
+ * @return true on success, false if index is out of bounds
+ */
+fn list_set<T>(self: struct list<T>*, index: uint64, value: T) -> bool {
+    if (index >= self->length)
+        return false;
+
+    self->data[index] = value;
+    return true;
+}
+
+/**
+ * Appends value to the end of the list, growing its storage if needed.
+ *
+ * @param self:  list to append to
+ * @param value: value to append
+ */
+fn list_append<T>(self: struct list<T>*, value: T) {
+    if (self->length == self->capacity)
+        list_grow<T>(self);
+
+    self->data[self->length] = value;
+    self->length = self->length + 1;
+}
+
+/**
+ * Doubles the list's capacity, moving the existing elements.
+ * Internal; called by list_append when storage runs out.
+ *
+ * @param self: list to grow
+ */
+@private
+fn list_grow<T>(self: struct list<T>*) {
+    let new_capacity: uint64 = self->capacity * 2;
+    if (new_capacity == 0)
+        new_capacity = 1;
+    self->data = resize(self->data, new_capacity);
+    self->capacity = new_capacity;
+}
+
+/***************************************
+ * Iteration
+ ***************************************/
+
+/**
+ * A forward cursor over an list's elements, produced by `list_it`. It borrows
+ * the list (does not copy it), so the list must outlive the iterator and
+ * must not be resized while iterating.
+ */
+struct list_iter<T> {
+    obj: struct list<T>*;   // the list being walked
+    idx: uint64;             // index of the next element to yield
+}
+
+/**
+ * Begins an iteration over an list, from the first element to the last. Part
+ * of the `list_it`/`list_next` protocol (used by `for ... in`); pair it with
+ * `list_next`.
+ *
+ * @param self: list to iterate
+ *
+ * @return an iterator positioned at the first element
+ */
+fn list_it<T>(self: struct list<T>*) -> struct list_iter<T> {
+    let it: struct list_iter<T>;
+    it.obj = self;
+    it.idx = 0;
+    return it;
+}
+
+/**
+ * Advances the iterator and writes the next element into out.
+ *
+ * @param it:  iterator to advance
+ * @param out: location the next element is written to; untouched when the
+ *             list is exhausted
+ *
+ * @return true if an element was produced, false once iteration is complete
+ */
+fn list_next<T>(it: struct list_iter<T>*, out: T*) -> bool {
+    if (it->idx >= it->obj->length)
+        return false;
+
+    *out = it->obj->data[it->idx];
+    it->idx = it->idx + 1;
+    return true;
+}

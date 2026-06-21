@@ -254,3 +254,24 @@ import "../syscall";
         "mov $out, x0"
     };
 }
+
+/**
+ * Writes the absolute path of the calling process's current working directory
+ * into buf via SYSCALL_GETCWD (svc #0). Traps into EL1, where
+ * syscall_getcwd_handler resolves the path from the process cwd.
+ *
+ * @param buf:  output buffer for the null-terminated path
+ * @param size: capacity of buf in bytes
+ *
+ * @return the path length excluding the null terminator, or -1 on failure.
+ */
+@inline fn getcwd(buf: uint8*, size: uint64) -> int64 {
+    return @asm @clobbers("x0", "x1", "x2", "memory")
+        (SYSCALL_GETCWD, buf, size) -> int64 {
+        "mov x0, $0"
+        "mov x1, $1"
+        "mov x2, $2"
+        "svc #0"
+        "mov $out, x0"
+    };
+}

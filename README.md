@@ -222,7 +222,7 @@ boilerplate for type-safe, reusable code. mc code links against C through
 
 ### **Syscall interface**
 
-- `svc #0` dispatch (`syscall.mc`): `syscall_handler` reads the syscall number from `ctx->x[0]` and dispatches through a table backed by a generic `set<uint64, handler>`; `syscall_init()` must be called before any handler registration. The user-facing `svc` wrappers live in `system/syscall.mc` under bare names (`yield`, `exit`, `fork`, `waitpid`, `sleep`, `time`, `uptime`, `open`, `close`, `read`, `write`, `fstat`, …) and emit `svc #0` directly via inline `@asm` (each declaring its register/memory `@clobbers`).
+- `svc #0` dispatch (`syscall.mc`): `syscall_handler` reads the syscall number from `ctx->x[0]` and dispatches through a table backed by a generic `set<uint64, handler>`; `syscall_init()` must be called before any handler registration. The user-facing `svc` wrappers live in `system/syscall.mc` under bare names (`yield`, `exit`, `fork`, `waitpid`, `sleep`, `time`, `uptime`, `open`, `close`, `read`, `write`, `fstat`, `getcwd`, …) and emit `svc #0` directly via inline `@asm` (each declaring its register/memory `@clobbers`).
 - `syscall_register_handler` / `syscall_unregister_handler` add and remove handlers at runtime.
 - `yield()` triggers an immediate context switch.
 - `exit(status)` terminates the calling process and schedules the next one.
@@ -234,10 +234,11 @@ boilerplate for type-safe, reusable code. mc code links against C through
 - `time()` returns the current Unix timestamp from the RTC.
 - `uptime()` returns system uptime in milliseconds, computed from `cntpct_el0` ticks since boot.
 - `open(path, attrs)` / `close(fd)` / `read(fd, buf, count)` / `write(fd, buf, count)` / `fstat(fd, stat)` operate on the calling process's per-process fd table (see "File descriptors" below).
+- `getcwd(buf, size)` writes the calling process's current working directory as an absolute path into `buf`, resolved by walking the `..` chain to the root (`fs_get_absolute_dir`).
 
 ### **File descriptors**
 
-- Each process owns an fd table (`process.dtor_ptrs`, an `array<pointer<file_descriptor>*>`); an fd is an index into it. There are no dedicated `stdin`/`stdout` fields — fds 0/1 are stdin/stdout by convention (the root process opens them in that order at startup).
+- Each process owns an fd table (`process.dtor_ptrs`, a `list<pointer<file_descriptor>*>`); an fd is an index into it. There are no dedicated `stdin`/`stdout` fields — fds 0/1 are stdin/stdout by convention (the root process opens them in that order at startup).
 - A `file_descriptor` (`filesystem/file.mc`) is the open-file layer: it binds an `fs_node` to a read/write position (`pos`) and an access mode (`FS_FILE_ATTRS_READ/WRITE/EXEC`). `file_read`/`file_write` check the mode, dispatch to `fs_read`/`fs_write` at `pos`, then advance `pos`; `file_stat` returns size + mode.
 - Descriptors are reference-counted via `pointer<file_descriptor>` (`kernel/pointer.mc`): `open` creates one (count 1), `close` clears the slot and `pointer_release`s it, and `fork` `pointer_acquire`s each entry so parent and child share the same descriptor (and `pos`), freed when the last owner closes/exits.
 - The `open`/`close`/`read`/`write`/`fstat` syscalls resolve into `process_open/close/read/write_file` / `process_file_stat`, which index the fd table and call the `file_*` layer — completing the loop syscall → `file_*` → `fs_*` → mount handler.
@@ -290,12 +291,12 @@ src/
       heap.mc       — kmalloc/kfree/krealloc/kmalloc_aligned bindings
       mem.mc        — mem_init: reads RAM base/size from the DTB at boot
     system/
-      syscall.mc    — user-facing svc wrappers (bare names): yield/exit/getpid/waitpid/fork/sleep/msleep/time/uptime/open/close/read/write/fstat, all emitting svc #0 via inline @asm
+      syscall.mc    — user-facing svc wrappers (bare names): yield/exit/getpid/waitpid/fork/sleep/msleep/time/uptime/open/close/read/write/fstat/getcwd, all emitting svc #0 via inline @asm
 
   libmc/            — mcc standard library (generic, type-parametric)
     memory.mc       — alloc<T>/alloc_aligned<T>/resize<T>/dealloc<T>, copy_bytes/set_bytes/copy_items/set_items
-    array.mc        — dynamic array<T> with array_it/array_next cursor (for-in)
-    string.mc       — growable byte string (array<uint8> specialization, @inline wrappers)
+    list.mc         — dynamic list<T> with list_it/list_next cursor (for-in)
+    string.mc       — growable byte string (list<uint8> specialization, @inline wrappers)
     dict.mc         — string-keyed dict<V> (open addressing, dict_it/dict_next cursor)
     set.mc, queue.mc, stack.mc — generic containers (set_entry extends pair; set_it/set_next cursor)
     hash.mc         — hash<T> dispatch (splitmix64 for values, fnv1a for pointers)

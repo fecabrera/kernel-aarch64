@@ -1,6 +1,6 @@
 import "debug";
 import "std";
-import "array";
+import "list";
 import "string";
 import "memory";
 import "scheduler";
@@ -41,11 +41,8 @@ fn command_help(argc: int64, argv: uint8**) -> int64 {
 
 @private
 fn command_exit(argc: int64, argv: uint8**) -> int64 {
-    let status: int64 = 0;
-    if (argc > 1) {
-        status = atoll(argv[1]);
-    }
-    println("exiting with status %d", status);
+    let status: int64 = argc > 1 ? atoll(argv[1]) : 0;
+    println("exiting with status %lld", status);
     return status;
 }
 
@@ -56,11 +53,9 @@ fn command_mount(argc: int64, argv: uint8**) -> int64 {
         return -1;
     }
 
-    let moutpoint: uint8* = null;
-    if (argc > 2)
-        moutpoint = argv[2];
+    let mountpoint: uint8* = argc > 2 ? argv[2] : null;
 
-    let status: int64 = fat32_mount(argv[1], moutpoint);
+    let status = fat32_mount(argv[1], mountpoint);
     if (status < 0) {
         println("fat32_mount() returned %d!", status);
         return -2;
@@ -72,13 +67,7 @@ fn command_mount(argc: int64, argv: uint8**) -> int64 {
 
 @private
 fn command_echo(argc: int64, argv: uint8**) -> int64 {
-    let str: uint8*;
-    if (argc > 1)
-        str = argv[1];
-    else
-        str = "";
-    println("%s", str);
-
+    println("%s", argc > 1 ? argv[1] : "");
     return 0;
 }
 
@@ -94,6 +83,8 @@ fn command_cat(argc: int64, argv: uint8**) -> int64 {
         println("open() returned %lld!", fd);
         return -2;
     }
+    
+    defer close(fd);
 
     let stat: struct file_stat;
     let st_status = fstat(fd, &stat);
@@ -119,13 +110,10 @@ fn command_cat(argc: int64, argv: uint8**) -> int64 {
 
 @private
 fn command_ls(argc: int64, argv: uint8**) -> int64 {
-    let filename: uint8*;
-    if (argc > 1)
-        filename = argv[1];
-    else
-        filename = "/";
+    let filename: uint8* = argc > 1 ? argv[1] : "/";
     
     let proc = scheduler_get_current_process();
+    
     let node = vfs_get_node_for_path(filename, proc->cwd);
     if (node == null) {
         println("\"%s\" not found!", filename);
@@ -159,7 +147,7 @@ fn command_sleep(argc: int64, argv: uint8**) -> int64 {
         return -1;
     }
 
-    let ret: int64 = sleep(atoll(argv[1]) as uint64);
+    let ret = sleep(atoll(argv[1]) as uint64);
     if (ret < 0) {
         println("failed to sleep");
         return ret;
@@ -302,19 +290,14 @@ fn console_parse_command(argc: int64, argv: uint8**) {
 fn console(pathname: uint8*) {
     printk("[console] starting console at \"%s\"...\n", pathname);
 
-    let proc = scheduler_get_current_process();
     open(pathname, FS_FILE_ATTRS_READ);
     open(pathname, FS_FILE_ATTRS_WRITE);
 
     while (true) {
-        let cwd = proc->cwd;
         let i: uint64;
 
-        let path: uint8*;
-        if (cwd == vfs_root())
-            path = "/";
-        else
-            path = cwd->name;
+        let path: uint8[1024];
+        getcwd(path, 1024);
 
         print("%s# ", path);
 
@@ -328,13 +311,13 @@ fn console(pathname: uint8*) {
         let _quotes = false;
         let _backslash = false;
 
-        let args: struct array<uint8*>;
-        array_init(&args, 10);
+        let args: struct list<uint8*>;
+        list_init(&args, 10);
         defer {
             for arg in &args {
                 dealloc(arg);
             }
-            array_destroy(&args);
+            list_destroy(&args);
         }
 
         let vec: struct string;
@@ -357,10 +340,10 @@ fn console(pathname: uint8*) {
                     _backslash = true;
                 when '\"':
                     arg = alloc<uint8*>(vec.length + 1);
-                    copy_bytes(arg, vec.data, vec.length);
+                    bytecopy(arg, vec.data, vec.length);
                     arg[vec.length] = '\0';
 
-                    array_append(&args, arg);
+                    list_append(&args, arg);
                     string_reset(&vec);
 
                     _quotes = false;
@@ -377,10 +360,10 @@ fn console(pathname: uint8*) {
                     if (isspace(c as int32) or c == '\0') {
                         if (vec.length > 0) {
                             arg = alloc<uint8*>(vec.length + 1);
-                            copy_bytes(arg, vec.data, vec.length);
+                            bytecopy(arg, vec.data, vec.length);
                             arg[vec.length] = '\0';
 
-                            array_append(&args, arg);
+                            list_append(&args, arg);
                             string_reset(&vec);
                         }
                     }

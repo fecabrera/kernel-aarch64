@@ -220,7 +220,60 @@ struct fat32_entry_reference {
  * @param buff:    512-byte buffer containing the boot sector read from disk
  * @param bs_info: output struct populated with parsed and derived fields
  */
-@extern fn fat32_parse_boot_sector(buff: uint8*, bs_info: struct fat32_bs_info*);
+fn fat32_parse_boot_sector(buff: uint8*, bs_info: struct fat32_bs_info*) {
+    let bs = buff as struct mbr_boot_sector*;
+    let ext_br = bs->boot_code as struct fat32_ext_bs*;
+
+    // extract volume label from EBR, which is more likely to be human-friendly than the OEM name in
+    // the MBR boot sector. Also trim trailing spaces.
+    strntrimend(bs_info->volume_label, ext_br->volume_label as uint8*, 11);
+    
+    // ARM doesn't like unaligned memory access, so we need to memcpy the fields into local
+    // variables before using them
+    let n_fat: uint8;
+    let n_sectors_per_cluster: uint8;
+    let n_reserved_sectors: uint16;
+    let n_bytes_per_sector: uint16;
+    let total_sectors_16: uint16;
+    let total_sectors_32: uint32;
+    bytecopy(&n_sectors_per_cluster, &bs->n_sectors_per_cluster, 1);
+    bytecopy(&n_fat, &bs->n_fat, 1);
+    bytecopy(&n_reserved_sectors, &bs->n_reserved_sectors, 1);
+    bytecopy(&n_bytes_per_sector, &bs->n_bytes_per_sector, 1);
+    bytecopy(&total_sectors_16, &bs->total_sectors_16, 1);
+    bytecopy(&total_sectors_32, &bs->total_sectors_32, 1);
+
+    // extended boot record fields
+    let drive_number: uint8; 
+    let root_cluster: uint32;
+    let table_size_32: uint32;
+    bytecopy(&drive_number, &ext_br->drive_number, 1);
+    bytecopy(&root_cluster, &ext_br->root_cluster, 1);
+    bytecopy(&table_size_32, &ext_br->table_size_32, 1);
+
+    // derived fields
+    let total_sectors = total_sectors_16 == 0 ? total_sectors_32 : total_sectors_16 as uint32;
+    let first_fat_sector = n_reserved_sectors as uint32;
+    let first_data_sector = n_reserved_sectors as uint32 + (table_size_32 * n_fat as uint32);
+    let data_sectors = total_sectors - first_data_sector;
+    let total_clusters = data_sectors / n_sectors_per_cluster as uint32;
+
+    // fill the bs_info struct
+    bs_info->n_fat = n_fat;
+    bs_info->n_sectors_per_cluster = n_sectors_per_cluster;
+    bs_info->n_reserved_sectors = n_reserved_sectors;
+    bs_info->n_bytes_per_sector = n_bytes_per_sector;
+    bs_info->total_sectors_16 = total_sectors_16;
+    bs_info->total_sectors_32 = total_sectors_32;
+    bs_info->drive_number = drive_number;
+    bs_info->root_cluster = root_cluster;
+    bs_info->table_size_32 = table_size_32;
+    bs_info->first_fat_sector = first_fat_sector;
+    bs_info->first_data_sector = first_data_sector;
+    bs_info->total_sectors = total_sectors;
+    bs_info->data_sectors = data_sectors;
+    bs_info->total_clusters = total_clusters;
+}
 
 /**
  * Parses one pre-read FAT sector into bs_info->fat_table, applying _le32 and masking to 28 bits per
@@ -326,9 +379,9 @@ fn fat32_read(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint
     let cluster_low: uint16;
     let cluster_high: uint16;
     let file_size: uint32;
-    copy_bytes(&cluster_low, &dir_entry->cluster_low, 1);
-    copy_bytes(&cluster_high, &dir_entry->cluster_high, 1);
-    copy_bytes(&file_size, &dir_entry->file_size, 1);
+    bytecopy(&cluster_low, &dir_entry->cluster_low, 1);
+    bytecopy(&cluster_high, &dir_entry->cluster_high, 1);
+    bytecopy(&file_size, &dir_entry->file_size, 1);
 
     let data_cluster: uint32 = (le16(cluster_high) as uint32 << 16) | (le16(cluster_low) as uint32);
     dprintk("[fat32] cluster=%d, file_size=%d\n", data_cluster, file_size);
@@ -364,6 +417,7 @@ fn fat32_read(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint
     // read contents
     let tmp: uint8* = alloc<uint8>(n_data_sectors_to_read * (bs_info->n_bytes_per_sector as uint64));
     defer dealloc(tmp);
+
     {
         let i: uint64 = 0;
         while (i < n_data_sectors_to_read) {
@@ -384,7 +438,7 @@ fn fat32_read(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint
     }
 
     // copy data to buffer
-    copy_bytes(buffer, &tmp[offset % (bs_info->n_bytes_per_sector as uint64)], count);
+    bytecopy(buffer, &tmp[offset % (bs_info->n_bytes_per_sector as uint64)], count);
 
     return 0;
 }

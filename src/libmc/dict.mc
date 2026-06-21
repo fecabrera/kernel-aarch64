@@ -68,7 +68,7 @@ fn str_eq(a: uint8*, b: uint8*) -> bool {
 fn str_clone(s: uint8*) -> uint8* {
     let n = strlen(s) + 1;
     let copy = alloc<uint8>(n);
-    copy_bytes(copy, s, n);
+    bytecopy(copy, s, n);
     return copy;
 }
 

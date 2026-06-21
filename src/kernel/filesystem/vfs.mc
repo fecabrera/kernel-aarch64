@@ -1,6 +1,6 @@
 import "debug";
 import "fs";
-import "array";
+import "list";
 import "dict";
 
 @static let _vfs_root: struct fs_node*;
