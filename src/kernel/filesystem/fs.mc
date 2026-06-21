@@ -20,18 +20,6 @@ const FS_IO_ERROR_MOUNTPOINT_NOT_FOUND = -3;
 const FS_IO_ERROR_HANDLER_NOT_PROVIDED = -4;
 
 /**
- * Callback state for fs_vprintf, passed through stb_sprintf's opaque `user`
- * pointer. Carries the destination node and the running write offset (advanced
- * per chunk so multi-chunk output is appended rather than overwritten), plus the
- * scratch buffer stb formats into.
- */
-struct fs_printf_ctx {
-    node: struct fs_node*;        // destination file
-    offset: uint64;               // running write offset across chunks
-    tmp: uint8[STB_SPRINTF_MIN];  // scratch buffer stb formats into
-}
-
-/**
  * A single node in the VFS tree, representing a file or folder. Folders link
  * their entries through the `child`/`next` chain; every folder also carries
  * "." and ".." entries (see fs_create_self_ref / fs_create_parent_ref).
@@ -487,61 +475,6 @@ fn fs_write(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint64
     }
 
     return mp->write(node, buffer, count, offset);
-}
-
-/**
- * Formats according to format and writes the result to node starting at offset,
- * via fs_write. Thin variadic wrapper around fs_vprintf; see vsprintfcb for the
- * supported format grammar.
- *
- * @param node:   destination file node
- * @param offset: byte offset in the file to start writing at
- * @param format: printf-style format string
- * @param ...:    variadic arguments matching the format specifiers
- */
-fn fs_printf(node: struct fs_node*, offset: uint64, format: uint8*, ...) {
-    let args: va_list;
-    va_start(args, format);
-    fs_vprintf(node, offset, format, args);
-    va_end(args);
-}
-
-/**
- * Formats according to format/args and writes the result to node starting at
- * offset. Drives stb_sprintf's vsprintfcb with fs_vprintf_cb, so output is
- * streamed to the file in STB_SPRINTF_MIN chunks (each fs_write advances the
- * offset) without a full output buffer.
- *
- * @param node:   destination file node
- * @param offset: byte offset in the file to start writing at
- * @param format: printf-style format string
- * @param args:   variadic argument list (must be initialized by the caller)
- */
-fn fs_vprintf(node: struct fs_node*, offset: uint64, format: uint8*, args: va_list) {
-    let ctx: struct fs_printf_ctx;
-    ctx.node = node;
-    ctx.offset = offset;
-    vsprintfcb(fs_vprintf_cb, &ctx as uint8*, ctx.tmp, format, args);
-}
-
-/**
- * vsprintfcb callback for fs_vprintf. Casts c back to fs_printf_ctx, writes the
- * count formatted bytes in buf to the file at the current offset via fs_write,
- * advances the offset, and returns ctx->tmp so stb keeps formatting into the same
- * scratch buffer.
- *
- * @param buf:   chunk of formatted output to flush
- * @param c:     opaque pointer to the fs_printf_ctx passed to vsprintfcb
- * @param count: number of valid bytes in buf
- *
- * @return ctx->tmp, the scratch buffer for stb's next chunk
- */
-@private
-fn fs_vprintf_cb(buf: uint8*, c: uint8*, count: int32) -> uint8* {
-    let ctx = c as struct fs_printf_ctx*;
-    fs_write(ctx->node, buf, count as uint64, ctx->offset);
-    ctx->offset = ctx->offset + count as uint64;
-    return ctx->tmp;
 }
 
 /**

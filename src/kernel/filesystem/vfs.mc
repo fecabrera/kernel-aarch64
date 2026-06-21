@@ -241,37 +241,6 @@ fn vfs_write(pathname: uint8*, buffer: uint8*, count: uint64, offset: uint64) ->
     return fs_write(node, buffer, count, offset);
 }
 
-/**
- * Resolves pathname to a VFS node and writes formatted output to it starting at
- * offset. Thin variadic wrapper around vfs_vprintf.
- *
- * @param pathname: VFS path of the destination file
- * @param offset:   byte offset in the file to start writing at
- * @param format:   printf-style format string
- * @param ...:      variadic arguments matching the format specifiers
- */
-fn vfs_printf(pathname: uint8*, offset: uint64, format: uint8*, ...) {
-    let args: va_list;
-    va_start(args, format);
-    vfs_vprintf(pathname, offset, format, args);
-    va_end(args);
-}
-
-/**
- * Resolves pathname (relative to the global root) via vfs_get_node_for_path and
- * formats output to the resolved node at offset via fs_vprintf. If the path does
- * not resolve, fs_vprintf's write fails gracefully (no-op).
- *
- * @param pathname: VFS path of the destination file
- * @param offset:   byte offset in the file to start writing at
- * @param format:   printf-style format string
- * @param args:     variadic argument list (must be initialized by the caller)
- */
-@inline
-fn vfs_vprintf(pathname: uint8*, offset: uint64, format: uint8*, args: va_list) {
-    let node = vfs_get_node_for_path(pathname, null);
-    fs_vprintf(node, offset, format, args);
-}
 
 /**
  * Resolves path via vfs_get_node_for_path and creates a new subfolder named name inside it via

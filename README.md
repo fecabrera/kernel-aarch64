@@ -135,14 +135,12 @@ boilerplate for type-safe, reusable code. mc code links against C through
 - `fs_get_child(node, name)` searches a node's direct children by name.
 - `fs_remove_child(node, name)` unlinks a named child from a folder's child list without freeing it.
 - `fs_read(node, buffer, count, offset)` / `fs_write(node, buffer, count, offset)` dispatch directly through the node's covering `mount` read/write handler. They validate the node is non-null and a file (folders are rejected), returning `FS_IO_ERROR_FILE_NOT_FOUND`, `FS_IO_ERROR_NOT_A_FILE`, `FS_IO_ERROR_MOUNTPOINT_NOT_FOUND`, or `FS_IO_ERROR_HANDLER_NOT_PROVIDED` on failure.
-- `fs_printf(node, offset, format, ...)` / `fs_vprintf(...)` format with stb_sprintf and stream the result to `node` via `fs_write`, advancing `offset` per chunk.
 - Folder `.` self-references and `..` parent-references are flagged `FS_NODE_ATTRS_FLAG_LINK | FS_NODE_ATTRS_FLAG_HIDDEN`, so directory listings skip them.
 - VFS mount system (`vfs.mc`): `vfs_init` initializes the mount table (a generic `dict`) and creates a global root tree with a "volumes" subfolder; `vfs_create_mountpoint(path, device, info, read, write)` registers a mount entry keyed by path, storing `info` as filesystem-private superblock data, and returns a pointer to the new `fs_mount` (caller creates the VFS node separately; ownership of `info` transferred to the mount); `vfs_destroy_mountpoint(path)` removes the entry, unlinks and destroys the root node.
 - `struct fs_mount` carries the mountpoint path, `device` (VFS path of the underlying block device, or null), `info` (filesystem-private superblock data, heap-allocated, freed by `vfs_destroy_mountpoint`), root node pointer, and read/write handlers.
 - `vfs_get_mountpoint(path)` looks up a mount entry by its exact path; `vfs_get_node_for_path(path, root)` resolves a path (relative to `root`, or the global root when `root` is null) and returns the `fs_node` directly; `vfs_get_file_size(path)` returns `node->file_size` for the resolved node.
 - `vfs_create_dir(path, name, attrs, mount)` / `vfs_create_file(path, name, file_size, attrs, mount)` resolve path and append a new subfolder or file node, storing `mount` in `node->mount`.
 - `vfs_read` / `vfs_write` resolve the node and dispatch via `fs_read`/`fs_write` to `node->mount->read`/`write`; return `FS_IO_ERROR_FILE_NOT_FOUND`, `FS_IO_ERROR_NOT_A_FILE`, `FS_IO_ERROR_MOUNTPOINT_NOT_FOUND`, or `FS_IO_ERROR_HANDLER_NOT_PROVIDED` on failure.
-- `vfs_printf(path, offset, format, ...)` / `vfs_vprintf(...)` resolve `path` then format to it via `fs_vprintf` (used by the console to render its prompt and output to the serial device).
 - `vfs_dump_fs` prints the entire VFS tree from the global root.
 
 ### **FAT32**
@@ -284,8 +282,8 @@ src/
         timer.mc    — ARM generic timer impl: timer_init/get_uptime/set_interval, timer_irq_handler, syscall_uptime_handler
     filesystem/
       file.mc       — open-file layer: file_descriptor (node + pos + access mode), file_stat; file_init/read/write/stat
-      fs.mc         — fs_node tree primitives + fs_read/fs_write dispatch and fs_printf/fs_vprintf (formatted write via stb_sprintf); fs_node / fs_mount structs
-      vfs.mc        — VFS mount system: vfs_init, vfs_create/destroy_mountpoint, vfs_get_node_for_path, vfs_read/write, vfs_printf/vprintf, vfs_create_dir/file, vfs_dump_fs; owns the global _fs_root tree
+      fs.mc         — fs_node tree primitives + fs_read/fs_write dispatch; fs_node / fs_mount structs
+      vfs.mc        — VFS mount system: vfs_init, vfs_create/destroy_mountpoint, vfs_get_node_for_path, vfs_read/write, vfs_create_dir/file, vfs_dump_fs; owns the global _fs_root tree
       fat32.mc      — fat32_mount/unmount/read/write bindings to src/fs/fat32.c
     mm/
       heap.mc       — kmalloc/kfree/krealloc/kmalloc_aligned bindings
