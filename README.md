@@ -73,18 +73,17 @@ boilerplate for type-safe, reusable code. mc code links against C through
 - DTB memory probe (`mm/mem.mc`)
 - Interactive console / shell (`console.mc`)
 - CPU helpers (`cpu.mc`) — register accessors (cntpct/cntfrq/cntp_ctl/cntp_tval, vbar_el1), wfi/wfe, halt/hang, irq enable/disable, and bswap, all via inline `@asm`
+- Boot entry / init sequence (`kernel.mc`) — `kernel_init` subsystem bring-up and the `init` (pid 1) entry point
 
-**Still C, wrapped via `@extern`** (port targets, low-level first):
+**Still C, bound from mc via `@extern`** (port targets):
 
-- printf formatter — stb_sprintf (`src/lib/stb_sprintf.h`, compiled via `src/lib/stdio.c`); the kernel print path is mc and binds to it through `libc/stdio.mc`
-- Memory — heap allocator (`src/mm/heap.c`); DTB memory probe ported to `kernel/mm/mem.mc`
+- Memory — heap allocator (`src/mm/heap.c`); the DTB memory probe is already ported to `kernel/mm/mem.mc`
 - FDT parser — `src/lib/dtb.c` (IRQ-number lookup for timer/RTC/virtio)
-- Boot entry / init sequence (`src/kernel.c`)
 
 **Not being ported:**
 
 - `start.S`, `vectors.S` — boot stub and exception vectors / context save-restore; stay hand-written AArch64 assembly by design.
-- `src/lib/` — freestanding C libc, superseded by `libmc` (retire with the C that uses them).
+- C standard library — `src/lib/`; kept as C and bound from mc via `@extern`, not reimplemented in mc.
 
 ## Features
 
@@ -243,17 +242,20 @@ boilerplate for type-safe, reusable code. mc code links against C through
 
 ## Source layout
 
-Implementations ported to `.mc` live under `src/kernel/`; the `.mc` module
-either implements the subsystem directly or `@extern`-binds the matching C in
-the parallel `src/<area>/` directory (which still holds the implementation and
-the shared `.h`). `src/libmc/` is mcc's standard library; `src/lib/` is the
-legacy C libc being retired.
+Implementations live in `.mc` under `src/kernel/`. The remaining C is the
+freestanding libc, heap allocator, and FDT parser (`src/lib/`, `src/mm/`),
+which mc `@extern`-binds. The per-subsystem C interface headers have been
+removed now that every subsystem is mc; what survives under `arch/`/`drivers/`
+is only what the remaining C still includes (`cpu.h`'s endian macros,
+`virtio_mmio.h`'s register structs), plus the still-vestigial `arch/irq.h` and
+`arch/syscall.h`. `src/libmc/` is mcc's standard library; `start.S`/`vectors.S`
+stay hand-written assembly and call `kernel_init` (in `kernel.mc`).
 
 ```
 init/               — files bundled into init.img at build time (FAT32 ramdisk)
 
 src/
-  kernel.c/h        — kernel_init: subsystem bring-up (DTB, memory, IRQ, VFS, I/O, serial, storage, scheduler, timer); init(): pid 1 entry point, runs console("/dev/serial")
+  kernel.mc         — kernel_init: subsystem bring-up (DTB, memory, IRQ, VFS, I/O, serial, storage, scheduler, timer); init(): pid 1 entry point, runs console("/dev/serial")
   console.mc        — console()/console_parse_command(): interactive terminal loop with cwd-aware prompt and argc/argv tokenization (quoted strings, backslash escapes), fork-per-command dispatch (cd dispatched directly); built-ins: ls, cd, cat, echo, mount, exit, help; line input via libmc/std readline
   start.S           — AArch64 boot stub, saves DTB pointer, zeros BSS
   vectors.S         — exception vector table, save/restore_context macros
@@ -288,7 +290,7 @@ src/
       heap.mc       — kmalloc/kfree/krealloc/kmalloc_aligned bindings
       mem.mc        — mem_init: reads RAM base/size from the DTB at boot
     system/
-      syscall.mc    — user-facing svc wrappers (bare names): yield/exit/getpid/waitpid/fork/sleep/msleep/time/uptime/open/close/read/write/fstat/getcwd, all emitting svc #0 via inline @asm
+      syscall.mc    — user-facing svc wrappers: yield/exit/getpid/waitpid/fork/sleep/msleep/time/uptime/open/close/read/write/fstat/getcwd, all emitting svc #0 via inline @asm
 
   libmc/            — mcc standard library (generic, type-parametric)
     memory.mc       — alloc<T>/alloc_aligned<T>/resize<T>/dealloc<T>, copy_bytes/set_bytes/copy_items/set_items
@@ -303,39 +305,21 @@ src/
     iteration/      — pair
     libc/           — freestanding ctype, stdlib, string, limits; stdio binds the stb_sprintf family (vsprintf/snprintf/vsprintfcb) and implements printf/vprintf/getchar/putchar over the read/write syscalls
 
-  arch/             — AArch64-specific C headers (no .c left; the register structs/defines and handlers now live in the matching kernel/ mc modules)
-    cpu.h           — bswap16/32/64 prototypes, be*/le* macros, halt/hang declarations; impls (register accessors, halt/hang, wfe/wfi) are in kernel/cpu.mc
-    irq.h           — irq_handler_t/interrupt_handler_t typedefs + irq_init() for kernel.c; cpu_context, ESR/IRQ defines, and the sync/irq/fiq/serr handlers are in kernel/interrupts/irq.mc
-    syscall.h       — SYSCALL_* numbers, syscall_init(), and the svc-wrapper prototypes; dispatch table in kernel/syscall.mc, wrappers in kernel/system/syscall.mc
+  arch/             — AArch64 C headers
+    cpu.h           — bswap16/32/64 + be*/le* endian macros (used by lib/dtb.c, lib/uchar.c, mm/heap.c) and halt/hang declarations; register-accessor/halt/hang/wfe/wfi impls are in kernel/cpu.mc
+    irq.h, syscall.h — vestigial: cpu_context/irq_handler_t typedefs and SYSCALL_* numbers, no remaining C caller (impls in kernel/interrupts/irq.mc, kernel/syscall.mc, kernel/system/syscall.mc)
 
-  drivers/          — MMIO peripheral driver C headers; register structs/defines/handlers moved into the matching kernel/interrupts/ mc modules, so each header now exposes only its C-callable init entry point
-    pl011.h         — pl011_init() (kernel/interrupts/drivers/pl011.mc)
-    gic.h           — gic_init() (kernel/interrupts/gic.mc)
-    timer.h         — timer_init() (kernel/interrupts/drivers/timer.mc)
-    pl031.h         — pl031_init() (kernel/interrupts/drivers/pl031.mc)
-    virtio_mmio.h   — virtio MMIO interface: register/virtq structs and prototypes (impl ported to kernel/interrupts/drivers/virtio_mmio.mc)
+  drivers/          — MMIO peripheral C headers
+    virtio_mmio.h   — register/virtq structs used by lib/dtb.c for slot discovery; the driver impl is in kernel/interrupts/drivers/virtio_mmio.mc
 
   mm/               — memory subsystem (C)
-    mem.h           — RAM base/size probe interface (impl ported to kernel/mm/mem.mc)
-    heap.c/h        — kmalloc/kfree/krealloc/kmalloc_aligned
+    heap.c/h        — kmalloc/kfree/krealloc/kmalloc_aligned (the RAM probe formerly in mem.h is ported to kernel/mm/mem.mc)
 
-  sched/            — scheduler C headers
-    process.h       — proc_entry/proc_state_t typedefs; the process struct and lifecycle fns are in kernel/process.mc
-    scheduler.h     — scheduler_init()/scheduler_spawn() for kernel.c; queues, handlers, and syscall handlers are in kernel/scheduler.mc
-
-  fs/               — filesystem C headers
-    filesystem.h    — fs_node struct + fs_handler_t typedef; the fs_* primitives and FS_NODE_ATTRS_* defines are in kernel/filesystem/fs.mc
-    vfs.h           — vfs_init() for kernel.c; the vfs_* API, vfs_mount struct, and FS_IO_ERROR_* defines are in kernel/filesystem/vfs.mc
-    fat32.h         — MBR/BPB structs, fat32_bs_info, fat32_entry_reference, 8.3 and LFN dir entry structs, partition type/media descriptor/attribute/LFN defines; the implementation is in kernel/filesystem/fat32.mc
-
-  io/               — I/O module registry C header
-    module.h        — io_init() for kernel.c; io_module/io_file structs and the registry are in kernel/io.mc
-
-  lib/              — legacy freestanding C libraries (being replaced by libmc/libc)
-    debug.h         — printk/dprintk prototypes for C callers (impl ported to kernel/debug.mc; debug.c is gone)
+  lib/              — C standard library
+    debug.h         — printk/dprintk prototypes for C callers (impl ported to kernel/debug.mc)
     dtb.c/h         — FDT parser (node/property walker); IRQ number lookup for timer, RTC, and virtio MMIO slots
     stb_sprintf.h   — vendored printf-family formatter; STB_SPRINTF_IMPLEMENTATION is compiled in stdio.c
-    stdio.c/h       — pulls in stb_sprintf (vsprintf/snprintf/vsprintfcb); NOFLOAT/NOUNALIGNED configured
+    stdio.c/h       — pulls in stb_sprintf (vsprintf/snprintf/vsprintfcb)
     string.c/h, ctype.c/h, stdlib.c/h, uchar.c/h
     stdint.h, stdarg.h, stddef.h, stdbool.h, limits.h, time.h, ascii.h, sys/types.h
 ```

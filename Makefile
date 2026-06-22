@@ -53,11 +53,11 @@ build/%.o: src/%.S
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-build/%.o: src/%.c
+build/lib/%.o: src/lib/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-build/lib/%.o: src/lib/%.c
+build/mm/%.o: src/mm/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@
 
