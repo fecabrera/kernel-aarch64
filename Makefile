@@ -24,11 +24,7 @@ SRCS := $(wildcard \
 		  src/*.c \
  		  src/*.S \
   		  src/lib/*.c \
-		  src/drivers/*.c \
-		  src/arch/*.c \
 		  src/mm/*.c \
-		  src/fs/*.c \
-		  src/io/*.c \
 		  src/*.mc \
   		  src/libmc/*.mc \
   		  src/libmc/iteration/*.mc \

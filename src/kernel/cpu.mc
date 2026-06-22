@@ -125,20 +125,20 @@ struct cpu_context {
 @inline fn le64(x: uint64) -> uint64 { return x; }
 
 /**
+ * Executes the WFI (Wait For Interrupt) instruction, suspending the CPU until
+ * an interrupt is pending. Used in spin loops to avoid busy-waiting.
+ */
+@asm fn wfi() {
+    "wfi"
+}
+
+/**
  * Executes the WFE (Wait For Event) instruction, suspending the CPU until an
  * event or interrupt is signalled. Less aggressive than WFI — wakes on SEV
  * (send event) from another core as well as interrupts.
  */
 @asm fn wfe() {
     "wfe"
-}
-
-/**
- * Executes the WFI (Wait For Interrupt) instruction, suspending the CPU until
- * an interrupt is pending. Used in spin loops to avoid busy-waiting.
- */
-@asm fn wfi() {
-    "wfi"
 }
 
 /**
@@ -159,13 +159,17 @@ struct cpu_context {
  * Halts the CPU in a low-power loop using wfi, waking only to service
  * interrupts before returning to sleep.
  */
-@extern fn halt();
+@inline fn halt() {
+    while (true) wfi();
+}
 
 /**
  * Spins forever with interrupts disabled. Used for unrecoverable errors
  * where the system must stop completely.
  */
-@extern fn hang();
+@inline fn hang() {
+    while (true) wfe();
+}
 
 /**
  * Reads the physical count register (cntpct_el0).

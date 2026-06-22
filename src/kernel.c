@@ -1,4 +1,6 @@
 #include "kernel.h"
+#include <arch/cpu.h>
+#include <arch/irq.h>
 #include <arch/syscall.h>
 #include <debug.h>
 #include <devices/serial.h>

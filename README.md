@@ -72,13 +72,13 @@ boilerplate for type-safe, reusable code. mc code links against C through
 - Device handlers — serial, storage (`devices/`)
 - DTB memory probe (`mm/mem.mc`)
 - Interactive console / shell (`console.mc`)
-- CPU helpers (`cpu.mc`) — register accessors (cntpct/cntfrq/cntp_ctl/cntp_tval, vbar_el1), wfi/wfe, irq enable/disable, and bswap, all via inline `@asm`
+- CPU helpers (`cpu.mc`) — register accessors (cntpct/cntfrq/cntp_ctl/cntp_tval, vbar_el1), wfi/wfe, halt/hang, irq enable/disable, and bswap, all via inline `@asm`
 
 **Still C, wrapped via `@extern`** (port targets, low-level first):
 
 - printf formatter — stb_sprintf (`src/lib/stb_sprintf.h`, compiled via `src/lib/stdio.c`); the kernel print path is mc and binds to it through `libc/stdio.mc`
-- Arch glue — `halt`/`hang` (`arch/cpu.c`); register accessors and `svc` trampolines ported to mc (`cpu.mc`, `system/syscall.mc`)
 - Memory — heap allocator (`src/mm/heap.c`); DTB memory probe ported to `kernel/mm/mem.mc`
+- FDT parser — `src/lib/dtb.c` (IRQ-number lookup for timer/RTC/virtio)
 - Boot entry / init sequence (`src/kernel.c`)
 
 **Not being ported:**
@@ -259,7 +259,7 @@ src/
   vectors.S         — exception vector table, save/restore_context macros
 
   kernel/           — mc kernel modules (logic + @extern bindings to the C below)
-    cpu.mc          — cpu_context, SPSR/CNTP_CTL defines; inline-@asm impls of wfe/wfi, irq_enable/disable, timer registers, set_vbar_el1, bswap; be*/le* helpers
+    cpu.mc          — cpu_context, SPSR/CNTP_CTL defines; inline-@asm impls of wfe/wfi, halt/hang, irq_enable/disable, timer registers, set_vbar_el1, bswap; be*/le* helpers
     syscall.mc      — svc #0 dispatch table (generic set): syscall_init/register/unregister_handler, syscall_handler, SYSCALL_* numbers
     dtb.mc          — @extern bindings to the C DTB parser: dtb_init/dump/find_prop, *_irq_number lookups, fdt_header/memreg/fdt_prop structs
     pointer.mc      — generic refcounted pointer<T>: create_pointer/pointer_acquire/pointer_release
@@ -303,32 +303,33 @@ src/
     iteration/      — pair
     libc/           — freestanding ctype, stdlib, string, limits; stdio binds the stb_sprintf family (vsprintf/snprintf/vsprintfcb) and implements printf/vprintf/getchar/putchar over the read/write syscalls
 
-  arch/             — AArch64-specific (C)
-    cpu.c/h         — halt/hang + _wfi_while/_wfe_while spin macros; the register accessors (cntpct/cntfrq/cntp/vbar_el1/DAIF) are ported to kernel/cpu.mc (inline @asm)
-    irq.h           — IRQ/exception interface: irq_handler_t, irq_init/register_handler, sync/irq/fiq/serr handlers (impl ported to kernel/interrupts/irq.mc)
-    syscall.h       — SYSCALL_* numbers + time/uptime prototypes; syscall.c is gone — the svc wrappers and dispatch table are ported to kernel/system/syscall.mc and kernel/syscall.mc
+  arch/             — AArch64-specific C headers (no .c left; the register structs/defines and handlers now live in the matching kernel/ mc modules)
+    cpu.h           — bswap16/32/64 prototypes, be*/le* macros, halt/hang declarations; impls (register accessors, halt/hang, wfe/wfi) are in kernel/cpu.mc
+    irq.h           — irq_handler_t/interrupt_handler_t typedefs + irq_init() for kernel.c; cpu_context, ESR/IRQ defines, and the sync/irq/fiq/serr handlers are in kernel/interrupts/irq.mc
+    syscall.h       — SYSCALL_* numbers, syscall_init(), and the svc-wrapper prototypes; dispatch table in kernel/syscall.mc, wrappers in kernel/system/syscall.mc
 
-  drivers/          — MMIO peripheral driver interfaces (C); impls ported to kernel/interrupts/
-    pl011.h         — PL011 register/flag definitions and prototypes (impl fully ported to kernel/interrupts/drivers/pl011.mc; pl011.c is gone)
-    gic.h           — GIC-400 interface (impl ported to kernel/interrupts/gic.mc)
-    timer.h         — ARM generic timer interface (impl ported to kernel/interrupts/drivers/timer.mc)
-    pl031.h         — PL031 RTC interface (impl ported to kernel/interrupts/drivers/pl031.mc)
+  drivers/          — MMIO peripheral driver C headers; register structs/defines/handlers moved into the matching kernel/interrupts/ mc modules, so each header now exposes only its C-callable init entry point
+    pl011.h         — pl011_init() (kernel/interrupts/drivers/pl011.mc)
+    gic.h           — gic_init() (kernel/interrupts/gic.mc)
+    timer.h         — timer_init() (kernel/interrupts/drivers/timer.mc)
+    pl031.h         — pl031_init() (kernel/interrupts/drivers/pl031.mc)
     virtio_mmio.h   — virtio MMIO interface: register/virtq structs and prototypes (impl ported to kernel/interrupts/drivers/virtio_mmio.mc)
 
   mm/               — memory subsystem (C)
     mem.h           — RAM base/size probe interface (impl ported to kernel/mm/mem.mc)
     heap.c/h        — kmalloc/kfree/krealloc/kmalloc_aligned
 
-  sched/            — scheduler (C)
-    process.h       — process struct (impl ported to kernel/process.mc)
-    scheduler.h     — C interface (scheduler_init/spawn/enqueue, handler prototypes) for kernel.c; the implementation is ported to kernel/scheduler.mc
+  sched/            — scheduler C headers
+    process.h       — proc_entry/proc_state_t typedefs; the process struct and lifecycle fns are in kernel/process.mc
+    scheduler.h     — scheduler_init()/scheduler_spawn() for kernel.c; queues, handlers, and syscall handlers are in kernel/scheduler.mc
 
-  fs/               — filesystem driver (C)
-    filesystem.h, vfs.h — shared fs_node / VFS interface headers (impls in kernel/filesystem/)
-    fat32.h         — MBR/BPB structs, fat32_bs_info, fat32_entry_reference, 8.3 and LFN dir entry structs, partition type/media descriptor/attribute/LFN defines; the implementation is ported to kernel/filesystem/fat32.mc and fat32.c is gone
+  fs/               — filesystem C headers
+    filesystem.h    — fs_node struct + fs_handler_t typedef; the fs_* primitives and FS_NODE_ATTRS_* defines are in kernel/filesystem/fs.mc
+    vfs.h           — vfs_init() for kernel.c; the vfs_* API, vfs_mount struct, and FS_IO_ERROR_* defines are in kernel/filesystem/vfs.mc
+    fat32.h         — MBR/BPB structs, fat32_bs_info, fat32_entry_reference, 8.3 and LFN dir entry structs, partition type/media descriptor/attribute/LFN defines; the implementation is in kernel/filesystem/fat32.mc
 
-  io/               — I/O module registry interface (C)
-    module.h        — io_module / io_file structs (impl ported to kernel/io.mc)
+  io/               — I/O module registry C header
+    module.h        — io_init() for kernel.c; io_module/io_file structs and the registry are in kernel/io.mc
 
   lib/              — legacy freestanding C libraries (being replaced by libmc/libc)
     debug.h         — printk/dprintk prototypes for C callers (impl ported to kernel/debug.mc; debug.c is gone)

@@ -2,16 +2,6 @@
 
 #include <stdint.h>
 
-// Spins on condition X, issuing wfi() each iteration to yield the CPU until an interrupt arrives.
-#define _wfi_while(X)                                                                              \
-    while (X)                                                                                      \
-        wfi();
-
-// Spins on condition X, issuing wfe() each iteration to yield the CPU until an event or interrupt.
-#define _wfe_while(X)                                                                              \
-    while (X)                                                                                      \
-        wfe();
-
 /**
  * Reverses the byte order of a 16-bit value, converting between big-endian
  * and little-endian representations.
@@ -62,19 +52,6 @@ uint64_t bswap64(uint64_t x);
 #endif
 
 /**
- * Executes the WFE (Wait For Event) instruction, suspending the CPU until an
- * event or interrupt is signalled. Less aggressive than WFI — wakes on SEV
- * (send event) from another core as well as interrupts.
- */
-void wfe();
-
-/**
- * Executes the WFI (Wait For Interrupt) instruction, suspending the CPU until
- * an interrupt is pending. Used in spin loops to avoid busy-waiting.
- */
-void wfi();
-
-/**
  * Clears the DAIF I-bit, unmasking IRQ exceptions at the current EL.
  */
 void irq_enable();
@@ -95,71 +72,3 @@ void halt() __attribute__((noreturn));
  * where the system must stop completely.
  */
 void hang() __attribute__((noreturn));
-
-/**
- * Reads the physical count register (cntpct_el0).
- * Increments at the frequency reported by cntfrq_el0 (typically 24 MHz on
- * QEMU virt). Divide by get_cntfrq_el0() to convert ticks to seconds.
- *
- * @return Current 64-bit physical counter value.
- */
-uint64_t get_cntpct_el0();
-
-/**
- * Reads the timer frequency register (cntfrq_el0).
- *
- * @return Timer frequency in Hz as set by firmware.
- */
-uint64_t get_cntfrq_el0();
-
-/**
- * Writes the EL1 physical timer value register (cntp_tval_el0).
- * Starts a countdown from value; the timer fires IRQ when it reaches zero.
- * Must be rewritten each tick to reload the countdown.
- *
- * @param value: number of timer ticks until the next interrupt
- */
-void set_cntp_tval_el0(const uint64_t value);
-
-// SPSR_EL1 — exception level and stack pointer selection (bits 3:0)
-#define SPSR_EL0t (0x00) // EL0, SP_EL0
-#define SPSR_EL1t (0x04) // EL1, SP_EL0
-#define SPSR_EL1h (0x05) // EL1, SP_EL1 (standard kernel mode)
-#define SPSR_EL2t (0x08) // EL2, SP_EL0
-#define SPSR_EL2h (0x09) // EL2, SP_EL2
-
-// SPSR_EL1 — interrupt mask bits (DAIF, bits 9:6)
-#define SPSR_D (1 << 9) // Debug exceptions masked
-#define SPSR_A (1 << 8) // SError masked
-#define SPSR_I (1 << 7) // IRQ masked
-#define SPSR_F (1 << 6) // FIQ masked
-#define SPSR_MASKS_ALL (SPSR_D | SPSR_A | SPSR_I | SPSR_F)
-
-// cntp_ctl_el0 bits
-#define CNTP_CTL_ENABLE (1 << 0)  // Timer enabled
-#define CNTP_CTL_IMASK (1 << 1)   // Interrupt masked (suppress IRQ)
-#define CNTP_CTL_ISTATUS (1 << 2) // Interrupt status (read-only, 1 = condition met)
-
-/**
- * Reads the EL1 physical timer control register (cntp_ctl_el0).
- * Check CNTP_CTL_ISTATUS to determine if the timer condition has been met.
- *
- * @return Current value of cntp_ctl_el0.
- */
-uint64_t get_cntp_ctl_el0();
-
-/**
- * Writes the EL1 physical timer control register (cntp_ctl_el0).
- * Use CNTP_CTL_ENABLE, CNTP_CTL_IMASK, and CNTP_CTL_ISTATUS flags.
- *
- * @param value: value to write (combination of CNTP_CTL_* flags)
- */
-void set_cntp_ctl_el0(const uint64_t value);
-
-/**
- * Sets the EL1 exception vector base register (vbar_el1) to the given table
- * address, followed by an instruction sync barrier so the change takes effect.
- *
- * @param table: address of the exception vector table to install
- */
-void set_vbar_el1(const uint64_t table);
