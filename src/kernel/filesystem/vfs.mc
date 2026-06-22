@@ -50,12 +50,12 @@ fn vfs_create_mountpoint(mountpoint: uint8*, device: uint8*, info: uint8*,
                          write: fn (struct fs_node*, uint8*, uint64, uint64) -> int64) -> struct fs_mount* {
     let mp_node = vfs_get_node_for_path(mountpoint, null);
     if (mp_node == null) {
-        printk("[vfs] mountpoint \"%s\" not found!\n", mountpoint);
+        dprintk("[vfs] mountpoint \"%s\" not found!\n", mountpoint);
         return null;
     }
 
     if ((mp_node->attrs & FS_NODE_ATTRS_TYPE_MASK) != FS_NODE_ATTRS_TYPE_FOLDER) {
-        printk("[vfs] \"%s\" is not a folder!\n", mountpoint);
+        dprintk("[vfs] \"%s\" is not a folder!\n", mountpoint);
         return null;
     }
 
@@ -110,7 +110,7 @@ fn vfs_get_mountpoint(mountpoint: uint8*) -> struct fs_mount* {
 fn vfs_destroy_mountpoint(mountpoint: uint8*) -> int32 {
     let mp = vfs_get_mountpoint(mountpoint);
     if (mp == null) {
-        printk("[vfs] mountpoint \"%s\" doesn't exist!\n", mountpoint);
+        dprintk("[vfs] mountpoint \"%s\" doesn't exist!\n", mountpoint);
         return -1;
     }
 
@@ -127,7 +127,7 @@ fn vfs_destroy_mountpoint(mountpoint: uint8*) -> int32 {
         dealloc(mp->info);
     dealloc(mp);
 
-    printk("[vfs] \"%s\" unmounted successfully\n", mountpoint);
+    dprintk("[vfs] \"%s\" unmounted successfully\n", mountpoint);
 
     return 0;
 }
@@ -216,7 +216,7 @@ fn vfs_read(pathname: uint8*, buffer: uint8*, count: uint64, offset: uint64) -> 
             pathname, buffer, count, offset);
 
     let node = vfs_get_node_for_path(pathname, null);
-    // printk("[vfs] node=%p\n", node);
+    // dprintk("[vfs] node=%p\n", node);
     return fs_read(node, buffer, count, offset);
 }
 
@@ -237,7 +237,7 @@ fn vfs_write(pathname: uint8*, buffer: uint8*, count: uint64, offset: uint64) ->
             pathname, buffer, count, offset);
 
     let node = vfs_get_node_for_path(pathname, null);
-    // printk("[vfs] node=%p\n", node);
+    // dprintk("[vfs] node=%p\n", node);
     return fs_write(node, buffer, count, offset);
 }
 
@@ -257,7 +257,7 @@ fn vfs_create_dir(path: uint8*, name: uint8*, attrs: uint16, mount: struct fs_mo
     let parent = vfs_get_node_for_path(path, null);
     let node = fs_add_subfolder(parent, name, attrs, null, mount);
     if (node == null) {
-        printk("[vfs] cannot create \"%s/%s\"!\n", path, name);
+        dprintk("[vfs] cannot create \"%s/%s\"!\n", path, name);
         return null;
     }
 
@@ -281,7 +281,7 @@ fn vfs_create_file(path: uint8*, name: uint8*, file_size: uint64, attrs: uint16,
     let parent = vfs_get_node_for_path(path, null);
     let node = fs_add_file_to_folder(parent, name, file_size, attrs, null, mount);
     if (node == null) {
-        printk("[vfs] cannot create \"%s/%s\"!\n", path, name);
+        dprintk("[vfs] cannot create \"%s/%s\"!\n", path, name);
         return null;
     }
 
