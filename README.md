@@ -61,6 +61,7 @@ boilerplate for type-safe, reusable code. mc code links against C through
 **Ported to `.mc`** (`src/kernel/`, `src/console.mc`):
 
 - VFS — node tree + mount system (`filesystem/fs.mc`, `filesystem/vfs.mc`)
+- FAT32 driver — boot-sector parse, FAT table read, cluster-chain + fs-tree traversal, mount/read (`filesystem/fat32.mc`)
 - I/O module registry (`io.mc`)
 - Process management (`process.mc`)
 - Syscall dispatch table + `svc` wrappers (`syscall.mc`, `system/syscall.mc`; wrappers emit `svc #0` via inline `@asm`)
@@ -78,13 +79,11 @@ boilerplate for type-safe, reusable code. mc code links against C through
 - printf formatter — stb_sprintf (`src/lib/stb_sprintf.h`, compiled via `src/lib/stdio.c`); the kernel print path is mc and binds to it through `libc/stdio.mc`
 - Arch glue — `halt`/`hang` (`arch/cpu.c`); register accessors and `svc` trampolines ported to mc (`cpu.mc`, `system/syscall.mc`)
 - Memory — heap allocator (`src/mm/heap.c`); DTB memory probe ported to `kernel/mm/mem.mc`
-- FAT32 driver (`src/fs/fat32.c`)
 - Boot entry / init sequence (`src/kernel.c`)
 
 **Not being ported:**
 
 - `start.S`, `vectors.S` — boot stub and exception vectors / context save-restore; stay hand-written AArch64 assembly by design.
-- `src/dsa/` — type-specialized C data structures, superseded by `libmc`'s generics (retire with the C that uses them).
 - `src/lib/` — freestanding C libc, superseded by `libmc` (retire with the C that uses them).
 
 ## Features
@@ -148,15 +147,15 @@ boilerplate for type-safe, reusable code. mc code links against C through
 - MBR/BPB parsing (`mbr_boot_sector`, `fat32_ext_bs`).
 - `fat32_is_boot_sector` validates the 0xAA55 signature and EBR sanity fields.
 - `fat32_parse_boot_sector` extracts BPB/EBR fields and computes derived values into `fat32_bs_info`.
-- `fat32_read_fat_table` parses one pre-read FAT sector directly into `bs_info->fat_table` (28-bit masked, LE-converted); call once per FAT sector in order to populate the full table.
+- `read_fat_table` (`@private`) reads the full FAT table from disk into `bs_info->fat_table` via `vfs_read`, one sector at a time; entries are 28-bit masked and LE-converted on access (`& 0x0FFFFFFF`) by the cluster-chain walkers.
 - `fat32_entry_reference` records a directory entry's on-disk location (cluster number, 8.3 entry index within the sector, and LFN entry count) and is stored in each `fs_node`'s `info` field.
-- Directory cluster parsing is handled by `_fat32_read_cluster` in `fat32.c`; handles multi-fragment LFN sequences, populates an `fs_node` tree, and records subfolder nodes in a `set64` map for recursive traversal.
-- `fat32_mount(device_path, mountpoint)` reads the boot sector from `device_path` via `vfs_read`, validates the FAT32 signature, parses the BPB, creates or resolves the VFS directory, registers a mountpoint, reads the full FAT table, then recursively traverses all directories via `_fat32_read_cluster`, registering `fat32_read`/`fat32_write` as `vfs_handler_t` callbacks. If `mountpoint` is NULL the volume is auto-mounted at `/volumes/<label>`; otherwise the existing node at the given path is used. The full FAT table is kept alive in `bs_info->fat_table` for cluster chain traversal at read time.
+- Directory cluster parsing is handled by `fat32_read_cluster` (`@private`); it handles multi-fragment LFN sequences, falls back to the space-padded 8.3 short name when no LFN is present, populates an `fs_node` tree, and records each entry's node in a `set<uint32, fs_node*>` keyed by data cluster for recursive parent linking.
+- `fat32_mount(device_path, mountpoint)` reads the boot sector from `device_path` via `vfs_read`, validates the FAT32 signature, parses the BPB, creates or resolves the VFS directory, registers a mountpoint, reads the full FAT table, then recursively traverses all directories via `fat32_build_fs_tree`, registering `fat32_read`/`fat32_write` as `vfs_handler_t` callbacks. If `mountpoint` is NULL the volume is auto-mounted at `/volumes/<label>`; otherwise the existing node at the given path is used. The full FAT table is kept alive in `bs_info->fat_table` for cluster chain traversal at read time.
 - `fat32_unmount(device_path)` frees `bs_info->fat_table` and destroys the mountpoint; not yet implemented.
 - `fat32_read` re-reads the dir entry from disk to get the file's first cluster and size, walks `bs_info->fat_table` to the cluster containing `offset`, reads the required sectors into a temporary buffer, and copies `count` bytes into `buffer`. `fat32_write` is not yet implemented.
-- `_fat32_read_cluster` and `_fat32_build_fs_tree` are internal helpers that traverse the directory cluster chain and populate the `fs_node` tree via `vfs_read`; each node is stamped with the `vfs_mount *` so dispatch is O(1) at read time.
-- `fat32_build_cluster_chains` scans `bs_info->fat_table` from `root_cluster` to `n_fat_entries`, marks visited clusters to avoid duplicates, and pushes the start cluster of each distinct chain into an output `queue32`.
-- `fat32_bs_info` exposes both `total_sectors_16` and `total_sectors_32` (resolved into `total_sectors`) for volumes using the 16-bit sector count field; also carries `fat_table` (heap-allocated, owned by `bs_info`, freed by `fat32_unmount` before calling `vfs_destroy_mountpoint`).
+- `fat32_read_cluster` and `fat32_build_fs_tree` (`@private`) traverse the directory cluster chain and populate the `fs_node` tree via `vfs_read`; `fat32_build_fs_tree` resolves each chain's parent through the `set<uint32, fs_node*>` map (falling back to the mount root), and each node is stamped with the `fs_mount *` so dispatch is O(1) at read time.
+- `fat32_build_cluster_chains` scans `bs_info->fat_table` from `root_cluster` to `n_fat_entries`, marks visited clusters to avoid duplicates, and pushes the start cluster of each distinct chain into an output `queue<uint32>`.
+- `fat32_bs_info` exposes both `total_sectors_16` and `total_sectors_32` (resolved into `total_sectors`) for volumes using the 16-bit sector count field; also carries `fat_table` (heap-allocated, owned by `bs_info`). `bs_info` itself is handed to `vfs_create_mountpoint` as the mount's private `info` and freed by `vfs_destroy_mountpoint`; it is freed directly by `fat32_mount` only on the error paths before ownership transfers.
 - 8.3 and LFN directory entry structs (`fat32_dir_entry`, `fat32_lfn_entry`) with `FAT32_ATTR_*`, `FAT32_DIRENT_*`, and `FAT32_LFN_*` defines.
 - Packed structs with aligned mirrors for safe field access on AArch64.
 - Dump functions for boot sector, EBR, dir, and LFN entries.
@@ -247,8 +246,8 @@ boilerplate for type-safe, reusable code. mc code links against C through
 Implementations ported to `.mc` live under `src/kernel/`; the `.mc` module
 either implements the subsystem directly or `@extern`-binds the matching C in
 the parallel `src/<area>/` directory (which still holds the implementation and
-the shared `.h`). `src/libmc/` is mcc's standard library; `src/lib/` and
-`src/dsa/` are the legacy C utilities being retired.
+the shared `.h`). `src/libmc/` is mcc's standard library; `src/lib/` is the
+legacy C libc being retired.
 
 ```
 init/               — files bundled into init.img at build time (FAT32 ramdisk)
@@ -284,7 +283,7 @@ src/
       file.mc       — open-file layer: file_descriptor (node + pos + access mode), file_stat; file_init/read/write/stat
       fs.mc         — fs_node tree primitives + fs_read/fs_write dispatch; fs_node / fs_mount structs
       vfs.mc        — VFS mount system: vfs_init, vfs_create/destroy_mountpoint, vfs_get_node_for_path, vfs_read/write, vfs_create_dir/file, vfs_dump_fs; owns the global _fs_root tree
-      fat32.mc      — fat32_mount/unmount/read/write bindings to src/fs/fat32.c
+      fat32.mc      — full FAT32 implementation: boot-sector parse, FAT-table read, cluster-chain + fs-tree traversal, mount/unmount/read/write; structs/defines come from src/fs/fat32.h
     mm/
       heap.mc       — kmalloc/kfree/krealloc/kmalloc_aligned bindings
       mem.mc        — mem_init: reads RAM base/size from the DTB at boot
@@ -326,7 +325,7 @@ src/
 
   fs/               — filesystem driver (C)
     filesystem.h, vfs.h — shared fs_node / VFS interface headers (impls in kernel/filesystem/)
-    fat32.c/h       — MBR/BPB structs (packed + aligned mirrors), fat32_bs_info, fat32_entry_reference, fat32_is_boot_sector, fat32_parse_boot_sector, fat32_read_fat_table, fat32_build_cluster_chains, fat32_mount, fat32_unmount, fat32_read, fat32_write, _fat32_read_cluster, _fat32_build_fs_tree; 8.3 and LFN dir entry structs, partition type/media descriptor/attribute/LFN defines, dump functions
+    fat32.h         — MBR/BPB structs, fat32_bs_info, fat32_entry_reference, 8.3 and LFN dir entry structs, partition type/media descriptor/attribute/LFN defines; the implementation is ported to kernel/filesystem/fat32.mc and fat32.c is gone
 
   io/               — I/O module registry interface (C)
     module.h        — io_module / io_file structs (impl ported to kernel/io.mc)
@@ -338,9 +337,6 @@ src/
     stdio.c/h       — pulls in stb_sprintf (vsprintf/snprintf/vsprintfcb); NOFLOAT/NOUNALIGNED configured
     string.c/h, ctype.c/h, stdlib.c/h, uchar.c/h
     stdint.h, stdarg.h, stddef.h, stdbool.h, limits.h, time.h, ascii.h, sys/types.h
-
-  dsa/              — legacy type-specialized C data structures (superseded by libmc)
-    queue/, stack/, deque/, hashmap/, set/, ordered_set/, vector/ (uint64/32/16/8 variants)
 ```
 
 ## Memory map (QEMU virt)

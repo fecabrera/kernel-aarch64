@@ -252,7 +252,7 @@ fn notify_waiters(wait_pid: int64, exit_status: int64) {
 
     for entry in &waitpid_queue {
         let proc = entry.value;
-        dprintk("proc->pid=%i, proc->wait_pid=%i\n", proc->pid, proc->wait_pid);
+        dprintk("[scheduler] proc->pid=%i, proc->wait_pid=%i\n", proc->pid, proc->wait_pid);
 
         if (proc->wait_pid != wait_pid)
             continue;

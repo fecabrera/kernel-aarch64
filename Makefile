@@ -24,14 +24,6 @@ SRCS := $(wildcard \
 		  src/*.c \
  		  src/*.S \
   		  src/lib/*.c \
-		  src/dsa/*.c \
-		  src/dsa/deque/*.c \
-		  src/dsa/hashmap/*.c \
-		  src/dsa/ordered_set/*.c \
-		  src/dsa/queue/*.c \
-		  src/dsa/set/*.c \
-		  src/dsa/stack/*.c \
-		  src/dsa/vector/*.c \
 		  src/drivers/*.c \
 		  src/arch/*.c \
 		  src/mm/*.c \
@@ -70,10 +62,6 @@ build/%.o: src/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 build/lib/%.o: src/lib/%.c
-	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -c $< -o $@
-
-build/dsa/%.o: src/dsa/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@
 

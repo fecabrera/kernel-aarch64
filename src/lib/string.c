@@ -117,11 +117,17 @@ int strcmp(const char *lhs, const char *rhs)
 
 int strncmp(const char *lhs, const char *rhs, size_t count)
 {
-    while (count-- && *lhs && *rhs)
+    while (count--)
     {
-        if (*lhs != *rhs)
+        unsigned char a = (unsigned char)*lhs;
+        unsigned char b = (unsigned char)*rhs;
+        if (a != b)
         {
-            return (unsigned char)*lhs - (unsigned char)*rhs;
+            return a - b;
+        }
+        if (a == '\0')
+        {
+            return 0;
         }
         lhs++;
         rhs++;
