@@ -1,4 +1,4 @@
-import "mm/heap";
+import "mm";
 import "libc/string";
 
 /**

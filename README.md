@@ -70,14 +70,13 @@ boilerplate for type-safe, reusable code. mc code links against C through
 - Drivers — GIC, PL031 RTC, ARM generic timer, PL011 UART, virtio MMIO (`interrupts/gic.mc`, `interrupts/drivers/pl031.mc`, `interrupts/drivers/timer.mc`, `interrupts/drivers/pl011.mc`, `interrupts/drivers/virtio_mmio.mc`)
 - Kernel log — `printk`/`dprintk` (`debug.mc`) and the PL011 print path (`pl011_vprintf`), formatting via stb_sprintf bound through `libc/stdio.mc`
 - Device handlers — serial, storage (`devices/`)
-- DTB memory probe (`mm/mem.mc`)
+- Memory management — free-list heap allocator (`heap.mc`: `struct heap` with block split/merge), plus the kernel heap, DTB memory probe, and `kmalloc`/`kfree`/`krealloc`/`kmalloc_aligned` wrappers (`mm.mc`)
 - Interactive console / shell (`console.mc`)
 - CPU helpers (`cpu.mc`) — register accessors (cntpct/cntfrq/cntp_ctl/cntp_tval, vbar_el1), wfi/wfe, halt/hang, irq enable/disable, and bswap, all via inline `@asm`
 - Boot entry / init sequence (`kernel.mc`) — `kernel_init` subsystem bring-up and the `init` (pid 1) entry point
 
 **Still C, bound from mc via `@extern`** (port targets):
 
-- Memory — heap allocator (`src/mm/heap.c`); the DTB memory probe is already ported to `kernel/mm/mem.mc`
 - FDT parser — `src/lib/dtb.c` (IRQ-number lookup for timer/RTC/virtio)
 
 **Not being ported:**
@@ -243,8 +242,8 @@ boilerplate for type-safe, reusable code. mc code links against C through
 ## Source layout
 
 Implementations live in `.mc` under `src/kernel/`. The remaining C is the
-freestanding libc, heap allocator, and FDT parser (`src/lib/`, `src/mm/`),
-which mc `@extern`-binds. The per-subsystem C interface headers have been
+freestanding libc and FDT parser (`src/lib/`), which mc `@extern`-binds. The
+per-subsystem C interface headers have been
 removed now that every subsystem is mc; what survives under `arch/`/`drivers/`
 is only what the remaining C still includes (`cpu.h`'s endian macros,
 `virtio_mmio.h`'s register structs), plus the still-vestigial `arch/irq.h` and
@@ -286,9 +285,8 @@ src/
       fs.mc         — fs_node tree primitives + fs_read/fs_write dispatch; fs_node / fs_mount structs
       vfs.mc        — VFS mount system: vfs_init, vfs_create/destroy_mountpoint, vfs_get_node_for_path, vfs_read/write, vfs_create_dir/file, vfs_dump_fs; owns the global _fs_root tree
       fat32.mc      — full FAT32 implementation: boot-sector parse, FAT-table read, cluster-chain + fs-tree traversal, mount/unmount/read/write; structs/defines come from src/fs/fat32.h
-    mm/
-      heap.mc       — kmalloc/kfree/krealloc/kmalloc_aligned bindings
-      mem.mc        — mem_init: reads RAM base/size from the DTB at boot
+    heap.mc         — free-list heap allocator: heap_init/heap_acquire/heap_release/heap_resize over a struct heap, with block splitting and adjacent-free coalescing
+    mm.mc           — kernel memory management: 16 MiB static kernel heap, mem_init (reads RAM base/size from the DTB at boot), kmalloc/kfree/krealloc/kmalloc_aligned wrappers over the kernel heap
     system/
       syscall.mc    — user-facing svc wrappers: yield/exit/getpid/waitpid/fork/sleep/msleep/time/uptime/open/close/read/write/fstat/getcwd, all emitting svc #0 via inline @asm
 
@@ -306,14 +304,11 @@ src/
     libc/           — freestanding ctype, stdlib, string, limits; stdio binds the stb_sprintf family (vsprintf/snprintf/vsprintfcb) and implements printf/vprintf/getchar/putchar over the read/write syscalls
 
   arch/             — AArch64 C headers
-    cpu.h           — bswap16/32/64 + be*/le* endian macros (used by lib/dtb.c, lib/uchar.c, mm/heap.c) and halt/hang declarations; register-accessor/halt/hang/wfe/wfi impls are in kernel/cpu.mc
+    cpu.h           — bswap16/32/64 + be*/le* endian macros (used by lib/dtb.c, lib/uchar.c) and halt/hang declarations; register-accessor/halt/hang/wfe/wfi impls are in kernel/cpu.mc
     irq.h, syscall.h — vestigial: cpu_context/irq_handler_t typedefs and SYSCALL_* numbers, no remaining C caller (impls in kernel/interrupts/irq.mc, kernel/syscall.mc, kernel/system/syscall.mc)
 
   drivers/          — MMIO peripheral C headers
     virtio_mmio.h   — register/virtq structs used by lib/dtb.c for slot discovery; the driver impl is in kernel/interrupts/drivers/virtio_mmio.mc
-
-  mm/               — memory subsystem (C)
-    heap.c/h        — kmalloc/kfree/krealloc/kmalloc_aligned (the RAM probe formerly in mem.h is ported to kernel/mm/mem.mc)
 
   lib/              — C standard library
     debug.h         — printk/dprintk prototypes for C callers (impl ported to kernel/debug.mc)

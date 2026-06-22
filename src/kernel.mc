@@ -1,8 +1,7 @@
 import "debug";
 import "dtb";
-import "mm/heap";
-import "mm/mem";
 import "syscall";
+import "mm";
 import "interrupts/gic";
 import "interrupts/irq";
 import "interrupts/drivers/virtio_mmio";
@@ -25,8 +24,6 @@ fn kernel_init() {
 
     // Initialize memory
     mem_init();
-    heap_init();
-    heap_dump();
 
     // Initialize syscall system
     syscall_init();

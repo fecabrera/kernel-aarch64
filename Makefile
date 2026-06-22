@@ -21,10 +21,8 @@ CFLAGS  = -ffreestanding -nostdlib -nostdinc \
           $(CFLAGS_EXTRA)
 
 SRCS := $(wildcard \
-		  src/*.c \
  		  src/*.S \
   		  src/lib/*.c \
-		  src/mm/*.c \
 		  src/*.mc \
   		  src/libmc/*.mc \
   		  src/libmc/iteration/*.mc \
@@ -35,7 +33,6 @@ SRCS := $(wildcard \
 		  src/kernel/filesystem/*.mc \
 		  src/kernel/interrupts/*.mc \
 		  src/kernel/interrupts/drivers/*.mc \
-		  src/kernel/mm/*.mc \
 		  src/kernel/system/*.mc)
 OBJS := $(patsubst src/%, build/%, $(SRCS:.c=.o))
 OBJS := $(OBJS:.S=.o)
@@ -54,10 +51,6 @@ build/%.o: src/%.S
 	$(CC) $(CFLAGS) -c $< -o $@
 
 build/lib/%.o: src/lib/%.c
-	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -c $< -o $@
-
-build/mm/%.o: src/mm/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@
 
