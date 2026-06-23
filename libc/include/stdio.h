@@ -1,6 +1,6 @@
 #pragma once
 
-#include "stdarg.h"
+#include <stdarg.h>
 
 #ifndef STB_SPRINTF_DECORATE
 #define STB_SPRINTF_DECORATE(name) name

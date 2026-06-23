@@ -12,7 +12,7 @@ init.img
 build/
 
 # object files
-**/.o
+**/*.o
 
 # IDE config
 .vscode/

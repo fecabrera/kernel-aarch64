@@ -1,6 +1,6 @@
-#include "uchar.h"
 #include <arch/cpu.h>
 #include <debug.h>
+#include <utf16.h>
 
 char utf16to8(char16_t c) { return c > 0xff ? '?' : (char)(c & 0xff); }
 

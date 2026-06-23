@@ -1,7 +1,7 @@
-#include "dtb.h"
 #include <arch/cpu.h>
 #include <debug.h>
 #include <drivers/virtio_mmio.h>
+#include <dtb.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>

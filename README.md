@@ -58,10 +58,10 @@ boilerplate for type-safe, reusable code. mc code links against C through
 `@extern` bindings, so the migration proceeds subsystem by subsystem and uses
 `libmc` (mcc's standard library) in place of the in-tree C utilities.
 
-**Ported to `.mc`** (`src/kernel/`, `src/console.mc`):
+**Ported to `.mc`** (`kernel/`, `src/console.mc`):
 
 - VFS — node tree + mount system (`filesystem/fs.mc`, `filesystem/vfs.mc`)
-- FAT32 driver — boot-sector parse, FAT table read, cluster-chain + fs-tree traversal, mount/read (`filesystem/fat32.mc`)
+- FAT32 driver — boot-sector parse, FAT table read, cluster-chain + fs-tree traversal, mount/read (`filesystem/drivers/fat32.mc`)
 - I/O module registry (`io.mc`)
 - Process management (`process.mc`)
 - Syscall dispatch table + `svc` wrappers (`syscall.mc`, `system/syscall.mc`; wrappers emit `svc #0` via inline `@asm`)
@@ -77,12 +77,13 @@ boilerplate for type-safe, reusable code. mc code links against C through
 
 **Still C, bound from mc via `@extern`** (port targets):
 
-- FDT parser — `src/lib/dtb.c` (IRQ-number lookup for timer/RTC/virtio)
+- FDT parser — `lib/src/dtb.c` (IRQ-number lookup for timer/RTC/virtio)
+- UTF-16 helpers — `lib/src/utf16.c` (used by the FAT32 long-name path)
 
 **Not being ported:**
 
 - `start.S`, `vectors.S` — boot stub and exception vectors / context save-restore; stay hand-written AArch64 assembly by design.
-- C standard library — `src/lib/`; kept as C and bound from mc via `@extern`, not reimplemented in mc.
+- C standard library — `libc/`; kept as C and bound from mc via `@extern`, not reimplemented in mc.
 
 ## Features
 
@@ -241,82 +242,84 @@ boilerplate for type-safe, reusable code. mc code links against C through
 
 ## Source layout
 
-Implementations live in `.mc` under `src/kernel/`. The remaining C is the
-freestanding libc and FDT parser (`src/lib/`), which mc `@extern`-binds. The
-per-subsystem C interface headers have been
-removed now that every subsystem is mc; what survives under `arch/`/`drivers/`
-is only what the remaining C still includes (`cpu.h`'s endian macros,
-`virtio_mmio.h`'s register structs), plus the still-vestigial `arch/irq.h` and
-`arch/syscall.h`. `src/libmc/` is mcc's standard library; `start.S`/`vectors.S`
-stay hand-written assembly and call `kernel_init` (in `kernel.mc`).
+Kernel implementations live in `.mc` under `kernel/` (plus the entry points in
+`src/`). The remaining C is split into two top-level trees that mc
+`@extern`-binds: `lib/` (the FDT parser and UTF-16 helpers, plus the AArch64/MMIO
+C headers the C still includes — `cpu.h`'s endian macros, `virtio_mmio.h`'s
+register structs, and the still-vestigial `arch/irq.h`) and `libc/` (the
+freestanding C standard library). `libmc/` is mcc's standard library;
+`start.S`/`vectors.S` stay hand-written assembly and call `kernel_init` (in
+`kernel.mc`). Each C tree is `include/` (headers) + `src/` (sources).
 
 ```
 init/               — files bundled into init.img at build time (FAT32 ramdisk)
 
-src/
+src/                — entry points (assembly stubs + top-level mc)
   kernel.mc         — kernel_init: subsystem bring-up (DTB, memory, IRQ, VFS, I/O, serial, storage, scheduler, timer); init(): pid 1 entry point, runs console("/dev/serial")
-  console.mc        — console()/console_parse_command(): interactive terminal loop with cwd-aware prompt and argc/argv tokenization (quoted strings, backslash escapes), fork-per-command dispatch (cd dispatched directly); built-ins: ls, cd, cat, echo, mount, exit, help; line input via libmc/std readline
+  console.mc        — console()/console_parse_command(): interactive terminal loop with cwd-aware prompt and argc/argv tokenization (quoted strings, backslash escapes), fork-per-command dispatch (cd dispatched directly); built-ins: ls, cd, cat, echo, stat, mount, exit, help; line input via libmc/std readline
   start.S           — AArch64 boot stub, saves DTB pointer, zeros BSS
   vectors.S         — exception vector table, save/restore_context macros
 
-  kernel/           — mc kernel modules (logic + @extern bindings to the C below)
-    cpu.mc          — cpu_context, SPSR/CNTP_CTL defines; inline-@asm impls of wfe/wfi, halt/hang, irq_enable/disable, timer registers, set_vbar_el1, bswap; be*/le* helpers
-    syscall.mc      — svc #0 dispatch table (generic set): syscall_init/register/unregister_handler, syscall_handler, SYSCALL_* numbers
-    dtb.mc          — @extern bindings to the C DTB parser: dtb_init/dump/find_prop, *_irq_number lookups, fdt_header/memreg/fdt_prop structs
-    pointer.mc      — generic refcounted pointer<T>: create_pointer/pointer_acquire/pointer_release
-    process.mc      — process struct (cwd + refcounted fd table), create/duplicate/set_entry/destroy_process, process_open/close/read/write_file + process_file_stat
-    scheduler.mc    — full scheduler: idle ctx+stack, ready/wait/sleep queues, scheduler_init/enqueue/dequeue/spawn/handler, notify_sleepers/waiters, all syscall handlers, scheduler_get/set_current_process
-    io.mc           — I/O module registry: io_init, io_register/unregister_module, io_read/io_write
-    debug.mc        — printk (always on) / dprintk (DEBUG-gated via @if), thin wrappers over pl011_vprintf
-    uchar.mc        — utf16lencpy/utf16bencpy bindings
-    devices/
-      serial.mc     — /dev/serial driver: serial_init, serial_read (pl011_getc+wfi), serial_write (pl011_putc)
-      storage.mc    — block driver: storage_init scans virtio slots, registers /dev/sd<letter>; storage_read/write handlers
-    interrupts/     — exception/IRQ dispatch, GIC, and peripheral drivers
-      irq.mc        — exception/IRQ dispatch: sync/irq/fiq/serr handlers, ESR_EC decode, generic-set IRQ registry, irq_init (vbar_el1), irq_register/unregister_handler
-      gic.mc        — GIC impl: gicd_regs/gicc_regs register structs, gic_init/enable_irq/trigger_sgi/acknowledge/end_of_interrupt
-      drivers/      — mc peripheral drivers (full impls)
-        pl011.mc    — PL011 UART impl: pl011_regs struct, pl011_init/getc/putc/printf/vprintf, pl011_irq_handler; pl011_vprintf streams to the UART via stb_sprintf's vsprintfcb (pl011_printf_cb callback)
-        virtio_mmio.mc — virtio MMIO impl: virtio_mmio_regs/virtq structs, virtio_mmio_init/probe_device/read/find_next_slot, virtio_mmio_irq_handler
-        pl031.mc    — PL031 RTC impl: pl031_regs struct, pl031_init/get_time/set_time/set_alarm, pl031_irq_handler, syscall_time_handler
-        timer.mc    — ARM generic timer impl: timer_init/get_uptime/set_interval, timer_irq_handler, syscall_uptime_handler
-    filesystem/
-      file.mc       — open-file layer: file_descriptor (node + pos + access mode), file_stat; file_init/read/write/stat
-      fs.mc         — fs_node tree primitives + fs_read/fs_write dispatch; fs_node / fs_mount structs
-      vfs.mc        — VFS mount system: vfs_init, vfs_create/destroy_mountpoint, vfs_get_node_for_path, vfs_read/write, vfs_create_dir/file, vfs_dump_fs; owns the global _fs_root tree
-      fat32.mc      — full FAT32 implementation: boot-sector parse, FAT-table read, cluster-chain + fs-tree traversal, mount/unmount/read/write; structs/defines come from src/fs/fat32.h
-    heap.mc         — free-list heap allocator: heap_init/heap_acquire/heap_release/heap_resize over a struct heap, with block splitting and adjacent-free coalescing
-    mm.mc           — kernel memory management: 16 MiB static kernel heap, mem_init (reads RAM base/size from the DTB at boot), kmalloc/kfree/krealloc/kmalloc_aligned wrappers over the kernel heap
-    system/
-      syscall.mc    — user-facing svc wrappers: yield/exit/getpid/waitpid/fork/sleep/msleep/time/uptime/open/close/read/write/fstat/getcwd, all emitting svc #0 via inline @asm
+kernel/             — mc kernel modules (logic + @extern bindings to the C below)
+  cpu.mc            — cpu_context, SPSR/CNTP_CTL defines; inline-@asm impls of wfe/wfi, halt/hang, irq_enable/disable, timer registers, set_vbar_el1, bswap; be*/le* helpers
+  syscall.mc        — svc #0 dispatch table (generic set): syscall_init/register/unregister_handler, syscall_handler, SYSCALL_* numbers
+  dtb.mc            — @extern bindings to the C DTB parser: dtb_init/dump/find_prop, *_irq_number lookups, fdt_header/memreg/fdt_prop structs
+  pointer.mc        — generic refcounted pointer<T>: create_pointer/pointer_acquire/pointer_release
+  process.mc        — process struct (cwd + refcounted fd table), create/duplicate/set_entry/destroy_process, process_open/close/read/write_file, process_file_stat/stat/get_cwd; bottom-of-stack canary (process_check_stack)
+  scheduler.mc      — full scheduler: idle ctx+stack, ready/wait/sleep queues, scheduler_init/enqueue/dequeue/spawn/handler, notify_sleepers/waiters, all syscall handlers, scheduler_get/set_current_process
+  io.mc             — I/O module registry: io_init, io_register/unregister_module, io_read/io_write
+  debug.mc          — printk (always on) / dprintk (DEBUG-gated via @if), thin wrappers over pl011_vprintf
+  utf16.mc          — utf16lencpy/utf16bencpy bindings
+  heap.mc           — free-list heap allocator: heap_init/heap_acquire/heap_release/heap_resize over a struct heap, with block splitting and adjacent-free coalescing; heap_check integrity validator (DEBUG-gated)
+  mm.mc             — kernel memory management: 16 MiB static kernel heap, mem_init (reads RAM base/size from the DTB at boot), kmalloc/kfree/krealloc/kmalloc_aligned wrappers over the kernel heap
+  devices/
+    serial.mc       — /dev/serial driver: serial_init, serial_read (pl011_getc+wfi), serial_write (pl011_putc)
+    storage.mc      — block driver: storage_init scans virtio slots, registers /dev/sd<letter>; storage_read/write handlers
+  interrupts/       — exception/IRQ dispatch, GIC, and peripheral drivers
+    irq.mc          — exception/IRQ dispatch: sync/irq/fiq/serr handlers, ESR_EC decode, generic-set IRQ registry, irq_init (vbar_el1), irq_register/unregister_handler
+    gic.mc          — GIC impl: gicd_regs/gicc_regs register structs, gic_init/enable_irq/trigger_sgi/acknowledge/end_of_interrupt
+    drivers/        — mc peripheral drivers (full impls)
+      pl011.mc      — PL011 UART impl: pl011_regs struct, pl011_init/getc/putc/printf/vprintf, pl011_irq_handler; pl011_vprintf streams to the UART via stb_sprintf's vsprintfcb (pl011_printf_cb callback)
+      virtio_mmio.mc — virtio MMIO impl: virtio_mmio_regs/virtq structs, virtio_mmio_init/probe_device/read/find_next_slot, virtio_mmio_irq_handler
+      pl031.mc      — PL031 RTC impl: pl031_regs struct, pl031_init/get_time/set_time/set_alarm, pl031_irq_handler, syscall_time_handler
+      timer.mc      — ARM generic timer impl: timer_init/get_uptime/set_interval, timer_irq_handler, syscall_uptime_handler
+  filesystem/
+    file.mc         — open-file layer: file_descriptor (node + pos + access mode), file_stat; file_init/read/write/stat, file_node_stat
+    fs.mc           — fs_node tree primitives + fs_read/fs_write dispatch (with permission checks), fs_get_absolute_dir; fs_node / fs_mount structs
+    vfs.mc          — VFS mount system: vfs_init, vfs_create/destroy_mountpoint, vfs_get_node_for_path, vfs_read/write, vfs_create_dir/file, vfs_dump_fs; owns the global _fs_root tree
+    drivers/
+      fat32.mc      — full FAT32 implementation: boot-sector parse, FAT-table read, cluster-chain + fs-tree traversal, mount/unmount/read/write
+  system/
+    syscall.mc      — user-facing svc wrappers: yield/exit/getpid/waitpid/fork/sleep/msleep/time/uptime/open/close/read/write/fstat/stat/getcwd, all emitting svc #0 via inline @asm
 
-  libmc/            — mcc standard library (generic, type-parametric)
-    memory.mc       — alloc<T>/alloc_aligned<T>/resize<T>/dealloc<T>, copy_bytes/set_bytes/copy_items/set_items
-    list.mc         — dynamic list<T> with list_it/list_next cursor (for-in)
-    string.mc       — growable byte string (list<uint8> specialization, @inline wrappers)
-    dict.mc         — string-keyed dict<V> (open addressing, dict_it/dict_next cursor)
-    set.mc, queue.mc, stack.mc — generic containers (set_entry extends pair; set_it/set_next cursor)
-    hash.mc         — hash<T> dispatch (splitmix64 for values, fnv1a for pointers)
-    std.mc          — ergonomic stdio over the fd syscalls: print/println, writechar/writestr/writeln, readchar/readline
-    ascii.mc, uchar.mc
-    hashing/        — splitmix64, fnv1a, crc32, murmur3
-    iteration/      — pair
-    libc/           — freestanding ctype, stdlib, string, limits; stdio binds the stb_sprintf family (vsprintf/snprintf/vsprintfcb) and implements printf/vprintf/getchar/putchar over the read/write syscalls
+libmc/              — mcc standard library (generic, type-parametric)
+  memory.mc         — alloc<T>/alloc_aligned<T>/resize<T>/dealloc<T>, bytecopy/copy/set_bytes/set_items (copy_bytes/copy_items kept as deprecated shims)
+  list.mc           — dynamic list<T> with list_it/list_next cursor (for-in)
+  string.mc         — growable byte string (list<uint8> specialization, @inline wrappers)
+  dict.mc           — string-keyed dict<V> (open addressing, dict_it/dict_next cursor)
+  set.mc, queue.mc, stack.mc — generic containers (set_entry extends pair; set_it/set_next cursor)
+  hash.mc           — hash<T> dispatch (splitmix64 for values, fnv1a for pointers)
+  std.mc            — ergonomic stdio over the fd syscalls: print/println, writechar/writestr/writeln, readchar/readline
+  ascii.mc
+  hashing/          — splitmix64, fnv1a, crc32, murmur3
+  iteration/        — pair
+  libc/             — freestanding ctype, stdlib, string, limits; stdio binds the stb_sprintf family (vsprintf/snprintf/vsprintfcb) and implements printf/vprintf/getchar/putchar over the read/write syscalls
 
-  arch/             — AArch64 C headers
-    cpu.h           — bswap16/32/64 + be*/le* endian macros (used by lib/dtb.c, lib/uchar.c) and halt/hang declarations; register-accessor/halt/hang/wfe/wfi impls are in kernel/cpu.mc
-    irq.h, syscall.h — vestigial: cpu_context/irq_handler_t typedefs and SYSCALL_* numbers, no remaining C caller (impls in kernel/interrupts/irq.mc, kernel/syscall.mc, kernel/system/syscall.mc)
+lib/                — C helpers bound from mc via @extern (FDT + UTF-16)
+  include/
+    arch/cpu.h      — bswap16/32/64 + be*/le* endian macros (used by lib/src/dtb.c) and halt/hang declarations; register-accessor/halt/hang/wfe/wfi impls are in kernel/cpu.mc
+    arch/irq.h      — vestigial: cpu_context/irq_handler_t typedefs, no remaining C caller (impl in kernel/interrupts/irq.mc)
+    drivers/virtio_mmio.h — register/virtq structs used by lib/src/dtb.c for slot discovery; the driver impl is in kernel/interrupts/drivers/virtio_mmio.mc
+    dtb.h, utf16.h, ascii.h, debug.h — prototypes for the C sources / kernel-ported equivalents
+  src/
+    dtb.c           — FDT parser (node/property walker); IRQ number lookup for timer, RTC, and virtio MMIO slots
+    utf16.c         — UTF-16 copy helpers used by the FAT32 long-name path
 
-  drivers/          — MMIO peripheral C headers
-    virtio_mmio.h   — register/virtq structs used by lib/dtb.c for slot discovery; the driver impl is in kernel/interrupts/drivers/virtio_mmio.mc
-
-  lib/              — C standard library
-    debug.h         — printk/dprintk prototypes for C callers (impl ported to kernel/debug.mc)
-    dtb.c/h         — FDT parser (node/property walker); IRQ number lookup for timer, RTC, and virtio MMIO slots
-    stb_sprintf.h   — vendored printf-family formatter; STB_SPRINTF_IMPLEMENTATION is compiled in stdio.c
-    stdio.c/h       — pulls in stb_sprintf (vsprintf/snprintf/vsprintfcb)
-    string.c/h, ctype.c/h, stdlib.c/h, uchar.c/h
-    stdint.h, stdarg.h, stddef.h, stdbool.h, limits.h, time.h, ascii.h, sys/types.h
+libc/               — freestanding C standard library
+  include/          — ctype, limits, stdio, stdlib, string, stdarg, stdbool, stddef, stdint, time, sys/types; stb_sprintf.h (vendored printf-family formatter)
+  src/
+    stdio.c         — pulls in stb_sprintf (STB_SPRINTF_IMPLEMENTATION; vsprintf/snprintf/vsprintfcb)
+    ctype.c, stdlib.c, string.c
 ```
 
 ## Memory map (QEMU virt)

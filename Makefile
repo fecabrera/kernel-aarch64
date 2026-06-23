@@ -8,49 +8,69 @@ MCFLAGS = --target aarch64-unknown-none-elf \
 		  --nostdlib --freestanding \
           --general-regs-only \
 		  -O3 \
-		  -I src/kernel \
-		  -I src/libmc \
+		  -I kernel \
+		  -I libmc \
+		  -I lib \
           $(CFLAGS_EXTRA)
 
 CFLAGS  = -ffreestanding -nostdlib -nostdinc \
           -mgeneral-regs-only \
           -O3 -Wall -Wextra \
           -mcpu=cortex-a710 \
-          -Isrc \
-          -Isrc/lib \
+          -Ilib/include \
+          -Ilibc/include \
           $(CFLAGS_EXTRA)
 
 SRCS := $(wildcard \
  		  src/*.S \
-  		  src/lib/*.c \
 		  src/*.mc \
-  		  src/libmc/*.mc \
-  		  src/libmc/iteration/*.mc \
-  		  src/libmc/hashing/*.mc \
-  		  src/libmc/libc/*.mc \
-		  src/kernel/*.mc \
-		  src/kernel/devices/*.mc \
-		  src/kernel/filesystem/*.mc \
-		  src/kernel/interrupts/*.mc \
-		  src/kernel/interrupts/drivers/*.mc \
-		  src/kernel/system/*.mc)
-OBJS := $(patsubst src/%, build/%, $(SRCS:.c=.o))
-OBJS := $(OBJS:.S=.o)
+  		  lib/src/*.c \
+  		  libc/src/*.c \
+  		  libmc/*.mc \
+  		  libmc/iteration/*.mc \
+  		  libmc/hashing/*.mc \
+  		  libmc/libc/*.mc \
+		  kernel/*.mc \
+		  kernel/devices/*.mc \
+		  kernel/filesystem/*.mc \
+		  kernel/filesystem/drivers/*.mc \
+		  kernel/interrupts/*.mc \
+		  kernel/interrupts/drivers/*.mc \
+		  kernel/system/*.mc)
+OBJS := $(SRCS:.c=.o)
 OBJS := $(OBJS:.mc=.o)
+OBJS := $(OBJS:.S=.o)
+OBJS := $(patsubst lib/src/%, build/lib/%, $(OBJS))
+OBJS := $(patsubst libc/src/%, build/libc/%, $(OBJS))
+OBJS := $(patsubst libmc/%, build/libmc/%, $(OBJS))
+OBJS := $(patsubst kernel/%, build/kernel/%, $(OBJS))
+OBJS := $(patsubst src/%, build/src/%, $(OBJS))
 
 build: kernel.elf kernel.img
 
 all: build init.img
 
-build/%.o: src/%.mc
+build/src/%.o: src/%.mc
 	@mkdir -p $(dir $@)
 	$(MCC) $(MCFLAGS) $< -o $@
 
-build/%.o: src/%.S
+build/src/%.o: src/%.S
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-build/lib/%.o: src/lib/%.c
+build/libmc/%.o: libmc/%.mc
+	@mkdir -p $(dir $@)
+	$(MCC) $(MCFLAGS) $< -o $@
+
+build/kernel/%.o: kernel/%.mc
+	@mkdir -p $(dir $@)
+	$(MCC) $(MCFLAGS) $< -o $@
+
+build/lib/%.o: lib/src/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+build/libc/%.o: libc/src/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@
 
