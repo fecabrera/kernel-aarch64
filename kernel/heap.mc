@@ -17,6 +17,32 @@ struct heap {
 const HEADER_SIZE = sizeof(struct heap_block_header);
 
 /**
+ * Debug-only integrity check: walks the free/block list and halts if any block's
+ * next pointer is not null, in-range, and 8-byte aligned -- i.e. catches a
+ * header that has been stomped by an out-of-bounds write or use-after-free.
+ * tag identifies the call site in the halt message.
+ *
+ * @param self: the heap to validate
+ * @param tag:  short label naming the call site (printed on corruption)
+ */
+fn heap_check(self: struct heap*, tag: uint8*) {
+	@if (DEBUG) {
+		let lo = self->head as uint64;
+		let hi = lo + self->size;
+
+		let cur = self->head;
+		until (cur == null) {
+			let n = cur->next as uint64;
+			if (n != 0 and (n < lo or n >= hi or (n & 7) != 0)) {
+				printk("[heap] CORRUPT next=%p at block %p (%s)\n", cur->next, cur, tag);
+				halt();
+			}
+			cur = cur->next;
+		}
+	}
+}
+
+/**
  * Initializes a heap over the region [ptr, ptr + size). Lays the whole region out as a single free
  * block whose header sits at ptr. Must be called before any heap_acquire/heap_release on this heap.
  *
@@ -34,7 +60,7 @@ fn heap_init(self: struct heap*, size: uint64, min_blk_size: uint16, ptr: uint8*
 	self->head->used = false;
 	self->head->next = null;
 
-	printk("[heap] heap initialized: addr=%p, size=%d B\n", ptr, self->head->size);
+	dprintk("[heap] heap initialized: addr=0x%p, size=%d B\n", ptr, self->head->size);
 }
 
 /**
@@ -67,6 +93,8 @@ fn heap_merge_free_blocks(self: struct heap*) {
  * @return pointer to the allocated payload, or null if size is 0 or no block is large enough
  */
 fn heap_acquire(self: struct heap*, size: uint64) -> uint8* {
+	heap_check(self, "acquire");
+
 	if (size == 0) return null;
 
     // Align size to 8 bytes
@@ -103,7 +131,7 @@ fn heap_acquire(self: struct heap*, size: uint64) -> uint8* {
 		current = current->next;
 	}
 	
-    printk("[heap] kmalloc: out of memory!\n");
+    dprintk("[heap] kmalloc: out of memory!\n");
 
     let head = self->head;
     until (head == null) {
@@ -176,6 +204,8 @@ fn heap_resize(self: struct heap*, ptr: uint8*, new_size: uint64) -> uint8* {
  *         -3 if the block was already free (double-free detected)
  */
 fn heap_release(self: struct heap*, ptr: uint8*) -> int32 {
+	heap_check(self, "release");
+
 	if (ptr == null) return -1;
 
 	let header = (ptr as uint64 - HEADER_SIZE) as struct heap_block_header*;

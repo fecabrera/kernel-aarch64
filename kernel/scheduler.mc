@@ -52,6 +52,7 @@ fn scheduler_init() {
     syscall_register_handler(SYSCALL_READ, syscall_read_handler);
     syscall_register_handler(SYSCALL_WRITE, syscall_write_handler);
     syscall_register_handler(SYSCALL_FSTAT, syscall_fstat_handler);
+    syscall_register_handler(SYSCALL_STAT, syscall_stat_handler);
     syscall_register_handler(SYSCALL_GETCWD, syscall_getcwd_handler);
 }
 
@@ -166,6 +167,7 @@ fn scheduler_handler(ctx: struct cpu_context*, ms_elapsed: uint64) -> struct cpu
 
     let previous = scheduler_get_current_process();
     if (previous != null) {
+        process_check_stack(previous);
         previous->ctx = ctx;
         queue_push(&ready_queue, previous);
     }
@@ -605,13 +607,32 @@ fn syscall_fstat_handler(ctx: struct cpu_context*) -> struct cpu_context* {
     }
 
     let fd = ctx->x[1] as int64;
-    let stat = ctx->x[2] as struct file_stat*;
+    let st = ctx->x[2] as struct file_stat*;
 
-    dprintk("[scheduler] fstat(), ctx->x0 = %llu, ctx->x1 = %llu\n",
-            ctx->x[0], ctx->x[1]);
+    dprintk("[scheduler] fstat(), ctx->x0 = %llu, ctx->x1 = %llu ctx->x2 = %llu\n",
+            ctx->x[0], ctx->x[1], ctx->x[2]);
     
-    ctx->x[0] = process_file_stat(proc, fd, stat) as uint64;
+    ctx->x[0] = process_file_stat(proc, fd, st) as uint64;
     
+    return ctx;
+}
+
+fn syscall_stat_handler(ctx: struct cpu_context*) -> struct cpu_context* {
+    let proc = scheduler_get_current_process();
+    if (proc == null) {
+        dprintk("[scheduler] no current process!\n");
+        ctx->x[0] = -1 as uint64;
+        return ctx;
+    }
+
+    let path = ctx->x[1] as uint8*;
+    let st = ctx->x[2] as struct file_stat*;
+
+    dprintk("[scheduler] stat(), ctx->x0 = %llu, ctx->x1 = %llu ctx->x2 = %llu\n",
+            ctx->x[0], ctx->x[1], ctx->x[2]);
+
+    ctx->x[0] = process_stat(proc, path, st) as uint64;
+
     return ctx;
 }
 

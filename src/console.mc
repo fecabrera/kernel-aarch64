@@ -7,7 +7,7 @@ import "scheduler";
 import "filesystem/file";
 import "filesystem/fs";
 import "filesystem/vfs";
-import "filesystem/fat32";
+import "filesystem/drivers/fat32";
 import "libc/ctype";
 import "libc/stdlib";
 import "system/syscall";
@@ -17,6 +17,7 @@ let available_commands: uint8*[][2] = [
     ["ls [path]", "list a folder's entries"],
     ["cd <path>", "change the working directory"],
     ["cat <path>", "print a file"],
+    ["stat <path>", "display file status"],
     ["echo [args...]", "print arguments"],
     ["sleep <seconds>", "sleep for the given number of seconds"],
     ["msleep <seconds>", "sleep for the given number of milliseconds"],
@@ -86,23 +87,23 @@ fn command_cat(argc: int64, argv: uint8**) -> int64 {
     
     defer close(fd);
 
-    let stat: struct file_stat;
-    let st_status = fstat(fd, &stat);
+    let st: struct file_stat;
+    let st_status = fstat(fd, &st);
     if (st_status < 0) {
         println("fstat() returned %lld!", st_status);
         return -3;
     }
     
-    let buffer: uint8* = alloc<uint8>(stat.st_size + 1);
+    let buffer: uint8* = alloc<uint8>(st.st_size + 1);
     defer dealloc(buffer);
 
-    let r_status = read(fd, buffer, stat.st_size);
+    let r_status = read(fd, buffer, st.st_size);
     if (r_status < 0) {
         println("read() returned %lld!", r_status);
         return -4;
     }
 
-    buffer[stat.st_size] = '\0';
+    buffer[st.st_size] = '\0';
     println("%s", buffer);
 
     return 0;
@@ -137,6 +138,31 @@ fn command_ls(argc: int64, argv: uint8**) -> int64 {
         println("%s", current->name);
     }
 
+    return 0;
+}
+
+@private
+fn command_stat(argc: int64, argv: uint8**) -> int64 {
+    if (argc < 2) {
+        println("usage: %s <path>", argv[0]);
+        return -1;
+    }
+
+    let st: struct file_stat;
+    let st_status = stat(argv[1], &st);
+    if (st_status < 0) {
+        println("stat() returned %lld!", st_status);
+        return -2;
+    }
+
+    if ((st.st_mode & FS_NODE_ATTRS_PERMISSIONS_MASK) > 0) {
+        if ((st.st_mode & FS_NODE_ATTRS_PERMISSIONS_READ) > 0) print("r");
+        if ((st.st_mode & FS_NODE_ATTRS_PERMISSIONS_WRITE) > 0) print("w");
+        if ((st.st_mode & FS_NODE_ATTRS_PERMISSIONS_EXECUTE) > 0) print("x");
+        print(" ");
+    }
+    println("%llu", st.st_size);
+    
     return 0;
 }
 
@@ -268,6 +294,8 @@ fn console_parse_command(argc: int64, argv: uint8**) {
         console_run_command(command_msleep, argc, argv);
     } else if (strcmp(argv[0], "cat") == 0) {
         console_run_command(command_cat, argc, argv);
+    } else if (strcmp(argv[0], "stat") == 0) {
+        console_run_command(command_stat, argc, argv);
     } else if (strcmp(argv[0], "mount") == 0) {
         console_run_command(command_mount, argc, argv);
     } else if (strcmp(argv[0], "help") == 0) {
@@ -296,7 +324,9 @@ fn console(pathname: uint8*) {
     while (true) {
         let i: uint64;
 
-        let path: uint8[1024];
+        let path: uint8* = alloc<uint8*>(1024);
+        defer dealloc(path);
+        
         getcwd(path, 1024);
 
         print("%s# ", path);

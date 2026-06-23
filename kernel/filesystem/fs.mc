@@ -10,14 +10,26 @@ const FS_NODE_ATTRS_TYPE_FILE = 1;
 
 const FS_NODE_ATTRS_FLAG_LINK = (1 << 2);
 const FS_NODE_ATTRS_FLAG_HIDDEN = (1 << 3);
-const FS_NODE_ATTRS_FLAG_READONLY = (1 << 4);
 
-const FS_NODE_ATTRS_FLAG_MASK = (FS_NODE_ATTRS_FLAG_LINK | FS_NODE_ATTRS_FLAG_HIDDEN | FS_NODE_ATTRS_FLAG_READONLY);
+const FS_NODE_ATTRS_PERMISSIONS_READ = (1 << 4);
+const FS_NODE_ATTRS_PERMISSIONS_WRITE = (1 << 5);
+const FS_NODE_ATTRS_PERMISSIONS_EXECUTE = (1 << 6);
+
+const FS_NODE_ATTRS_PERMISSIONS_MASK = (FS_NODE_ATTRS_PERMISSIONS_READ |
+                                        FS_NODE_ATTRS_PERMISSIONS_WRITE |
+                                        FS_NODE_ATTRS_PERMISSIONS_EXECUTE);
+
+const FS_NODE_ATTRS_FLAG_MASK = (FS_NODE_ATTRS_FLAG_LINK |
+                                 FS_NODE_ATTRS_FLAG_HIDDEN);
+
+const FS_NODE_ATTRS_FLAG_PERMISSIONS_MASK = (FS_NODE_ATTRS_PERMISSIONS_MASK |
+                                             FS_NODE_ATTRS_FLAG_MASK);
 
 const FS_IO_ERROR_FILE_NOT_FOUND = -1;
 const FS_IO_ERROR_NOT_A_FILE = -2;
 const FS_IO_ERROR_MOUNTPOINT_NOT_FOUND = -3;
 const FS_IO_ERROR_HANDLER_NOT_PROVIDED = -4;
+const FS_IO_ERROR_NOT_PERMITTED = -5;
 
 /**
  * A single node in the VFS tree, representing a file or folder. Folders link
@@ -35,7 +47,7 @@ const FS_IO_ERROR_HANDLER_NOT_PROVIDED = -4;
 struct fs_node {
     name: uint8*;
     file_size: uint64;
-    attrs: uint16;
+    attrs: uint32;
     info: uint8*;
     mount: struct fs_mount*;
     next: struct fs_node*;
@@ -125,7 +137,7 @@ fn fs_remove_child(node: struct fs_node*, name: uint8*) -> int32 {
  *
  * @return pointer to the new node, or null if alloc failed
  */
-fn fs_create_node(name: uint8*, file_size: uint64, attrs: uint16, info: uint8*,
+fn fs_create_node(name: uint8*, file_size: uint64, attrs: uint32, info: uint8*,
                   mount: struct fs_mount*, next: struct fs_node*, child: struct fs_node*) -> struct fs_node * {
     let node: struct fs_node* = alloc<struct fs_node>(1);
 
@@ -176,9 +188,9 @@ fn fs_destroy_node(node: struct fs_node*) {
  *
  * @return pointer to the new file node, or null if alloc failed
  */
-fn fs_create_file(name: uint8*, file_size: uint64, attrs: uint16, data: uint8*,
+fn fs_create_file(name: uint8*, file_size: uint64, attrs: uint32, data: uint8*,
                   mount: struct fs_mount*) -> struct fs_node * {
-    let _attrs = (attrs & FS_NODE_ATTRS_FLAG_MASK) | FS_NODE_ATTRS_TYPE_FILE;
+    let _attrs = (attrs & FS_NODE_ATTRS_FLAG_PERMISSIONS_MASK) | FS_NODE_ATTRS_TYPE_FILE;
     return fs_create_node(name, file_size, _attrs, data, mount, null, null);
 }
 
@@ -194,8 +206,8 @@ fn fs_create_file(name: uint8*, file_size: uint64, attrs: uint16, data: uint8*,
  *
  * @return pointer to the new folder node, or null if alloc failed
  */
-fn fs_create_folder(name: uint8*, attrs: uint16, data: uint8*, mount: struct fs_mount*) -> struct fs_node * {
-    let _attrs = (attrs & FS_NODE_ATTRS_FLAG_MASK) | FS_NODE_ATTRS_TYPE_FOLDER;
+fn fs_create_folder(name: uint8*, attrs: uint32, data: uint8*, mount: struct fs_mount*) -> struct fs_node * {
+    let _attrs = (attrs & FS_NODE_ATTRS_FLAG_PERMISSIONS_MASK) | FS_NODE_ATTRS_TYPE_FOLDER;
 
     let folder = fs_create_node(name, 0, _attrs, data, mount, null, null);
     fs_create_self_ref(folder);
@@ -232,7 +244,10 @@ fn fs_add_to_folder(parent: struct fs_node*, node: struct fs_node*) {
  */
 @private
 fn fs_create_self_ref(folder: struct fs_node*) -> struct fs_node* {
-    let attrs: uint16 = FS_NODE_ATTRS_TYPE_FOLDER | FS_NODE_ATTRS_FLAG_LINK | FS_NODE_ATTRS_FLAG_HIDDEN;
+    let attrs: uint32 = ((folder->attrs & FS_NODE_ATTRS_PERMISSIONS_MASK) |
+                         FS_NODE_ATTRS_TYPE_FOLDER |
+                         FS_NODE_ATTRS_FLAG_LINK |
+                         FS_NODE_ATTRS_FLAG_HIDDEN);
     let self_ref = fs_create_node(".", 0, attrs, null, folder->mount, null, null);
     self_ref->child = folder;
     fs_add_to_folder(folder, self_ref);
@@ -250,7 +265,10 @@ fn fs_create_self_ref(folder: struct fs_node*) -> struct fs_node* {
  */
 @private
 fn fs_create_parent_ref(parent: struct fs_node*, folder: struct fs_node*) -> struct fs_node* {
-    let attrs: uint16 = FS_NODE_ATTRS_TYPE_FOLDER | FS_NODE_ATTRS_FLAG_LINK | FS_NODE_ATTRS_FLAG_HIDDEN;
+    let attrs: uint32 = ((parent->attrs & FS_NODE_ATTRS_PERMISSIONS_MASK) |
+                         FS_NODE_ATTRS_TYPE_FOLDER |
+                         FS_NODE_ATTRS_FLAG_LINK |
+                         FS_NODE_ATTRS_FLAG_HIDDEN);
     let parent_ref = fs_create_node("..", 0, attrs, null, folder->mount, null, null);
     parent_ref->child = parent;
     fs_add_to_folder(folder, parent_ref);
@@ -272,7 +290,7 @@ fn fs_create_parent_ref(parent: struct fs_node*, folder: struct fs_node*) -> str
  * @return pointer to the new file node, or null if node is not a folder
  */
 fn fs_add_file_to_folder(parent: struct fs_node*, name: uint8*, file_size: uint64,
-                         attrs: uint16, data: uint8*, mount: struct fs_mount*) -> struct fs_node* {
+                         attrs: uint32, data: uint8*, mount: struct fs_mount*) -> struct fs_node* {
     if ((parent->attrs & FS_NODE_ATTRS_TYPE_MASK) != FS_NODE_ATTRS_TYPE_FOLDER) {
         dprintk("[filesystem] Node is not a folder!\n");
         return null;
@@ -297,7 +315,7 @@ fn fs_add_file_to_folder(parent: struct fs_node*, name: uint8*, file_size: uint6
  *
  * @return pointer to the new folder node, or null if node is not a folder
  */
-fn fs_add_subfolder(parent: struct fs_node *, name: uint8*, attrs: uint16, data: uint8*,
+fn fs_add_subfolder(parent: struct fs_node *, name: uint8*, attrs: uint32, data: uint8*,
                     mount: struct fs_mount*) -> struct fs_node * {
     if ((parent->attrs & FS_NODE_ATTRS_TYPE_MASK) != FS_NODE_ATTRS_TYPE_FOLDER) {
         dprintk("[filesystem] node is not a folder!\n");
@@ -436,6 +454,11 @@ fn fs_read(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint64)
         return FS_IO_ERROR_HANDLER_NOT_PROVIDED;
     }
 
+    if ((node->attrs & FS_NODE_ATTRS_PERMISSIONS_READ) == 0) {
+        dprintk("[fs] \"%s\" does not allow reads\n", node->name);
+        return FS_IO_ERROR_NOT_PERMITTED;
+    }
+
     return mp->read(node, buffer, count, offset);
 }
 
@@ -472,6 +495,11 @@ fn fs_write(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint64
     if (mp->write == null) {
         dprintk("[fs] mountpoint \"%s\" didn't provide a `write` handler!\n", mp->mountpoint);
         return FS_IO_ERROR_HANDLER_NOT_PROVIDED;
+    }
+
+    if ((node->attrs & FS_NODE_ATTRS_PERMISSIONS_WRITE) == 0) {
+        dprintk("[fs] \"%s\" does not allow writes\n", node->name);
+        return FS_IO_ERROR_NOT_PERMITTED;
     }
 
     return mp->write(node, buffer, count, offset);

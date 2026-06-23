@@ -255,6 +255,17 @@ import "../syscall";
     };
 }
 
+@inline fn stat(path: uint8*, stat: struct file_stat*) -> int64 {
+    return @asm @clobbers("x0", "x1", "x2", "memory")
+        (SYSCALL_STAT, path, stat) -> int64 {
+        "mov x0, $0"
+        "mov x1, $1"
+        "mov x2, $2"
+        "svc #0"
+        "mov $out, x0"
+    };
+}
+
 /**
  * Writes the absolute path of the calling process's current working directory
  * into buf via SYSCALL_GETCWD (svc #0). Traps into EL1, where

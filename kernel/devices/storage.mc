@@ -25,7 +25,9 @@ fn storage_init() {
         _next = _next + 1;
 
         dprintk("[storage] adding \"/dev/%s\"\n", mod_name);
-        io_register_module(mod_name, slot as uint64, storage_read, storage_write);
+
+        let attrs: uint32 = FS_NODE_ATTRS_PERMISSIONS_READ;
+        io_register_module(mod_name, attrs, slot as uint64, storage_read, storage_write);
     }
 }
 

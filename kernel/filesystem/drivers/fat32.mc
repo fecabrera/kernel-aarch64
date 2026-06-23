@@ -1,10 +1,10 @@
 import "debug";
 import "memory";
 import "cpu";
-import "fs";
-import "vfs";
-import "uchar";
+import "utf16";
 import "libc/string";
+import "filesystem/fs";
+import "filesystem/vfs";
 
 // Partition type byte
 const MBR_PARTITION_TYPE_EMPTY = 0;
@@ -392,13 +392,22 @@ fn fat32_read_cluster(pathname: uint8*, bs_info: struct fat32_bs_info*, cluster:
             entry_ref->n_lfn_entries = n_lfn_entries;
 
             let node: struct fs_node*;
-            if (attributes & FAT32_ATTR_DIRECTORY)
-                node = fs_add_subfolder(parent_node, name, 0, entry_ref, mount);
-            else {
+            if (attributes & FAT32_ATTR_DIRECTORY) {
+                let attrs: uint32 = FS_NODE_ATTRS_PERMISSIONS_READ;
+                if ((attributes & FAT32_ATTR_READ_ONLY) == 0)
+                    attrs = attrs | FS_NODE_ATTRS_PERMISSIONS_WRITE;
+
+                node = fs_add_subfolder(parent_node, name, attrs, entry_ref, mount);
+            } else {
                 let file_size: uint32;
                 bytecopy(&file_size, &dir_entry->file_size, 1);
+
+                let attrs: uint32 = FS_NODE_ATTRS_PERMISSIONS_READ;
+                if ((attributes & FAT32_ATTR_READ_ONLY) == 0)
+                    attrs = attrs | FS_NODE_ATTRS_PERMISSIONS_WRITE;
+
                 node = fs_add_file_to_folder(parent_node, name, file_size as uint64,
-                                             0, entry_ref, mount);
+                                             attrs, entry_ref, mount);
             }
 
             set_set(parent_nodes, next_cluster, node);

@@ -27,7 +27,7 @@ struct io_file {
  * Must be called after vfs_init() and before any other io_* function.
  */
 fn io_init() {
-    _dev_root = vfs_create_dir("/", "dev", 0, null);
+    _dev_root = vfs_create_dir("/", "dev", FS_NODE_ATTRS_PERMISSIONS_READ, null);
     if (_dev_root == null) {
         dprintk("[io] cannot create \"/dev\" folder!\n");
         hang();
@@ -66,7 +66,7 @@ fn io_get_module(name: uint8*) -> struct io_module* {
  *
  * @return 0 on success, -1 if a module with that name is already registered
  */
-fn io_register_module(name: uint8*, drv_info: uint64,
+fn io_register_module(name: uint8*, attrs: uint32, drv_info: uint64,
                       read: fn (uint8*, uint64, uint64, uint64) -> int64,
                       write: fn (uint8*, uint64, uint64, uint64) -> int64) -> int32 {
     if (io_get_module(name) != null) {
@@ -79,7 +79,7 @@ fn io_register_module(name: uint8*, drv_info: uint64,
     mod->read = read;
     mod->write = write;
 
-    if (fs_add_file_to_folder(_dev_root, name, 0, 0, null, dev_mp) == null) {
+    if (fs_add_file_to_folder(_dev_root, name, 0, attrs, null, dev_mp) == null) {
         dprintk("[io] cannot add \"%s\" to /dev!\n", name);
         return -1;
     }

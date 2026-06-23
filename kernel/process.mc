@@ -7,6 +7,12 @@ import "filesystem/vfs";
 import "filesystem/file";
 
 const DEFAULT_STACK_SIZE = (1 << 14); // 16 KiB
+
+// Magic planted at the bottom 8 bytes of every task stack. The stack grows down
+// toward stack[0]; if this value is ever clobbered the stack has (nearly)
+// overflowed into the adjacent heap block. See process_check_stack.
+const STACK_CANARY: uint64 = 0xDEADC0DECAFEF00D;
+
 const PROC_DEAD = -1;
 const PROC_CREATED = 0;
 const PROC_READY = 1;
@@ -62,6 +68,8 @@ fn create_process(proc: struct process*, stack_size: uint64) -> int32 {
         return -1;
     }
 
+    *(stack as uint64*) = STACK_CANARY; // bottom-of-stack overflow guard
+
     // vectors.S save_context uses a 272-byte frame (sizeof(cpu_context)=264 + 8
     // bytes padding for 16-byte SP alignment). Place ctx 272 bytes from the top
     // so that after restore_context's "add sp, sp, #272", sp == stack + stack_size
@@ -101,6 +109,8 @@ fn duplicate_process(dest: struct process*, src: struct process*) -> int32 {
     if (stack == null)
         return -1;
 
+    *(stack as uint64*) = STACK_CANARY; // bottom-of-stack overflow guard
+
     let ctx_offset: uint64 = (src->ctx as uint64) - (src->stack as uint64);
     let ctx = (stack as uint64 + ctx_offset) as struct cpu_context*;
     bytecopy(ctx, src->ctx, 1);
@@ -134,6 +144,25 @@ fn process_set_entry(proc: struct process*, entry: fn ()) {
     let ctx: struct cpu_context* = proc->ctx;
     ctx->elr = entry as uint64;
     ctx->spsr = SPSR_EL1h;
+}
+
+/**
+ * Verifies the bottom-of-stack canary planted at process creation is intact.
+ * A clobbered canary means the stack has grown down past its allocation and
+ * (nearly) overflowed into the adjacent heap block. Halts on detection so the
+ * fault is attributed to the offending process rather than surfacing later as
+ * mysterious heap corruption. Debug-only; compiles out of normal builds.
+ *
+ * @param proc: process whose stack to validate
+ */
+fn process_check_stack(proc: struct process*) {
+    @if (DEBUG) {
+        if (proc != null and *(proc->stack as uint64*) != STACK_CANARY) {
+            printk("[process] stack overflow detected in pid %lld (stack=%p)!\n",
+                   proc->pid, proc->stack);
+            halt();
+        }
+    }
 }
 
 /**
@@ -281,9 +310,9 @@ fn process_write_file(proc: struct process*, fd: int64, buffer: uint8*, count: u
  *
  * @return 0 on success, FILE_IO_ERROR_INVALID_DESCRIPTOR if fd is out of range
  */
-fn process_file_stat(proc: struct process*, fd: int64, stat: struct file_stat*) -> int64 {
+fn process_file_stat(proc: struct process*, fd: int64, st: struct file_stat*) -> int64 {
     dprintk("[process] file_stat(%lld, %lld, %p)\n",
-            proc->pid, fd, stat);
+            proc->pid, fd, st);
 
     let dtor_ptrs = &proc->dtor_ptrs;
 
@@ -291,7 +320,18 @@ fn process_file_stat(proc: struct process*, fd: int64, stat: struct file_stat*) 
     if (!list_get(dtor_ptrs, fd as uint64, &dtor) or dtor == null)
         return FILE_IO_ERROR_INVALID_DESCRIPTOR;
 
-    return file_stat(dtor->value, stat);
+    return file_stat(dtor->value, st);
+}
+
+fn process_stat(proc: struct process*, path: uint8*, st: struct file_stat*) -> int64 {
+    dprintk("[process] stat(%lld, %s, %p)\0",
+            proc->pid, path, st);
+
+    let node = vfs_get_node_for_path(path, proc->cwd);
+    if (node == null)
+        return FILE_IO_ERROR_NOT_FOUND;
+
+    return file_node_stat(node, st);
 }
 
 /**

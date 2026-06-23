@@ -15,8 +15,8 @@ fn vfs_init() {
     dict_init(&_vfs_mp_table, 10);
 
     // create root and volumes
-    _vfs_root = fs_create_folder(null, 0, null, null);
-    fs_add_subfolder(_vfs_root, "volumes", 0, null, null);
+    _vfs_root = fs_create_folder(null, FS_NODE_ATTRS_PERMISSIONS_READ, null, null);
+    fs_add_subfolder(_vfs_root, "volumes", FS_NODE_ATTRS_PERMISSIONS_READ, null, null);
 }
 
 /**
@@ -253,7 +253,7 @@ fn vfs_write(pathname: uint8*, buffer: uint8*, count: uint64, offset: uint64) ->
  *
  * @return pointer to the new folder node, or null if the parent is not found or creation fails
  */
-fn vfs_create_dir(path: uint8*, name: uint8*, attrs: uint16, mount: struct fs_mount*) -> struct fs_node* {
+fn vfs_create_dir(path: uint8*, name: uint8*, attrs: uint32, mount: struct fs_mount*) -> struct fs_node* {
     let parent = vfs_get_node_for_path(path, null);
     let node = fs_add_subfolder(parent, name, attrs, null, mount);
     if (node == null) {
@@ -277,7 +277,7 @@ fn vfs_create_dir(path: uint8*, name: uint8*, attrs: uint16, mount: struct fs_mo
  *
  * @return pointer to the new file node, or null if the parent is not found or creation fails
  */
-fn vfs_create_file(path: uint8*, name: uint8*, file_size: uint64, attrs: uint16, mount: struct fs_mount*) -> struct fs_node* {
+fn vfs_create_file(path: uint8*, name: uint8*, file_size: uint64, attrs: uint32, mount: struct fs_mount*) -> struct fs_node* {
     let parent = vfs_get_node_for_path(path, null);
     let node = fs_add_file_to_folder(parent, name, file_size, attrs, null, mount);
     if (node == null) {

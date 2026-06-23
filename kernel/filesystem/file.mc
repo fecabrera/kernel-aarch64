@@ -70,7 +70,7 @@ fn file_read(fd: struct file_descriptor*, buffer: uint8*, count: uint64) -> int6
     let n = fs_read(fd->node, buffer, count, fd->pos);
     if(n < 0)
         // @todo: parse response and translate to FILE_IO_ERROR_*
-        return -2;
+        return -999;
 
     fd->pos = fd->pos + n as uint64;
     return n;
@@ -109,8 +109,12 @@ fn file_write(fd: struct file_descriptor*, buffer: uint8*, count: uint64) -> int
  *
  * @return 0 on success
  */
-fn file_stat(fd: struct file_descriptor*, stat: struct file_stat*) -> int64 {
-    stat->st_size = fd->node->file_size;
-    stat->st_mode = fd->attrs;
+fn file_stat(fd: struct file_descriptor*, st: struct file_stat*) -> int64 {
+    return file_node_stat(fd->node, st);
+}
+
+fn file_node_stat(node: struct fs_node*, st: struct file_stat*) -> int64 {
+    st->st_size = node->file_size;
+    st->st_mode = node->attrs;
     return 0;
 }
