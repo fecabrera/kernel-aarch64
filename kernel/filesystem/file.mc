@@ -101,11 +101,11 @@ fn file_write(fd: struct file_descriptor*, buffer: uint8*, count: uint64) -> int
 }
 
 /**
- * Fills stat with metadata for the open file: the node's size and the fd's
- * access mode.
+ * Fills st with metadata for the open file: the node's size and access mode.
+ * Thin wrapper that forwards the descriptor's node to file_node_stat.
  *
- * @param fd:   open file to stat
- * @param stat: caller-allocated file_stat to fill
+ * @param fd: open file to stat
+ * @param st: caller-allocated file_stat to fill
  *
  * @return 0 on success
  */
@@ -113,6 +113,16 @@ fn file_stat(fd: struct file_descriptor*, st: struct file_stat*) -> int64 {
     return file_node_stat(fd->node, st);
 }
 
+/**
+ * Fills st with metadata for a node directly (no open descriptor required):
+ * st_size from node->file_size and st_mode from node->attrs. Backs both
+ * file_stat (fd-based) and the path-based stat syscall.
+ *
+ * @param node: node to stat
+ * @param st:   caller-allocated file_stat to fill
+ *
+ * @return 0 on success
+ */
 fn file_node_stat(node: struct fs_node*, st: struct file_stat*) -> int64 {
     st->st_size = node->file_size;
     st->st_mode = node->attrs;

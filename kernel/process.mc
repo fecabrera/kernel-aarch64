@@ -302,11 +302,11 @@ fn process_write_file(proc: struct process*, fd: int64, buffer: uint8*, count: u
 }
 
 /**
- * Fills stat with metadata for descriptor fd via file_stat.
+ * Fills st with metadata for descriptor fd via file_stat.
  *
  * @param proc: process owning the fd
  * @param fd:   file descriptor to stat
- * @param stat: caller-allocated file_stat to fill
+ * @param st:   caller-allocated file_stat to fill
  *
  * @return 0 on success, FILE_IO_ERROR_INVALID_DESCRIPTOR if fd is out of range
  */
@@ -323,8 +323,19 @@ fn process_file_stat(proc: struct process*, fd: int64, st: struct file_stat*) ->
     return file_stat(dtor->value, st);
 }
 
+/**
+ * Fills stat with metadata for the file at path, resolved relative to the
+ * process's cwd, via file_node_stat. Unlike process_file_stat, no open
+ * descriptor is required.
+ *
+ * @param proc: process whose cwd path is resolved against
+ * @param path: path to stat, resolved relative to proc->cwd
+ * @param st:   caller-allocated file_stat to fill
+ *
+ * @return 0 on success, FILE_IO_ERROR_NOT_FOUND if the path does not resolve
+ */
 fn process_stat(proc: struct process*, path: uint8*, st: struct file_stat*) -> int64 {
-    dprintk("[process] stat(%lld, %s, %p)\0",
+    dprintk("[process] stat(%lld, %s, %p)\n",
             proc->pid, path, st);
 
     let node = vfs_get_node_for_path(path, proc->cwd);

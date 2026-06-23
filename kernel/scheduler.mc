@@ -31,6 +31,8 @@ import "interrupts/drivers/timer";
  *   SYSCALL_READ             → syscall_read_handler
  *   SYSCALL_WRITE            → syscall_write_handler
  *   SYSCALL_FSTAT            → syscall_fstat_handler
+ *   SYSCALL_STAT             → syscall_stat_handler
+ *   SYSCALL_GETCWD           → syscall_getcwd_handler
  */
 fn scheduler_init() {
     idle_ctx = (idle_stack as uint64 + DEFAULT_STACK_SIZE - 272) as struct cpu_context*;
@@ -617,6 +619,16 @@ fn syscall_fstat_handler(ctx: struct cpu_context*) -> struct cpu_context* {
     return ctx;
 }
 
+/**
+ * Handles SYSCALL_STAT. Fills the file_stat at x2 with metadata for the file at
+ * the path in x1 (resolved relative to the process cwd) via process_stat and
+ * returns the result in x0. Unlike fstat, no open descriptor is needed. No
+ * context switch.
+ *
+ * @param ctx: saved context of the calling process
+ *
+ * @return ctx with x0 set to 0 on success, or a negative error
+ */
 fn syscall_stat_handler(ctx: struct cpu_context*) -> struct cpu_context* {
     let proc = scheduler_get_current_process();
     if (proc == null) {

@@ -255,6 +255,17 @@ import "../syscall";
     };
 }
 
+/**
+ * Retrieves metadata for the file at path into stat via SYSCALL_STAT (svc #0).
+ * Traps into EL1, where syscall_stat_handler resolves path relative to the
+ * process cwd and fills the file_stat. Unlike fstat, no open descriptor is
+ * required.
+ *
+ * @param path: null-terminated path to stat, resolved relative to the cwd
+ * @param stat: caller-allocated file_stat to fill
+ *
+ * @return 0 on success, or a negative error.
+ */
 @inline fn stat(path: uint8*, stat: struct file_stat*) -> int64 {
     return @asm @clobbers("x0", "x1", "x2", "memory")
         (SYSCALL_STAT, path, stat) -> int64 {
