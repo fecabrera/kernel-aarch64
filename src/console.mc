@@ -80,7 +80,7 @@ fn command_cat(argc: int64, argv: uint8**) -> int64 {
     }
 
     let fd = open(argv[1], FS_FILE_ATTRS_READ);
-    if(fd < 0) {
+    if (fd < 0) {
         println("open() returned %lld!", fd);
         return -2;
     }

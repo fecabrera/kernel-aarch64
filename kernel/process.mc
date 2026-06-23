@@ -1,12 +1,11 @@
 import "cpu";
 import "list";
+import "mm";
 import "memory";
 import "pointer";
 import "filesystem/fs";
 import "filesystem/vfs";
 import "filesystem/file";
-
-const DEFAULT_STACK_SIZE = (1 << 14); // 16 KiB
 
 // Magic planted at the bottom 8 bytes of every task stack. The stack grows down
 // toward stack[0]; if this value is ever clobbered the stack has (nearly)
@@ -61,12 +60,9 @@ struct process {
  *
  * @return 0 on success, -1 if stack allocation fails
  */
-fn create_process(proc: struct process*, stack_size: uint64) -> int32 {
-    let stack: uint8* = alloc_aligned<uint8>(stack_size, 16);
-
-    if (stack == null) {
-        return -1;
-    }
+fn process_create(proc: struct process*, stack_block_count: uint64) -> int32 {
+    let stack = stack_alloc(stack_block_count);
+    if (stack == null) return -1;
 
     *(stack as uint64*) = STACK_CANARY; // bottom-of-stack overflow guard
 
@@ -74,6 +70,7 @@ fn create_process(proc: struct process*, stack_size: uint64) -> int32 {
     // bytes padding for 16-byte SP alignment). Place ctx 272 bytes from the top
     // so that after restore_context's "add sp, sp, #272", sp == stack + stack_size
     // (16-byte aligned).
+    let stack_size = stack_block_count * STACK_POOL_BLK_SIZE;
     let ctx = (stack as uint64 + stack_size - 272) as struct cpu_context*;
     set_bytes(ctx, 0, 1);
 
@@ -102,9 +99,10 @@ fn create_process(proc: struct process*, stack_size: uint64) -> int32 {
  *
  * @return 0 on success, -1 if stack allocation fails
  */
-fn duplicate_process(dest: struct process*, src: struct process*) -> int32 {
+fn process_duplicate(dest: struct process*, src: struct process*) -> int32 {
     let stack_size = src->stack_size;
-    let stack: uint8* = alloc_aligned<uint8>(stack_size, 16);
+    let stack: uint8* = stack_alloc(stack_size / STACK_POOL_BLK_SIZE);
+    bytecopy(stack, src->stack, stack_size);
 
     if (stack == null)
         return -1;
@@ -173,11 +171,11 @@ fn process_check_stack(proc: struct process*) {
  *
  * @return 0 on success, -1 if proc->state != PROC_DEAD
  */
-fn destroy_process(proc: struct process*) -> int32 {
+fn process_destroy(proc: struct process*) -> int32 {
     if (proc->state != PROC_DEAD)
         return -1;
 
-    dealloc(proc->stack);
+    stack_free(proc->stack, proc->stack_size / STACK_POOL_BLK_SIZE);
 
     proc->stack = null;
     proc->ctx = null;

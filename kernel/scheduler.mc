@@ -138,7 +138,7 @@ fn scheduler_spawn(entry: fn ()) -> int64 {
     let proc: struct process* = alloc<struct process>(1);
 
     dprintk("[scheduler] creating process\n");
-    create_process(proc, DEFAULT_STACK_SIZE);
+    process_create(proc, DEFAULT_STACK_BLOCK_COUNT);
 
     dprintk("[scheduler] configuring process\n");
     process_set_entry(proc, entry);
@@ -298,7 +298,7 @@ fn syscall_exit_handler(ctx: struct cpu_context*) -> struct cpu_context* {
     notify_waiters(proc->pid, ctx->x[1] as int64);
 
     // destroy process resources
-    if (destroy_process(proc) < 0) {
+    if (process_destroy(proc) < 0) {
         dprintk("[scheduler] failed to destroy process, addr = %p\n", proc);
     }
 
@@ -402,7 +402,7 @@ fn syscall_fork_handler(ctx: struct cpu_context*) -> struct cpu_context* {
     dprintk("[scheduler] fork(%i), ctx->x0 = %llu\n", proc->pid, ctx->x[0]);
 
     let child: struct process* = alloc<struct process>(1);
-    duplicate_process(child, proc);
+    process_duplicate(child, proc);
     scheduler_enqueue(child);
 
     child->ctx->x[0] = 0;

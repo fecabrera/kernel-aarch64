@@ -1,13 +1,24 @@
 import "debug";
 import "dtb";
 import "heap";
+import "pool";
 
 const KERNEL_HEAP_SIZE = 16 * (1 << 20); // 16 MiB heap
 const KERNEL_MIN_BLK_SIZE = 16;
 
+const STACK_POOL_SIZE = 16 * (1 << 20); // 16 MiB stack pool
+const STACK_POOL_BLK_SIZE = 16 * (1 << 10); // 16 KiB stack blocks;
+
+const DEFAULT_STACK_BLOCK_COUNT = 1;
+const DEFAULT_STACK_SIZE = STACK_POOL_BLK_SIZE * DEFAULT_STACK_BLOCK_COUNT;
+
 @static let mem: struct memreg;
+
 @static let kheap_ptr: uint8[KERNEL_HEAP_SIZE];
 @static let kheap: struct heap;
+
+@static let stack_pool_ptr: uint8[STACK_POOL_SIZE];
+@static let stack_pool: struct pool;
 
 /**
  * Initializes the kernel heap over the static 16 MiB kheap_ptr region, then reads the RAM base
@@ -15,12 +26,28 @@ const KERNEL_MIN_BLK_SIZE = 16;
  * called after the DTB has been parsed and before any kmalloc/kfree.
  */
 fn mem_init() {
+    // initialize kernel heap
     heap_init(&kheap, KERNEL_HEAP_SIZE, KERNEL_MIN_BLK_SIZE, kheap_ptr);
+
+    // initialize stack pool
+    pool_init(&stack_pool, stack_pool_ptr as uint64, STACK_POOL_SIZE,
+              STACK_POOL_BLK_SIZE);
+    pool_dump(&stack_pool);
     
     if (dtb_get_memory_register(&mem) == 0)
         dprintk("[mem] base: %p, size=%i MiB\n", mem.base, mem.size / (1 << 20));
     else
         dprintk("[mem] Memory register not found!");
+}
+
+@inline
+fn stack_alloc(count: uint64) -> uint8* {
+    return pool_alloc(&stack_pool, count);
+}
+
+@inline
+fn stack_free(ptr: uint8*, count: uint64) {
+    pool_free(&stack_pool, ptr, count);
 }
 
 /**
