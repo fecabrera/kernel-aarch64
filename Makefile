@@ -3,6 +3,7 @@ MCC		= PYTHONPATH=$(MCCPATH) python -m mcc
 CC      = aarch64-elf-gcc
 LD      = aarch64-elf-ld
 OBJCOPY = aarch64-elf-objcopy
+AR      = aarch64-elf-ar
 
 MCFLAGS = --target aarch64-unknown-none-elf \
 		  --nostdlib --freestanding \
@@ -10,7 +11,6 @@ MCFLAGS = --target aarch64-unknown-none-elf \
 		  -O3 \
 		  -I kernel \
 		  -I libmc \
-		  -I lib \
           $(CFLAGS_EXTRA)
 
 CFLAGS  = -ffreestanding -nostdlib -nostdinc \
@@ -26,6 +26,7 @@ SRCS := $(wildcard \
 		  src/*.mc \
   		  lib/src/*.c \
   		  libc/src/*.c \
+  		  libsys/*.mc \
   		  libmc/*.mc \
   		  libmc/iteration/*.mc \
   		  libmc/hashing/*.mc \
@@ -48,7 +49,7 @@ OBJS := $(patsubst src/%, build/src/%, $(OBJS))
 
 build: kernel.elf kernel.img
 
-all: build init.img
+all: build helloworld init.img
 
 build/src/%.o: src/%.mc
 	@mkdir -p $(dir $@)
@@ -57,10 +58,6 @@ build/src/%.o: src/%.mc
 build/src/%.o: src/%.S
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@
-
-build/libmc/%.o: libmc/%.mc
-	@mkdir -p $(dir $@)
-	$(MCC) $(MCFLAGS) $< -o $@
 
 build/kernel/%.o: kernel/%.mc
 	@mkdir -p $(dir $@)
@@ -73,6 +70,20 @@ build/lib/%.o: lib/src/%.c
 build/libc/%.o: libc/src/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@
+
+build/libmc/%.o: libmc/%.mc
+	@mkdir -p $(dir $@)
+	$(MCC) $(MCFLAGS) $< -o $@
+
+libmc.a: build
+	$(AR) rcs $@ build/libmc/*.o build/libmc/iteration/*.o build/libmc/hashing/*.o
+
+libc.a: build
+	$(AR) rcs $@ build/libc/*.o
+
+helloworld: libmc.a libc.a
+	$(MCC) $(MCFLAGS) user/helloworld/main.mc
+	$(LD) -r user/helloworld/main.o $< -o init/bin/helloworld
 
 kernel.elf: $(OBJS) linker.ld
 	$(LD) -T linker.ld -o $@ $(OBJS)

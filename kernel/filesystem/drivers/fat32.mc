@@ -785,10 +785,14 @@ fn fat32_read(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint
         }
     }
 
-    // copy data to buffer
-    bytecopy(buffer, &tmp[offset % bs_info->n_bytes_per_sector], count);
+    // copy data to buffer, clamping to the bytes that actually remain in the file
+    let bytes_read: uint64 = count;
+    if (offset + count > file_size as uint64)
+        bytes_read = file_size as uint64 - offset;
 
-    return 0;
+    bytecopy(buffer, &tmp[offset % bs_info->n_bytes_per_sector], bytes_read);
+
+    return bytes_read as int64;
 }
 
 /**

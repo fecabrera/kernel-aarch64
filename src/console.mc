@@ -4,6 +4,7 @@ import "list";
 import "string";
 import "memory";
 import "scheduler";
+import "elf/elf64";
 import "filesystem/file";
 import "filesystem/fs";
 import "filesystem/vfs";
@@ -11,6 +12,11 @@ import "filesystem/drivers/fat32";
 import "libc/ctype";
 import "libc/stdlib";
 import "system/syscall";
+import "commands/echo.mc";
+import "commands/exit.mc";
+import "commands/ls.mc";
+import "commands/cat.mc";
+import "commands/elf.mc";
 
 @static
 let available_commands: uint8*[][2] = [
@@ -18,6 +24,7 @@ let available_commands: uint8*[][2] = [
     ["cd <path>", "change the working directory"],
     ["cat <path>", "print a file"],
     ["stat <path>", "display file status"],
+    ["elf <path>", "display elf info"],
     ["echo [args...]", "print arguments"],
     ["sleep <seconds>", "sleep for the given number of seconds"],
     ["msleep <seconds>", "sleep for the given number of milliseconds"],
@@ -41,13 +48,6 @@ fn command_help(argc: int64, argv: uint8**) -> int64 {
 }
 
 @private
-fn command_exit(argc: int64, argv: uint8**) -> int64 {
-    let status: int64 = argc > 1 ? atoll(argv[1]) : 0;
-    println("exiting with status %lld", status);
-    return status;
-}
-
-@private
 fn command_mount(argc: int64, argv: uint8**) -> int64 {
     if (argc < 2) {
         println("usage: %s <device> [mountpoint]", argv[0]);
@@ -66,80 +66,6 @@ fn command_mount(argc: int64, argv: uint8**) -> int64 {
     return 0;
 }
 
-@private
-fn command_echo(argc: int64, argv: uint8**) -> int64 {
-    println("%s", argc > 1 ? argv[1] : "");
-    return 0;
-}
-
-@private
-fn command_cat(argc: int64, argv: uint8**) -> int64 {
-    if (argc < 2) {
-        println("usage: %s <path>", argv[0]);
-        return -1;
-    }
-
-    let fd = open(argv[1], FS_FILE_ATTRS_READ);
-    if (fd < 0) {
-        println("open() returned %lld!", fd);
-        return -2;
-    }
-    
-    defer close(fd);
-
-    let st: struct file_stat;
-    let st_status = fstat(fd, &st);
-    if (st_status < 0) {
-        println("fstat() returned %lld!", st_status);
-        return -3;
-    }
-    
-    let buffer: uint8* = alloc<uint8>(st.st_size + 1);
-    defer dealloc(buffer);
-
-    let r_status = read(fd, buffer, st.st_size);
-    if (r_status < 0) {
-        println("read() returned %lld!", r_status);
-        return -4;
-    }
-
-    buffer[st.st_size] = '\0';
-    println("%s", buffer);
-
-    return 0;
-}
-
-@private
-fn command_ls(argc: int64, argv: uint8**) -> int64 {
-    let filename: uint8* = argc > 1 ? argv[1] : "/";
-    
-    let proc = scheduler_get_current_process();
-    
-    let node = vfs_get_node_for_path(filename, proc->cwd);
-    if (node == null) {
-        println("\"%s\" not found!", filename);
-        return -1;
-    }
-
-    if ((node->attrs & FS_NODE_ATTRS_TYPE_MASK) != FS_NODE_ATTRS_TYPE_FOLDER) {
-        println("\"%s\" is not a folder!", filename);
-        return -2;
-    }
-
-    until((node->attrs & FS_NODE_ATTRS_FLAG_LINK) == 0)
-        node = node->child;
-
-    let current = node->child;
-    until(current == null) {
-        defer current = current->next;
-        if ((current->attrs & FS_NODE_ATTRS_FLAG_HIDDEN) != 0)
-            continue;
-        
-        println("%s", current->name);
-    }
-
-    return 0;
-}
 
 @private
 fn command_stat(argc: int64, argv: uint8**) -> int64 {
@@ -282,6 +208,8 @@ fn console_parse_command(argc: int64, argv: uint8**) {
     
     if (strcmp(argv[0], "cd") == 0) {
         console_cd(argc, argv);
+    } else if (strcmp(argv[0], "elf") == 0) {
+        console_run_command(command_elf, argc, argv);
     } else if (strcmp(argv[0], "ls") == 0) {
         console_run_command(command_ls, argc, argv);
     } else if (strcmp(argv[0], "exit") == 0) {

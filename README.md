@@ -71,9 +71,10 @@ boilerplate for type-safe, reusable code. mc code links against C through
 - Kernel log — `printk`/`dprintk` (`debug.mc`) and the PL011 print path (`pl011_vprintf`), formatting via stb_sprintf bound through `libc/stdio.mc`
 - Device handlers — serial, storage (`devices/`)
 - Memory management — free-list heap allocator (`heap.mc`: `struct heap` with block split/merge), plus the kernel heap, DTB memory probe, and `kmalloc`/`kfree`/`krealloc`/`kmalloc_aligned` wrappers (`mm.mc`)
-- Interactive console / shell (`console.mc`)
+- Interactive console / shell (`console.mc`) with per-command modules (`src/commands/`)
 - CPU helpers (`cpu.mc`) — register accessors (cntpct/cntfrq/cntp_ctl/cntp_tval, vbar_el1), wfi/wfe, halt/hang, irq enable/disable, and bswap, all via inline `@asm`
 - Boot entry / init sequence (`kernel.mc`) — `kernel_init` subsystem bring-up and the `init` (pid 1) entry point
+- ELF64 loader — loads & runs relocatable objects (`ET_REL`) in-kernel: section layout, symbol rebasing, per-symbol GOT, and the core AArch64 relocations (`elf/elf64.mc`, `src/commands/elf.mc`)
 
 **Still C, bound from mc via `@extern`** (port targets):
 
@@ -240,6 +241,13 @@ boilerplate for type-safe, reusable code. mc code links against C through
 - The `open`/`close`/`read`/`write`/`fstat` syscalls resolve into `process_open/close/read/write_file` / `process_file_stat`, which index the fd table and call the `file_*` layer — completing the loop syscall → `file_*` → `fs_*` → mount handler.
 - `printf`/`vprintf` (`libc/stdio.mc`) format with stb_sprintf and stream to `STDOUT_FILENO` via the `write` syscall, so they require the caller to have that fd open. The console opens stdin/stdout on its device at startup (fds 0/1) and forked command children inherit them, so command output flows printf → `write` → fd table → `fs_write` → device.
 
+### **ELF loader**
+
+- Loads relocatable ELF64 objects (`ET_REL` — e.g. `init/bin/helloworld`, built with `ld -r`) and runs them in-kernel, `insmod`-style. `elf_read` parses the header/section/symbol tables and sums the load size; `elf64_load(file, base)` lays sections out at `base + sh_addr`, rebases the symbol table to runtime addresses (`base + section.sh_addr + st_value`), builds a per-symbol GOT, then applies relocations against the copied image.
+- Relocations handled: `ABS64`, `ADR_PREL_PG_HI21`, `ADD_ABS_LO12_NC`, `LDST{8,16,32,64,128}_ABS_LO12_NC`, `CALL26`/`JUMP26`, `PREL32`/`PREL64`, and the GOT pair `ADR_GOT_PAGE`/`LD64_GOT_LO12_NC`. Unhandled types are logged with their patch address.
+- `elf64_locate_symbol(file, name)` returns a symbol's runtime address; the `elf` shell command resolves `main`, calls it, and prints the return value.
+- Not yet implemented: I-cache maintenance before execution (relies on QEMU's unified caches), `UNDEF`-symbol resolution against a kernel export table, PLTs for out-of-range branches, and GOT/exec-buffer lifetime on unload.
+
 ## Source layout
 
 Kernel implementations live in `.mc` under `kernel/` (plus the entry points in
@@ -256,7 +264,10 @@ init/               — files bundled into init.img at build time (FAT32 ramdisk
 
 src/                — entry points (assembly stubs + top-level mc)
   kernel.mc         — kernel_init: subsystem bring-up (DTB, memory, IRQ, VFS, I/O, serial, storage, scheduler, timer); init(): pid 1 entry point, runs console("/dev/serial")
-  console.mc        — console()/console_parse_command(): interactive terminal loop with cwd-aware prompt and argc/argv tokenization (quoted strings, backslash escapes), fork-per-command dispatch (cd dispatched directly); built-ins: ls, cd, cat, echo, stat, mount, exit, help; line input via libmc/std readline
+  console.mc        — console()/console_parse_command(): interactive terminal loop with cwd-aware prompt and argc/argv tokenization (quoted strings, backslash escapes), fork-per-command dispatch (cd dispatched directly); built-ins: ls, cd, cat, echo, stat, mount, exit, elf, help; line input via libmc/std readline
+  commands/         — one module per shell command, dispatched by console.mc
+    cat.mc, echo.mc, exit.mc, ls.mc — built-in command implementations
+    elf.mc          — `elf <path>`: opens an object, runs elf_read/elf64_load, resolves `main`, calls it, prints the return value
   start.S           — AArch64 boot stub, saves DTB pointer, zeros BSS
   vectors.S         — exception vector table, save/restore_context macros
 
@@ -289,8 +300,8 @@ kernel/             — mc kernel modules (logic + @extern bindings to the C bel
     vfs.mc          — VFS mount system: vfs_init, vfs_create/destroy_mountpoint, vfs_get_node_for_path, vfs_read/write, vfs_create_dir/file, vfs_dump_fs; owns the global _fs_root tree
     drivers/
       fat32.mc      — full FAT32 implementation: boot-sector parse, FAT-table read, cluster-chain + fs-tree traversal, mount/unmount/read/write
-  system/
-    syscall.mc      — user-facing svc wrappers: yield/exit/getpid/waitpid/fork/sleep/msleep/time/uptime/open/close/read/write/fstat/stat/getcwd, all emitting svc #0 via inline @asm
+  elf/
+    elf64.mc        — ELF64 relocatable-object loader: header/section/symbol parsing (elf_read), section layout + symbol rebasing + per-symbol GOT + AArch64 relocations (elf64_load), elf64_locate_symbol; elf64_dump helpers and the full e_ident/ehdr/phdr/shdr/sym/rela type definitions
 
 libmc/              — mcc standard library (generic, type-parametric)
   memory.mc         — alloc<T>/alloc_aligned<T>/resize<T>/dealloc<T>, bytecopy/copy/set_bytes/set_items (copy_bytes/copy_items kept as deprecated shims)
@@ -304,6 +315,9 @@ libmc/              — mcc standard library (generic, type-parametric)
   hashing/          — splitmix64, fnv1a, crc32, murmur3
   iteration/        — pair
   libc/             — freestanding ctype, stdlib, string, limits; stdio binds the stb_sprintf family (vsprintf/snprintf/vsprintfcb) and implements printf/vprintf/getchar/putchar over the read/write syscalls
+  system/           — user-facing syscall surface, linked into both the kernel and loaded user programs
+    syscall.mc      — svc #0 wrappers: yield/exit/getpid/waitpid/fork/sleep/msleep/time/uptime/open/close/read/write/fstat/stat/getcwd, all via inline @asm
+    fs.mc           — shared open-file types: file_descriptor, file_stat, and the FS_FILE_ATTRS_*/FILE_IO_ERROR_* constants
 
 lib/                — C helpers bound from mc via @extern (FDT + UTF-16)
   include/

@@ -44,6 +44,8 @@ fn storage_init() {
  * @return count on success, negative error code from virtio_mmio_read on failure
  */
 fn storage_read(buffer: uint8*, count: uint64, offset: uint64, slot: uint64) -> int64 {
+    dprintk("[/dev/sd%d] buf=0x%p, count=%llu, offset=%llu\n", slot, buffer, count, offset);
+
     let first_sector: uint64 = offset / VIRTIO_MMIO_BLK_SECTOR_SIZE;
     let last_sector: uint64 = (offset + count - 1) / VIRTIO_MMIO_BLK_SECTOR_SIZE;
     let sectors_to_read: uint64 = last_sector - first_sector + 1;
@@ -67,7 +69,6 @@ fn storage_read(buffer: uint8*, count: uint64, offset: uint64, slot: uint64) -> 
         let buf_offset: uint64 = i * VIRTIO_MMIO_BLK_SECTOR_SIZE;
 
         // read sector
-
         let data = (tmp as uint64 + buf_offset) as uint8*;
         let n = virtio_mmio_read(slot as int8, sector, data);
         if (n < 0) {

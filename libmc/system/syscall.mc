@@ -1,6 +1,23 @@
-import "debug";
-import "filesystem/file";
-import "../syscall";
+import "system/fs";
+
+const NUM_SYSCALLS = 256;
+
+const SYSCALL_EXIT: uint64 = 0;
+const SYSCALL_YIELD: uint64 = 1;
+const SYSCALL_GETPID: uint64 = 2;
+const SYSCALL_WAITPID: uint64 = 3;
+const SYSCALL_FORK: uint64 = 4;
+const SYSCALL_SLEEP: uint64 = 5;
+const SYSCALL_MSLEEP: uint64 = 6;
+const SYSCALL_TIME: uint64 = 7;
+const SYSCALL_UPTIME: uint64 = 8;
+const SYSCALL_OPEN: uint64 = 9;
+const SYSCALL_CLOSE: uint64 = 10;
+const SYSCALL_READ: uint64 = 11;
+const SYSCALL_WRITE: uint64 = 12;
+const SYSCALL_FSTAT: uint64 = 13;
+const SYSCALL_STAT: uint64 = 14;
+const SYSCALL_GETCWD: uint64 = 15;
 
 /**
  * Voluntarily yields the CPU to the scheduler via SYSCALL_YIELD (svc #0).
@@ -11,7 +28,6 @@ import "../syscall";
  * @return 0 on return from the scheduler.
  */
 @inline fn yield() -> int64 {
-    dprintk("[syscall] yield()\n");
     return @asm @clobbers("x0", "memory") (SYSCALL_YIELD) -> int64 {
         "mov x0, $0"
         "svc #0"
@@ -27,7 +43,6 @@ import "../syscall";
  * @param status: exit status passed in x1 (logged by syscall_exit_handler).
  */
 @inline fn exit(status: int64) {
-    dprintk("[syscall] exit(%lld)\n", status);
     @asm @clobbers("x0", "x1", "memory") (SYSCALL_EXIT, status) {
         "mov x0, $0"
         "mov x1, $1"
@@ -43,7 +58,6 @@ import "../syscall";
  * @return PID of the current process, or -1 if no process is currently scheduled.
  */
 @inline fn getpid() -> int64 {
-    dprintk("[syscall] getpid()\n");
     return @asm @clobbers("x0") (SYSCALL_GETPID) -> int64 {
         "mov x0, $0"
         "svc #0"
@@ -62,7 +76,6 @@ import "../syscall";
  *         currently scheduled.
  */
 @inline fn waitpid(pid: int64) -> int64 {
-    dprintk("[syscall] waitpid(%lld)\n", pid);
     return @asm @clobbers("x0", "x1", "memory") (SYSCALL_WAITPID, pid) -> int64 {
         "mov x0, $0"
         "mov x1, $1"
@@ -79,7 +92,6 @@ import "../syscall";
  * @return child PID in the parent, 0 in the child, or -1 on failure.
  */
 @inline fn fork() -> int64 {
-    dprintk("[syscall] fork()\n");
     return @asm @clobbers("x0", "memory") (SYSCALL_FORK) -> int64 {
         "mov x0, $0"
         "svc #0"
@@ -97,7 +109,6 @@ import "../syscall";
  * @return 0 on wakeup, or -1 if no process is currently scheduled.
  */
 @inline fn sleep(seconds: uint64) -> int64 {
-    dprintk("[syscall] sleep(%llu)\n", seconds);
     return @asm @clobbers("x0", "x1", "memory") (SYSCALL_SLEEP, seconds) -> int64 {
         "mov x0, $0"
         "mov x1, $1"
@@ -117,7 +128,6 @@ import "../syscall";
  * @return 0 on wakeup, or -1 if no process is currently scheduled.
  */
 @inline fn msleep(mseconds: uint64) -> int64 {
-    dprintk("[syscall] msleep(%llu)\n", mseconds);
     return @asm @clobbers("x0", "x1", "memory") (SYSCALL_MSLEEP, mseconds) -> int64 {
         "mov x0, $0"
         "mov x1, $1"

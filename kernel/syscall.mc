@@ -2,25 +2,7 @@ import "debug";
 import "memory";
 import "cpu";
 import "set";
-
-const NUM_SYSCALLS = 256;
-
-const SYSCALL_EXIT: uint64 = 0;
-const SYSCALL_YIELD: uint64 = 1;
-const SYSCALL_GETPID: uint64 = 2;
-const SYSCALL_WAITPID: uint64 = 3;
-const SYSCALL_FORK: uint64 = 4;
-const SYSCALL_SLEEP: uint64 = 5;
-const SYSCALL_MSLEEP: uint64 = 6;
-const SYSCALL_TIME: uint64 = 7;
-const SYSCALL_UPTIME: uint64 = 8;
-const SYSCALL_OPEN: uint64 = 9;
-const SYSCALL_CLOSE: uint64 = 10;
-const SYSCALL_READ: uint64 = 11;
-const SYSCALL_WRITE: uint64 = 12;
-const SYSCALL_FSTAT: uint64 = 13;
-const SYSCALL_STAT: uint64 = 14;
-const SYSCALL_GETCWD: uint64 = 15;
+import "system/syscall";
 
 @static let _syscall_table: struct set<uint64, fn (struct cpu_context *) -> struct cpu_context*>;
 
