@@ -39,7 +39,8 @@ make CFLAGS_EXTRA=-DDEBUG
 Targets:
 
 - `make build` — kernel only (`kernel.elf`, `kernel.img`)
-- `make` / `make all` — kernel + `init.img` (100MB FAT32 ramdisk populated from `init/`)
+- `make user` — the user programs (`init/bin/helloworld`, `echo`, `sleep`, `msleep`, `stat`), each `ld -r`-linked against `libmc.a`/`libc.a`
+- `make` / `make all` — kernel + user programs + `init.img` (100MB FAT32 ramdisk populated from `init/`)
 
 ## Run
 
@@ -71,7 +72,7 @@ boilerplate for type-safe, reusable code. mc code links against C through
 - Kernel log — `printk`/`dprintk` (`debug.mc`) and the PL011 print path (`pl011_vprintf`), formatting via stb_sprintf bound through `libc/stdio.mc`
 - Device handlers — serial, storage (`devices/`)
 - Memory management — free-list heap allocator (`heap.mc`: `struct heap` with block split/merge), plus the kernel heap, DTB memory probe, and `kmalloc`/`kfree`/`krealloc`/`kmalloc_aligned` wrappers (`mm.mc`)
-- Interactive console / shell (`console.mc`) with per-command modules (`src/commands/`)
+- Interactive console / shell (`console.mc`) — fixed built-ins plus a PATH-style lookup that loads and runs ELF user programs (`user/`)
 - CPU helpers (`cpu.mc`) — register accessors (cntpct/cntfrq/cntp_ctl/cntp_tval, vbar_el1), wfi/wfe, halt/hang, irq enable/disable, and bswap, all via inline `@asm`
 - Boot entry / init sequence (`kernel.mc`) — `kernel_init` subsystem bring-up and the `init` (pid 1) entry point
 - ELF64 loader — loads & runs relocatable objects (`ET_REL`) in-kernel: section layout, symbol rebasing, per-symbol GOT, and the core AArch64 relocations (`elf/elf64.mc`, `src/commands/elf.mc`)
@@ -241,12 +242,12 @@ boilerplate for type-safe, reusable code. mc code links against C through
 - The `open`/`close`/`read`/`write`/`fstat` syscalls resolve into `process_open/close/read/write_file` / `process_file_stat`, which index the fd table and call the `file_*` layer — completing the loop syscall → `file_*` → `fs_*` → mount handler.
 - `printf`/`vprintf` (`libc/stdio.mc`) format with stb_sprintf and stream to `STDOUT_FILENO` via the `write` syscall, so they require the caller to have that fd open. The console opens stdin/stdout on its device at startup (fds 0/1) and forked command children inherit them, so command output flows printf → `write` → fd table → `fs_write` → device.
 
-### **ELF loader**
+### **ELF loader / user programs**
 
-- Loads relocatable ELF64 objects (`ET_REL` — e.g. `init/bin/helloworld`, built with `ld -r`) and runs them in-kernel, `insmod`-style. `elf_read` parses the header/section/symbol tables and sums the load size; `elf64_load(file, base)` lays sections out at `base + sh_addr`, rebases the symbol table to runtime addresses (`base + section.sh_addr + st_value`), builds a per-symbol GOT, then applies relocations against the copied image.
-- Relocations handled: `ABS64`, `ADR_PREL_PG_HI21`, `ADD_ABS_LO12_NC`, `LDST{8,16,32,64,128}_ABS_LO12_NC`, `CALL26`/`JUMP26`, `PREL32`/`PREL64`, and the GOT pair `ADR_GOT_PAGE`/`LD64_GOT_LO12_NC`. Unhandled types are logged with their patch address.
-- `elf64_locate_symbol(file, name)` returns a symbol's runtime address; the `elf` shell command resolves `main`, calls it, and prints the return value.
-- Not yet implemented: I-cache maintenance before execution (relies on QEMU's unified caches), `UNDEF`-symbol resolution against a kernel export table, PLTs for out-of-range branches, and GOT/exec-buffer lifetime on unload.
+- Loads relocatable ELF64 objects (`ET_REL`, built with `ld -r` against `libmc.a`/`libc.a` so they are self-contained) and runs them in-kernel, `insmod`-style. The shell built-ins are a small fixed set (`cd`, `ls`, `cat`, `mount`, `help`); any other command name is looked up as a program — the console searches each entry in `dirs` (currently `bin`) for an object named `argv[0]`, loads it, and runs its `main(argc, argv)`. The user programs live under `user/` and are bundled into `init.img` as `init/bin/*` (`echo`, `sleep`, `msleep`, `stat`, `helloworld`).
+- `elf_read` parses the header/section/symbol tables and sums the load size; `elf64_load(file, base)` lays sections out at `base + sh_addr`, rebases the symbol table to runtime addresses (`base + section.sh_addr + st_value`), builds a per-symbol GOT, then applies relocations against the copied image. `elf64_locate_symbol(file, name)` returns a symbol's runtime address; `elf64_unload` frees the GOT.
+- Relocations handled: `ABS64`, `ADR_PREL_PG_HI21`, `ADD_ABS_LO12_NC`, `LDST{8,16,32,64,128}_ABS_LO12_NC`, `CALL26`/`JUMP26`, `PREL32`/`PREL64`, and the GOT pair `ADR_GOT_PAGE`/`LD64_GOT_LO12_NC`. Unhandled relocation types and references to unresolved (`UNDEF`) symbols are logged and counted in `file->relerrs`; the console refuses to run an object with `relerrs > 0` rather than executing a partially-linked image.
+- Not yet implemented: I-cache maintenance before execution (relies on QEMU's unified caches), `UNDEF`-symbol resolution against a kernel export table (so modules can call kernel functions instead of statically bundling everything), PLTs for out-of-range branches, and exec-buffer lifetime tracking on unload.
 
 ## Source layout
 
@@ -261,13 +262,16 @@ freestanding C standard library). `libmc/` is mcc's standard library;
 
 ```
 init/               — files bundled into init.img at build time (FAT32 ramdisk)
+  bin/              — built user programs (helloworld, echo, sleep, msleep, stat); gitignored, produced by the user/* Makefile targets
+
+user/               — user-program sources, each built with `ld -r` against libmc.a/libc.a into a self-contained ELF object
+  helloworld/, echo/, sleep/, msleep/, stat/ — main(argc, argv) per program
 
 src/                — entry points (assembly stubs + top-level mc)
   kernel.mc         — kernel_init: subsystem bring-up (DTB, memory, IRQ, VFS, I/O, serial, storage, scheduler, timer); init(): pid 1 entry point, runs console("/dev/serial")
-  console.mc        — console()/console_parse_command(): interactive terminal loop with cwd-aware prompt and argc/argv tokenization (quoted strings, backslash escapes), fork-per-command dispatch (cd dispatched directly); built-ins: ls, cd, cat, echo, stat, mount, exit, elf, help; line input via libmc/std readline
-  commands/         — one module per shell command, dispatched by console.mc
-    cat.mc, echo.mc, exit.mc, ls.mc — built-in command implementations
-    elf.mc          — `elf <path>`: opens an object, runs elf_read/elf64_load, resolves `main`, calls it, prints the return value
+  console.mc        — console()/console_parse_command(): interactive terminal loop with cwd-aware prompt and argc/argv tokenization (quoted strings, backslash escapes), fork-per-command dispatch (cd dispatched directly); built-ins: cd, ls, cat, mount, help; any other name is loaded & run as an ELF program from the `dirs` search path (try_run); line input via libmc/std readline
+  commands/         — built-in command handlers used by console.mc
+    cat.mc          — `cat <path>`: print a file's contents
   start.S           — AArch64 boot stub, saves DTB pointer, zeros BSS
   vectors.S         — exception vector table, save/restore_context macros
 
@@ -301,7 +305,7 @@ kernel/             — mc kernel modules (logic + @extern bindings to the C bel
     drivers/
       fat32.mc      — full FAT32 implementation: boot-sector parse, FAT-table read, cluster-chain + fs-tree traversal, mount/unmount/read/write
   elf/
-    elf64.mc        — ELF64 relocatable-object loader: header/section/symbol parsing (elf_read), section layout + symbol rebasing + per-symbol GOT + AArch64 relocations (elf64_load), elf64_locate_symbol; elf64_dump helpers and the full e_ident/ehdr/phdr/shdr/sym/rela type definitions
+    elf64.mc        — ELF64 relocatable-object loader: header/section/symbol parsing (elf_read), section layout + symbol rebasing + per-symbol GOT + AArch64 relocations with UNDEF-symbol/unknown-type rejection into relerrs (elf64_load), elf64_locate_symbol, elf64_unload; elf64_dump helpers and the full e_ident/ehdr/phdr/shdr/sym/rela type definitions
 
 libmc/              — mcc standard library (generic, type-parametric)
   memory.mc         — alloc<T>/alloc_aligned<T>/resize<T>/dealloc<T>, bytecopy/copy/set_bytes/set_items (copy_bytes/copy_items kept as deprecated shims)

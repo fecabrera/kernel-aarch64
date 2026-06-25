@@ -237,15 +237,15 @@ fn try_run(const dir: uint8*, argc: int64, argv: uint8**) -> int32 {
 }
 
 /**
- * Dispatches a parsed command to its built-in handler. Most built-ins run in a
- * forked child via console_run_command; cd is the exception, dispatched
- * directly so it can mutate the console process's own cwd. Built-in commands:
+ * Dispatches a parsed command. Built-ins run in the console process (cd, which
+ * mutates the console's own cwd) or a forked child (ls, cat, mount, help):
  * ls [path] (list a folder's entries), cd <path> (change the working
- * directory), cat <path> (print a file), echo [args...] (print first arg),
- * sleep <seconds> (block for N seconds via the sleep syscall),
- * mount <device> [mountpoint] (fat32_mount; mountpoint defaults to
- * /volumes/<label>), exit [status] (exit), help (list commands).
- * Unknown commands print a "not found!" message. Empty input is ignored.
+ * directory), cat <path> (print a file), mount <device> [mountpoint]
+ * (fat32_mount; mountpoint defaults to /volumes/<label>), help (list commands).
+ * Anything else is treated as an external program: each entry in `dirs` is
+ * searched for an ELF object named argv[0] (via try_run), which is loaded,
+ * relocated, and run. Unknown commands print a "not found!" message; empty
+ * input is ignored.
  *
  * @param argc: number of arguments
  * @param argv: null-terminated argument strings; argv[0] is the command name
