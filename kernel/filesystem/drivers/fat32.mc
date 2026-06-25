@@ -3,6 +3,7 @@ import "memory";
 import "cpu";
 import "utf16";
 import "libc/string";
+import "libc/ctype";
 import "filesystem/fs";
 import "filesystem/vfs";
 
@@ -336,7 +337,15 @@ fn fat32_read_cluster(pathname: uint8*, bs_info: struct fat32_bs_info*, cluster:
 
         let dir_name: uint8[12];
         set_bytes(dir_name, 0, 12);
-        bytecopy(dir_name, dir_entry->name, 11);
+        {
+            let i: uint16 = 0;
+            while (i < 11) {
+                dir_name[i] = tolower(dir_entry->name[i] as int32) as uint8;
+                i = i + 1;
+            }
+        }
+        // bytecopy(dir_name, dir_entry->name, 11);
+        
 
         let lfn_dir_name = alloc<uint8>(n_lfn_entries as uint64 * 13 + 1);
         defer dealloc(lfn_dir_name);
@@ -393,18 +402,18 @@ fn fat32_read_cluster(pathname: uint8*, bs_info: struct fat32_bs_info*, cluster:
 
             let node: struct fs_node*;
             if (attributes & FAT32_ATTR_DIRECTORY) {
-                let attrs: uint32 = FS_NODE_ATTRS_PERMISSIONS_READ;
+                let attrs: uint32 = node_attrs::READ;
                 if ((attributes & FAT32_ATTR_READ_ONLY) == 0)
-                    attrs = attrs | FS_NODE_ATTRS_PERMISSIONS_WRITE;
+                    attrs = attrs | node_attrs::WRITE;
 
                 node = fs_add_subfolder(parent_node, name, attrs, entry_ref, mount);
             } else {
                 let file_size: uint32;
                 bytecopy(&file_size, &dir_entry->file_size, 1);
 
-                let attrs: uint32 = FS_NODE_ATTRS_PERMISSIONS_READ;
+                let attrs: uint32 = node_attrs::READ;
                 if ((attributes & FAT32_ATTR_READ_ONLY) == 0)
-                    attrs = attrs | FS_NODE_ATTRS_PERMISSIONS_WRITE;
+                    attrs = attrs | node_attrs::WRITE;
 
                 node = fs_add_file_to_folder(parent_node, name, file_size as uint64,
                                              attrs, entry_ref, mount);
@@ -456,7 +465,7 @@ fn fat32_build_fs_tree(pathname: uint8*, bs_info: struct fat32_bs_info*,
             parent_node = root_node;
 
         // ignore file contents
-        if ((parent_node->attrs & FS_NODE_ATTRS_TYPE_MASK) == FS_NODE_ATTRS_TYPE_FILE)
+        if ((parent_node->attrs & node_attrs::TYPE_MASK) == node_attrs::FILE)
             continue;
 
         // go through all clusters on the cluster chain
@@ -590,12 +599,12 @@ fn fat32_mount(device_path: uint8*, mountpoint: uint8*) -> int64 {
             return FAT32_MOUNT_ERROR_MOUNTPOINT_NOT_FOUND;
         }
 
-        until ((root->attrs & FS_NODE_ATTRS_FLAG_LINK) == 0)
+        until ((root->attrs & node_attrs::LINK) == 0)
             root = root->child;
     }
 
     // check if root is a folder
-    if ((root->attrs & FS_NODE_ATTRS_TYPE_MASK) != FS_NODE_ATTRS_TYPE_FOLDER) {
+    if ((root->attrs & node_attrs::TYPE_MASK) != node_attrs::DIR) {
         dprintk("[fat32] root is not a folder!\n");
         dealloc(bs_info);
         return FAT32_MOUNT_ERROR_MOUNTPOINT_IS_NOT_A_FOLDER;

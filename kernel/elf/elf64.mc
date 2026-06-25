@@ -414,6 +414,7 @@ struct elf64_file {
     strtab:    uint8*;
     shstrtab:  uint8*;
     relocated: bool;
+    relerrs:   uint16;
     memsz:     uint64;
     got:       uint64*;   // one slot per symbol, filled with resolved addresses
 }
@@ -702,47 +703,60 @@ fn elf64_patch_adrp(P: uint64, imm: uint64) {
  */
 @private
 fn elf64_apply_one_relocation(rela: struct elf64_rela*, symtab: struct elf64_sym*,
-                              got: uint64*, site_base: uint64) {
+                              strtab: uint8*, got: uint64*, site_base: uint64) -> bool {
     let type = (rela->r_info & 0xFFFFFFFF) as uint32;
     let sym_idx = rela->r_info >> 32;
     let sym = &symtab[sym_idx];
+
+    // A non-null symbol still marked UNDEF was never resolved (no kernel export
+    // table yet); applying the relocation against st_value=0 would silently
+    // produce a wild branch/pointer, so reject the load instead.
+    if (sym_idx != 0 and sym->st_shndx == elf64_shn::UNDEF) {
+        printk("[elf] unresolved symbol \"%s\" at %p\n",
+               elf64_get_symbol_name(sym, strtab), site_base + rela->r_offset);
+        return false;
+    }
 
     let S = sym->st_value;              // already rebased to a runtime address
     let A = rela->r_addend as uint64;
     let P = site_base + rela->r_offset;
 
-    if (type == R_AARCH64_ABS64) {
+    case (type) {
+    when R_AARCH64_ABS64:
         *(P as uint64*) = S + A;
-    } else if (type == R_AARCH64_ADR_PREL_PG_HI21) {
+    when R_AARCH64_ADR_PREL_PG_HI21:
         elf64_patch_adrp(P, (elf64_page(S + A) - elf64_page(P)) >> 12);
-    } else if (type == R_AARCH64_ADD_ABS_LO12_NC or type == R_AARCH64_LDST8_ABS_LO12_NC) {
+    when R_AARCH64_ADD_ABS_LO12_NC, R_AARCH64_LDST8_ABS_LO12_NC:
         elf64_patch_lo12(P, S + A, 0);
-    } else if (type == R_AARCH64_LDST16_ABS_LO12_NC) {
+    when R_AARCH64_LDST16_ABS_LO12_NC:
         elf64_patch_lo12(P, S + A, 1);
-    } else if (type == R_AARCH64_LDST32_ABS_LO12_NC) {
+    when R_AARCH64_LDST32_ABS_LO12_NC:
         elf64_patch_lo12(P, S + A, 2);
-    } else if (type == R_AARCH64_LDST64_ABS_LO12_NC) {
+    when R_AARCH64_LDST64_ABS_LO12_NC:
         elf64_patch_lo12(P, S + A, 3);
-    } else if (type == R_AARCH64_LDST128_ABS_LO12_NC) {
+    when R_AARCH64_LDST128_ABS_LO12_NC:
         elf64_patch_lo12(P, S + A, 4);
-    } else if (type == R_AARCH64_ADR_GOT_PAGE) {
+    when R_AARCH64_ADR_GOT_PAGE:
         let slot = &got[sym_idx] as uint64;
         elf64_patch_adrp(P, (elf64_page(slot) - elf64_page(P)) >> 12);
-    } else if (type == R_AARCH64_LD64_GOT_LO12_NC) {
+    when R_AARCH64_LD64_GOT_LO12_NC:
         let slot = &got[sym_idx] as uint64;
         elf64_patch_lo12(P, slot, 3);
-    } else if (type == R_AARCH64_CALL26 or type == R_AARCH64_JUMP26) {
+    when R_AARCH64_CALL26, R_AARCH64_JUMP26:
         let imm26 = (((S + A - P) >> 2) & 0x3FFFFFF) as uint32;
         let insn = *(P as uint32*);
         insn = (insn & ~(0x3FFFFFF as uint32)) | imm26;
         *(P as uint32*) = insn;
-    } else if (type == R_AARCH64_PREL32) {
+    when R_AARCH64_PREL32:
         *(P as uint32*) = (S + A - P) as uint32;
-    } else if (type == R_AARCH64_PREL64) {
+    when R_AARCH64_PREL64:
         *(P as uint64*) = S + A - P;
-    } else {
-        dprintk("[elf] unhandled relocation type %u at %p\n", type, P);
+    else:
+        printk("[elf] unhandled relocation type %u at %p\n", type, P);
+        return false;
     }
+
+    return true;
 }
 
 /**
@@ -752,6 +766,8 @@ fn elf64_apply_one_relocation(rela: struct elf64_rela*, symtab: struct elf64_sym
  */
 @private
 fn elf64_apply_relocations(file: struct elf64_file*, base_addr: uint64) {
+    file->relerrs = 0;
+
     let i: uint16 = 0;
     while (i < file->shnum) {
         defer i = i + 1;
@@ -772,7 +788,8 @@ fn elf64_apply_relocations(file: struct elf64_file*, base_addr: uint64) {
         let j: uint64 = 0;
         while (j < count) {
             defer j = j + 1;
-            elf64_apply_one_relocation(&entries[j], file->symtab, file->got, site_base);
+            if (!elf64_apply_one_relocation(&entries[j], file->symtab, file->strtab, file->got, site_base))
+                file->relerrs = file->relerrs + 1;
         }
     }
 }

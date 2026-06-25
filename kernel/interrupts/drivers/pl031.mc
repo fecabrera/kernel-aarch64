@@ -46,7 +46,7 @@ fn pl031_init() {
     if (dtb_get_rtc_irq_number(&pl031_irq) == 0) {
         dprintk("[pl031] Initializing IRQ: %i\n", pl031_irq);
         irq_register_handler(pl031_irq, pl031_irq_handler);
-        syscall_register_handler(SYSCALL_TIME, syscall_time_handler);
+        syscall_register_handler(syscall::TIME, syscall_time_handler);
     } else {
         dprintk("[pl031] IRQ not found!!\n");
     }

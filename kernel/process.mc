@@ -209,12 +209,8 @@ fn process_open_file(proc: struct process*, pathname: uint8*, attrs: uint32) -> 
 
     let node = vfs_get_node_for_path(pathname, proc->cwd);
     if (node == null)
-        return FILE_IO_ERROR_NOT_FOUND;
+        return io_error::NOT_FOUND;
     
-    if ((node->attrs & FS_NODE_ATTRS_TYPE_MASK) == FS_NODE_ATTRS_TYPE_FOLDER) {
-        return FILE_IO_ERROR_NOT_A_FILE;
-    }
-
     let dtor_ptrs = &proc->dtor_ptrs;
     let fd = dtor_ptrs->length as int64;
 
@@ -224,6 +220,29 @@ fn process_open_file(proc: struct process*, pathname: uint8*, attrs: uint32) -> 
     file_init(dtor->value, node, attrs);
 
     return fd;
+}
+
+fn process_open_file_at(proc: struct process*, dirfd: int64, pathname: uint8*, attrs: uint32) -> int64 {
+    dprintk("[process] open_file_at(%lld, %lld, \"%s\", %04X)\n",
+            proc->pid, dirfd, pathname, attrs);
+
+    let dtor_ptrs = &proc->dtor_ptrs;
+    let dtor: struct pointer<struct file_descriptor>*;
+    if (!list_get(dtor_ptrs, dirfd as uint64, &dtor))
+        return io_error::NOT_FOUND;
+
+    let node = vfs_get_node_for_path(pathname, dtor->value->fd_node);
+    if (node == null)
+        return io_error::NOT_FOUND;
+
+    let new_fd = dtor_ptrs->length as int64;
+
+    let new_dtor = create_pointer<struct file_descriptor>();
+    list_append(dtor_ptrs, new_dtor);
+
+    file_init(new_dtor->value, node, attrs);
+
+    return new_fd;
 }
 
 /**
@@ -243,7 +262,7 @@ fn process_close_file(proc: struct process*, fd: int64) -> int64 {
 
     let dtor: struct pointer<struct file_descriptor>*;
     if (!list_get(dtor_ptrs, fd as uint64, &dtor))
-        return FILE_IO_ERROR_INVALID_DESCRIPTOR;
+        return io_error::INVALID_DESCRIPTOR;
 
     list_set(dtor_ptrs, fd as uint64, null);
     pointer_release(dtor);
@@ -270,7 +289,7 @@ fn process_read_file(proc: struct process*, fd: int64, buffer: uint8*, count: ui
 
     let dtor: struct pointer<struct file_descriptor>*;
     if (!list_get(dtor_ptrs, fd as uint64, &dtor) or dtor == null)
-        return FILE_IO_ERROR_INVALID_DESCRIPTOR;
+        return io_error::INVALID_DESCRIPTOR;
 
     return file_read(dtor->value, buffer, count);
 }
@@ -294,7 +313,7 @@ fn process_write_file(proc: struct process*, fd: int64, buffer: uint8*, count: u
 
     let dtor: struct pointer<struct file_descriptor>*;
     if (!list_get(dtor_ptrs, fd as uint64, &dtor) or dtor == null)
-        return FILE_IO_ERROR_INVALID_DESCRIPTOR;
+        return io_error::INVALID_DESCRIPTOR;
 
     return file_write(dtor->value, buffer, count);
 }
@@ -316,7 +335,7 @@ fn process_file_stat(proc: struct process*, fd: int64, st: struct file_stat*) ->
 
     let dtor: struct pointer<struct file_descriptor>*;
     if (!list_get(dtor_ptrs, fd as uint64, &dtor) or dtor == null)
-        return FILE_IO_ERROR_INVALID_DESCRIPTOR;
+        return io_error::INVALID_DESCRIPTOR;
 
     return file_stat(dtor->value, st);
 }
@@ -338,7 +357,7 @@ fn process_stat(proc: struct process*, path: uint8*, st: struct file_stat*) -> i
 
     let node = vfs_get_node_for_path(path, proc->cwd);
     if (node == null)
-        return FILE_IO_ERROR_NOT_FOUND;
+        return io_error::NOT_FOUND;
 
     return file_node_stat(node, st);
 }

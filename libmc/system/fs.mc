@@ -1,12 +1,18 @@
-const FS_FILE_ATTRS_NONE = 0;
-const FS_FILE_ATTRS_READ = (1 << 0);
-const FS_FILE_ATTRS_WRITE = (1 << 1);
-const FS_FILE_ATTRS_EXEC = (1 << 2);
+enum open_mode: uint32 {
+    NONE  = 0,
+    DIR   = (1 << 0),
+    READ  = (1 << 1),
+    WRITE = (1 << 2),
+    EXEC  = (1 << 3),
+}
 
-const FILE_IO_ERROR_INVALID_DESCRIPTOR = -1;
-const FILE_IO_ERROR_NOT_FOUND = -2;
-const FILE_IO_ERROR_NOT_A_FILE = -3;
-const FILE_IO_ERROR_NOT_PERMITTED = -4;
+enum io_error: int64 {
+    INVALID_DESCRIPTOR = -1,
+    NOT_FOUND          = -2,
+    NOT_A_FILE         = -3,
+    NOT_A_DIR          = -4,
+    NOT_PERMITTED      = -5,
+}
 
 /**
  * An open file: a node bound to a read/write position and an access mode. This
@@ -20,9 +26,9 @@ const FILE_IO_ERROR_NOT_PERMITTED = -4;
  * @field attrs: access mode (FS_FILE_ATTRS_READ/WRITE/EXEC bits)
  */
 struct file_descriptor {
-    node: struct fs_node*;
-    pos: uint64;
-    attrs: uint32;
+    fd_node: struct fs_node*;
+    fd_pos:  uint64;
+    fd_mode: uint32;
 }
 
 /**

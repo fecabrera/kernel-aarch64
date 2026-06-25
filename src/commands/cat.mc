@@ -9,7 +9,7 @@ fn command_cat(argc: int64, argv: uint8**) -> int64 {
         return -1;
     }
 
-    let fd = open(argv[1], FS_FILE_ATTRS_READ);
+    let fd = open(argv[1], open_mode::READ);
     if (fd < 0) {
         println("open() returned %lld!", fd);
         return -2;

@@ -4,33 +4,29 @@ import "stack";
 import "libc/stdio";
 import "libc/string";
 
-const FS_NODE_ATTRS_TYPE_MASK = (1 << 0);
-const FS_NODE_ATTRS_TYPE_FOLDER = 0;
-const FS_NODE_ATTRS_TYPE_FILE = 1;
+enum node_attrs: uint32 {
+    DIR              = (0 << 0),
+    FILE             = (1 << 0),
+    // RESERVED         = (1 << 1),
+    LINK             = (1 << 2),
+    HIDDEN           = (1 << 3),
+    READ             = (1 << 4),
+    WRITE            = (1 << 5),
+    EXECUTE          = (1 << 6),
+    TYPE_MASK        = (node_attrs::FILE),
+    PERMISSIONS_MASK = (node_attrs::READ | node_attrs::WRITE | node_attrs::EXECUTE),
+    FLAG_MASK        = (node_attrs::LINK | node_attrs::HIDDEN),
+}
 
-const FS_NODE_ATTRS_FLAG_LINK = (1 << 2);
-const FS_NODE_ATTRS_FLAG_HIDDEN = (1 << 3);
-
-const FS_NODE_ATTRS_PERMISSIONS_READ = (1 << 4);
-const FS_NODE_ATTRS_PERMISSIONS_WRITE = (1 << 5);
-const FS_NODE_ATTRS_PERMISSIONS_EXECUTE = (1 << 6);
-
-const FS_NODE_ATTRS_PERMISSIONS_MASK = (FS_NODE_ATTRS_PERMISSIONS_READ |
-                                        FS_NODE_ATTRS_PERMISSIONS_WRITE |
-                                        FS_NODE_ATTRS_PERMISSIONS_EXECUTE);
-
-const FS_NODE_ATTRS_FLAG_MASK = (FS_NODE_ATTRS_FLAG_LINK |
-                                 FS_NODE_ATTRS_FLAG_HIDDEN);
-
-const FS_NODE_ATTRS_FLAG_PERMISSIONS_MASK = (FS_NODE_ATTRS_PERMISSIONS_MASK |
-                                             FS_NODE_ATTRS_FLAG_MASK);
-
-const FS_IO_ERROR_FILE_NOT_FOUND = -1;
-const FS_IO_ERROR_NOT_A_FILE = -2;
-const FS_IO_ERROR_MOUNTPOINT_NOT_FOUND = -3;
-const FS_IO_ERROR_HANDLER_NOT_PROVIDED = -4;
-const FS_IO_ERROR_NOT_PERMITTED = -5;
-
+enum fs_error: int64 {
+    NOT_FOUND            = -2,
+    NOT_A_FILE           = -3,
+    NOT_A_DIR            = -4,
+    NOT_PERMITTED        = -5,
+    MOUNTPOINT_NOT_FOUND = -6,
+    HANDLER_NOT_PROVIDED = -7,
+}
+    
 /**
  * A single node in the VFS tree, representing a file or folder. Folders link
  * their entries through the `child`/`next` chain; every folder also carries
@@ -190,7 +186,7 @@ fn fs_destroy_node(node: struct fs_node*) {
  */
 fn fs_create_file(name: uint8*, file_size: uint64, attrs: uint32, data: uint8*,
                   mount: struct fs_mount*) -> struct fs_node * {
-    let _attrs = (attrs & FS_NODE_ATTRS_FLAG_PERMISSIONS_MASK) | FS_NODE_ATTRS_TYPE_FILE;
+    let _attrs = (attrs & node_attrs::PERMISSIONS_MASK) | node_attrs::FILE;
     return fs_create_node(name, file_size, _attrs, data, mount, null, null);
 }
 
@@ -207,7 +203,7 @@ fn fs_create_file(name: uint8*, file_size: uint64, attrs: uint32, data: uint8*,
  * @return pointer to the new folder node, or null if alloc failed
  */
 fn fs_create_folder(name: uint8*, attrs: uint32, data: uint8*, mount: struct fs_mount*) -> struct fs_node * {
-    let _attrs = (attrs & FS_NODE_ATTRS_FLAG_PERMISSIONS_MASK) | FS_NODE_ATTRS_TYPE_FOLDER;
+    let _attrs = (attrs & node_attrs::PERMISSIONS_MASK) | node_attrs::DIR;
 
     let folder = fs_create_node(name, 0, _attrs, data, mount, null, null);
     fs_create_self_ref(folder);
@@ -244,10 +240,10 @@ fn fs_add_to_folder(parent: struct fs_node*, node: struct fs_node*) {
  */
 @private
 fn fs_create_self_ref(folder: struct fs_node*) -> struct fs_node* {
-    let attrs: uint32 = ((folder->attrs & FS_NODE_ATTRS_PERMISSIONS_MASK) |
-                         FS_NODE_ATTRS_TYPE_FOLDER |
-                         FS_NODE_ATTRS_FLAG_LINK |
-                         FS_NODE_ATTRS_FLAG_HIDDEN);
+    let attrs: uint32 = ((folder->attrs & node_attrs::PERMISSIONS_MASK) |
+                         node_attrs::DIR |
+                         node_attrs::LINK |
+                         node_attrs::HIDDEN);
     let self_ref = fs_create_node(".", 0, attrs, null, folder->mount, null, null);
     self_ref->child = folder;
     fs_add_to_folder(folder, self_ref);
@@ -265,10 +261,10 @@ fn fs_create_self_ref(folder: struct fs_node*) -> struct fs_node* {
  */
 @private
 fn fs_create_parent_ref(parent: struct fs_node*, folder: struct fs_node*) -> struct fs_node* {
-    let attrs: uint32 = ((parent->attrs & FS_NODE_ATTRS_PERMISSIONS_MASK) |
-                         FS_NODE_ATTRS_TYPE_FOLDER |
-                         FS_NODE_ATTRS_FLAG_LINK |
-                         FS_NODE_ATTRS_FLAG_HIDDEN);
+    let attrs: uint32 = ((folder->attrs & node_attrs::PERMISSIONS_MASK) |
+                         node_attrs::DIR |
+                         node_attrs::LINK |
+                         node_attrs::HIDDEN);
     let parent_ref = fs_create_node("..", 0, attrs, null, folder->mount, null, null);
     parent_ref->child = parent;
     fs_add_to_folder(folder, parent_ref);
@@ -291,7 +287,7 @@ fn fs_create_parent_ref(parent: struct fs_node*, folder: struct fs_node*) -> str
  */
 fn fs_add_file_to_folder(parent: struct fs_node*, name: uint8*, file_size: uint64,
                          attrs: uint32, data: uint8*, mount: struct fs_mount*) -> struct fs_node* {
-    if ((parent->attrs & FS_NODE_ATTRS_TYPE_MASK) != FS_NODE_ATTRS_TYPE_FOLDER) {
+    if ((parent->attrs & node_attrs::TYPE_MASK) != node_attrs::DIR) {
         dprintk("[filesystem] Node is not a folder!\n");
         return null;
     }
@@ -317,7 +313,7 @@ fn fs_add_file_to_folder(parent: struct fs_node*, name: uint8*, file_size: uint6
  */
 fn fs_add_subfolder(parent: struct fs_node *, name: uint8*, attrs: uint32, data: uint8*,
                     mount: struct fs_mount*) -> struct fs_node * {
-    if ((parent->attrs & FS_NODE_ATTRS_TYPE_MASK) != FS_NODE_ATTRS_TYPE_FOLDER) {
+    if ((parent->attrs & node_attrs::TYPE_MASK) != node_attrs::DIR) {
         dprintk("[filesystem] node is not a folder!\n");
         return null;
     }
@@ -392,8 +388,8 @@ fn fs_dump_node(node: struct fs_node*, prefix: uint8*) {
 
     fs_dump_file(node, prefix);
 
-    let attrs = node->attrs & FS_NODE_ATTRS_TYPE_MASK;
-    if (attrs == FS_NODE_ATTRS_TYPE_FOLDER and
+    let attrs = node->attrs & node_attrs::TYPE_MASK;
+    if (attrs == node_attrs::DIR and
         strcmp(node->name, ".") != 0 and
         strcmp(node->name, "..") != 0) {
         let _prefix: uint8*;
@@ -432,33 +428,33 @@ fn fs_dump_node(node: struct fs_node*, prefix: uint8*) {
  *         FS_IO_ERROR_MOUNTPOINT_NOT_FOUND if the node has no mount,
  *         FS_IO_ERROR_HANDLER_NOT_PROVIDED if the mount has no read handler
  */
-fn fs_read(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint64) -> int64 {
+fn fs_read(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint64) -> fs_error {
     dprintk("[fs] buffer=0x%p, count=%llu, offset=%llu\n");
 
     if (node == null) {
         dprintk("[fs] node is null!\n");
-        return FS_IO_ERROR_FILE_NOT_FOUND;
+        return fs_error::NOT_FOUND;
     }
 
-    if ((node->attrs & FS_NODE_ATTRS_TYPE_MASK) != FS_NODE_ATTRS_TYPE_FILE) {
+    if ((node->attrs & node_attrs::TYPE_MASK) != node_attrs::FILE) {
         dprintk("[fs] \"%s\" is not a file!\n", node->name);
-        return FS_IO_ERROR_NOT_A_FILE;
+        return fs_error::NOT_A_FILE;
     }
 
     let mp = node->mount;
     if (mp == null) {
         dprintk("[fs] mountpoint for \"%s\" not found!\n", node->name);
-        return FS_IO_ERROR_MOUNTPOINT_NOT_FOUND;
+        return fs_error::MOUNTPOINT_NOT_FOUND;
     }
 
     if (mp->read == null) {
         dprintk("[fs] mountpoint \"%s\" didn't provide a `read` handler!\n", mp->mountpoint);
-        return FS_IO_ERROR_HANDLER_NOT_PROVIDED;
+        return fs_error::HANDLER_NOT_PROVIDED;
     }
 
-    if ((node->attrs & FS_NODE_ATTRS_PERMISSIONS_READ) == 0) {
+    if ((node->attrs & node_attrs::READ) == 0) {
         dprintk("[fs] \"%s\" does not allow reads\n", node->name);
-        return FS_IO_ERROR_NOT_PERMITTED;
+        return fs_error::NOT_PERMITTED;
     }
 
     return mp->read(node, buffer, count, offset);
@@ -480,28 +476,28 @@ fn fs_read(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint64)
 fn fs_write(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint64) -> int64 {
     if (node == null) {
         dprintk("[fs] node is null!\n");
-        return FS_IO_ERROR_FILE_NOT_FOUND;
+        return fs_error::NOT_FOUND;
     }
 
-    if ((node->attrs & FS_NODE_ATTRS_TYPE_MASK) != FS_NODE_ATTRS_TYPE_FILE) {
+    if ((node->attrs & node_attrs::TYPE_MASK) != node_attrs::FILE) {
         dprintk("[fs] \"%s\" is not a file!\n", node->name);
-        return FS_IO_ERROR_NOT_A_FILE;
+        return fs_error::NOT_A_FILE;
     }
 
     let mp = node->mount;
     if (mp == null) {
         dprintk("[fs] mountpoint for file \"%s\" not found!\n", node->name);
-        return FS_IO_ERROR_MOUNTPOINT_NOT_FOUND;
+        return fs_error::MOUNTPOINT_NOT_FOUND;
     }
 
     if (mp->write == null) {
         dprintk("[fs] mountpoint \"%s\" didn't provide a `write` handler!\n", mp->mountpoint);
-        return FS_IO_ERROR_HANDLER_NOT_PROVIDED;
+        return fs_error::HANDLER_NOT_PROVIDED;
     }
 
-    if ((node->attrs & FS_NODE_ATTRS_PERMISSIONS_WRITE) == 0) {
+    if ((node->attrs & node_attrs::WRITE) == 0) {
         dprintk("[fs] \"%s\" does not allow writes\n", node->name);
-        return FS_IO_ERROR_NOT_PERMITTED;
+        return fs_error::NOT_PERMITTED;
     }
 
     return mp->write(node, buffer, count, offset);
@@ -530,7 +526,7 @@ fn fs_get_absolute_dir(node: struct fs_node*, buf: uint8*, size: uint64) -> int6
     until (current == null) {
         dprintk("[fs] pushing \"%s\"\n", current->name == null ? "" : current->name);
 
-        if ((current->attrs & FS_NODE_ATTRS_TYPE_MASK == FS_NODE_ATTRS_TYPE_FOLDER))
+        if ((current->attrs & node_attrs::TYPE_MASK == node_attrs::DIR))
             stack_push(&s, current);
 
         let parent_ref = fs_get_child(current, "..");

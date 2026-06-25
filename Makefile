@@ -49,7 +49,9 @@ OBJS := $(patsubst src/%, build/src/%, $(OBJS))
 
 build: kernel.elf kernel.img
 
-all: build helloworld init.img
+all: build user init.img
+
+user: helloworld echo stat sleep msleep
 
 build/src/%.o: src/%.mc
 	@mkdir -p $(dir $@)
@@ -83,7 +85,23 @@ libc.a: build
 
 helloworld: libmc.a libc.a
 	$(MCC) $(MCFLAGS) user/helloworld/main.mc
-	$(LD) -r user/helloworld/main.o $< -o init/bin/helloworld
+	$(LD) -r user/helloworld/main.o $^ -o init/bin/helloworld
+
+echo: libmc.a libc.a
+	$(MCC) $(MCFLAGS) user/echo/main.mc
+	$(LD) -r user/echo/main.o $^ -o init/bin/echo
+
+stat: libmc.a libc.a
+	$(MCC) $(MCFLAGS) user/stat/main.mc
+	$(LD) -r user/stat/main.o $^ -o init/bin/stat
+
+sleep: libmc.a libc.a
+	$(MCC) $(MCFLAGS) user/sleep/main.mc
+	$(LD) -r user/sleep/main.o $^ -o init/bin/sleep
+
+msleep: libmc.a libc.a
+	$(MCC) $(MCFLAGS) user/msleep/main.mc
+	$(LD) -r user/msleep/main.o $^ -o init/bin/msleep
 
 kernel.elf: $(OBJS) linker.ld
 	$(LD) -T linker.ld -o $@ $(OBJS)

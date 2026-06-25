@@ -27,7 +27,7 @@ struct io_file {
  * Must be called after vfs_init() and before any other io_* function.
  */
 fn io_init() {
-    _dev_root = vfs_create_dir("/", "dev", FS_NODE_ATTRS_PERMISSIONS_READ, null);
+    _dev_root = vfs_create_dir("/", "dev", node_attrs::READ, null);
     if (_dev_root == null) {
         dprintk("[io] cannot create \"/dev\" folder!\n");
         hang();

@@ -15,8 +15,8 @@ fn vfs_init() {
     dict_init(&_vfs_mp_table, 10);
 
     // create root and volumes
-    _vfs_root = fs_create_folder(null, FS_NODE_ATTRS_PERMISSIONS_READ, null, null);
-    fs_add_subfolder(_vfs_root, "volumes", FS_NODE_ATTRS_PERMISSIONS_READ, null, null);
+    _vfs_root = fs_create_folder(null, node_attrs::READ, null, null);
+    fs_add_subfolder(_vfs_root, "volumes", node_attrs::READ, null, null);
 }
 
 /**
@@ -54,7 +54,7 @@ fn vfs_create_mountpoint(mountpoint: uint8*, device: uint8*, info: uint8*,
         return null;
     }
 
-    if ((mp_node->attrs & FS_NODE_ATTRS_TYPE_MASK) != FS_NODE_ATTRS_TYPE_FOLDER) {
+    if ((mp_node->attrs & node_attrs::TYPE_MASK) != node_attrs::DIR) {
         dprintk("[vfs] \"%s\" is not a folder!\n", mountpoint);
         return null;
     }

@@ -42,7 +42,7 @@ fn timer_init() {
     set_cntp_ctl_el0(CNTP_CTL_ENABLE);
 
     // register uptime syscall
-    syscall_register_handler(SYSCALL_UPTIME, syscall_uptime_handler);
+    syscall_register_handler(syscall::UPTIME, syscall_uptime_handler);
 
     if (dtb_get_timer_irq_number(&timer_irq) == 0) {
         dprintk("[timer] Initializing IRQ: %i\n", timer_irq);

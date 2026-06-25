@@ -42,20 +42,21 @@ fn scheduler_init() {
     set_init(&waitpid_queue, 10);
     set_init(&sleep_queue, 10);
 
-    syscall_register_handler(SYSCALL_EXIT, syscall_exit_handler);
-    syscall_register_handler(SYSCALL_YIELD, syscall_yield_handler);
-    syscall_register_handler(SYSCALL_GETPID, syscall_getpid_handler);
-    syscall_register_handler(SYSCALL_WAITPID, syscall_waitpid_handler);
-    syscall_register_handler(SYSCALL_FORK, syscall_fork_handler);
-    syscall_register_handler(SYSCALL_SLEEP, syscall_sleep_handler);
-    syscall_register_handler(SYSCALL_MSLEEP, syscall_msleep_handler);
-    syscall_register_handler(SYSCALL_OPEN, syscall_open_handler);
-    syscall_register_handler(SYSCALL_CLOSE, syscall_close_handler);
-    syscall_register_handler(SYSCALL_READ, syscall_read_handler);
-    syscall_register_handler(SYSCALL_WRITE, syscall_write_handler);
-    syscall_register_handler(SYSCALL_FSTAT, syscall_fstat_handler);
-    syscall_register_handler(SYSCALL_STAT, syscall_stat_handler);
-    syscall_register_handler(SYSCALL_GETCWD, syscall_getcwd_handler);
+    syscall_register_handler(syscall::EXIT, syscall_exit_handler);
+    syscall_register_handler(syscall::YIELD, syscall_yield_handler);
+    syscall_register_handler(syscall::GETPID, syscall_getpid_handler);
+    syscall_register_handler(syscall::WAITPID, syscall_waitpid_handler);
+    syscall_register_handler(syscall::FORK, syscall_fork_handler);
+    syscall_register_handler(syscall::SLEEP, syscall_sleep_handler);
+    syscall_register_handler(syscall::MSLEEP, syscall_msleep_handler);
+    syscall_register_handler(syscall::OPEN, syscall_open_handler);
+    syscall_register_handler(syscall::OPENAT, syscall_openat_handler);
+    syscall_register_handler(syscall::CLOSE, syscall_close_handler);
+    syscall_register_handler(syscall::READ, syscall_read_handler);
+    syscall_register_handler(syscall::WRITE, syscall_write_handler);
+    syscall_register_handler(syscall::FSTAT, syscall_fstat_handler);
+    syscall_register_handler(syscall::STAT, syscall_stat_handler);
+    syscall_register_handler(syscall::GETCWD, syscall_getcwd_handler);
 }
 
 /**
@@ -500,10 +501,30 @@ fn syscall_open_handler(ctx: struct cpu_context*) -> struct cpu_context* {
     let path = ctx->x[1] as uint8*;
     let attrs = ctx->x[2] as uint32;
 
-    dprintk("[scheduler] open(), ctx->x0 = %llu, ctx->x1 = %llu, ctx->x2 = %llu\n",
+    dprintk("[scheduler] open(), ctx->x0 = %llu, ctx->x1 = 0x%p, ctx->x2 = %llu\n",
            ctx->x[0], ctx->x[1], ctx->x[2]);
 
     ctx->x[0] = process_open_file(proc, path, attrs) as uint64;
+
+    return ctx;
+}
+
+fn syscall_openat_handler(ctx: struct cpu_context*) -> struct cpu_context* {
+    let proc = scheduler_get_current_process();
+    if (proc == null) {
+        dprintk("[scheduler] no current process!\n");
+        ctx->x[0] = -1 as uint64;
+        return ctx;
+    }
+
+    let dirfd = ctx->x[1] as int64;
+    let path = ctx->x[2] as uint8*;
+    let attrs = ctx->x[3] as uint32;
+
+    dprintk("[scheduler] openat(), ctx->x0 = %llu, ctx->x1 = %llu, ctx->x2 = 0x%p, ctx->x3 = %llu\n",
+           ctx->x[0], ctx->x[1], ctx->x[2], ctx->x[3]);
+
+    ctx->x[0] = process_open_file_at(proc, dirfd, path, attrs) as uint64;
 
     return ctx;
 }

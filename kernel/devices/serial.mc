@@ -11,7 +11,7 @@ fn serial_init() {
     let mod_name: uint8* = "serial";
     dprintk("[serial] adding \"/dev/%s\"\n", mod_name);
 
-    let attrs: uint32 = FS_NODE_ATTRS_PERMISSIONS_READ | FS_NODE_ATTRS_PERMISSIONS_WRITE;
+    let attrs: uint32 = node_attrs::READ | node_attrs::WRITE;
     io_register_module(mod_name, attrs, 0, serial_read, serial_write);
     dprintk("[serial] \"/dev/%s\" added successfully!\n", mod_name);
 }

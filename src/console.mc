@@ -12,26 +12,19 @@ import "filesystem/drivers/fat32";
 import "libc/ctype";
 import "libc/stdlib";
 import "system/syscall";
-import "commands/echo.mc";
-import "commands/exit.mc";
-import "commands/ls.mc";
-import "commands/cat.mc";
-import "commands/elf.mc";
+import "commands/cat";
 
 @static
 let available_commands: uint8*[][2] = [
     ["ls [path]", "list a folder's entries"],
     ["cd <path>", "change the working directory"],
     ["cat <path>", "print a file"],
-    ["stat <path>", "display file status"],
-    ["elf <path>", "display elf info"],
-    ["echo [args...]", "print arguments"],
-    ["sleep <seconds>", "sleep for the given number of seconds"],
-    ["msleep <seconds>", "sleep for the given number of milliseconds"],
     ["mount <device> [mountpoint]", "mount a FAT32 block device"],
-    ["exit [status]", "exit with status code"],
     ["help", "show this message"],
 ];
+
+@static
+let dirs: uint8*[] = ["bin"];
 
 @private
 fn command_help(argc: int64, argv: uint8**) -> int64 {
@@ -66,59 +59,33 @@ fn command_mount(argc: int64, argv: uint8**) -> int64 {
     return 0;
 }
 
-
 @private
-fn command_stat(argc: int64, argv: uint8**) -> int64 {
-    if (argc < 2) {
-        println("usage: %s <path>", argv[0]);
+fn console_ls(argc: int64, argv: uint8**) -> int64 {
+    let filename: uint8* = argc > 1 ? argv[1] : "/";
+    
+    let proc = scheduler_get_current_process();
+    
+    let node = vfs_get_node_for_path(filename, proc->cwd);
+    if (node == null) {
+        println("\"%s\" not found!", filename);
         return -1;
     }
 
-    let st: struct file_stat;
-    let st_status = stat(argv[1], &st);
-    if (st_status < 0) {
-        println("stat() returned %lld!", st_status);
+    if ((node->attrs & node_attrs::TYPE_MASK) != node_attrs::DIR) {
+        println("\"%s\" is not a folder!", filename);
         return -2;
     }
 
-    if ((st.st_mode & FS_NODE_ATTRS_PERMISSIONS_MASK) > 0) {
-        if ((st.st_mode & FS_NODE_ATTRS_PERMISSIONS_READ) > 0) print("r");
-        if ((st.st_mode & FS_NODE_ATTRS_PERMISSIONS_WRITE) > 0) print("w");
-        if ((st.st_mode & FS_NODE_ATTRS_PERMISSIONS_EXECUTE) > 0) print("x");
-        print(" ");
-    }
-    println("%llu", st.st_size);
-    
-    return 0;
-}
+    until ((node->attrs & node_attrs::LINK) == 0)
+        node = node->child;
 
-@private
-fn command_sleep(argc: int64, argv: uint8**) -> int64 {
-    if (argc < 2) {
-        println("usage: %s <seconds>", argv[0]);
-        return -1;
-    }
-
-    let ret = sleep(atoll(argv[1]) as uint64);
-    if (ret < 0) {
-        println("failed to sleep");
-        return ret;
-    }
-
-    return 0;
-}
-
-@private
-fn command_msleep(argc: int64, argv: uint8**) -> int64 {
-    if (argc < 2) {
-        println("usage: %s <seconds>", argv[0]);
-        return -1;
-    }
-
-    let ret: int64 = msleep(atoll(argv[1]) as uint64);
-    if (ret < 0) {
-        println("failed to sleep");
-        return ret;
+    let current = node->child;
+    until (current == null) {
+        defer current = current->next;
+        if ((current->attrs & node_attrs::HIDDEN) != 0)
+            continue;
+        
+        println("%s", current->name);
     }
 
     return 0;
@@ -152,12 +119,12 @@ fn console_cd(argc: int64, argv: uint8**) -> int64 {
         return -2;
     }
 
-    if ((node->attrs & FS_NODE_ATTRS_TYPE_MASK) != FS_NODE_ATTRS_TYPE_FOLDER) {
+    if ((node->attrs & node_attrs::TYPE_MASK) != node_attrs::DIR) {
         println("\"%s\" is not a folder!", argv[1]);
         return -2;
     }
 
-    until((node->attrs & FS_NODE_ATTRS_FLAG_LINK) == 0)
+    until((node->attrs & node_attrs::LINK) == 0)
         node = node->child;
 
     proc->cwd = node;
@@ -174,7 +141,7 @@ fn console_cd(argc: int64, argv: uint8**) -> int64 {
  * @param argv: null-terminated argument strings; argv[0] is the command name
  */
 @private
-fn console_run_command(fnc: fn (int64, uint8**) -> int64, argc: int64, argv: uint8**) {
+fn run_command(fnc: fn (int64, uint8**) -> int64, argc: int64, argv: uint8**) {
     let pid: int64 = fork();
     if (pid < 0) {
         println("[console] fork() returned %d!", pid);
@@ -185,6 +152,88 @@ fn console_run_command(fnc: fn (int64, uint8**) -> int64, argc: int64, argv: uin
         let status: int64 = fnc(argc, argv);
         exit(status);
     }
+}
+
+@private
+fn try_run(const dir: uint8*, argc: int64, argv: uint8**) -> int32 {
+    // open dir
+    let dirfd = open(dir, open_mode::DIR);
+    if (dirfd < 0) {
+        println("open() returned %lld!", dirfd);
+        return -1;
+    }
+
+    defer close(dirfd);
+
+    // open file
+    let fd = openat(dirfd, argv[0], open_mode::READ);
+    if (fd < 0) {
+        println("open() returned %lld!", fd);
+        return -2;
+    }
+
+    defer close(fd);
+
+    // get file size
+    let st: struct file_stat;
+    let st_status = fstat(fd, &st);
+    if (st_status < 0) {
+        println("fstat() returned %lld!", st_status);
+        return -3;
+    }
+
+    // allocate buffer
+    let buf: uint8* = alloc<uint8>(st.st_size);
+    defer dealloc(buf);
+
+    // read file
+    let rd_status = read(fd, buf, st.st_size);
+    if (rd_status < 0) {
+        println("read() returned %lld!", rd_status);
+        return -4;
+    }
+
+    // check if it's a valid elf header
+    if (!is_elf(buf)) {
+        println("\"%s\" is not an ELF file!", argv[1]);
+        return -5;
+    }
+
+    // parse elf file
+    let elf_file: struct elf64_file;
+    let elf_rd_status = elf_read(buf, st.st_size, &elf_file);
+    if (elf_rd_status < 0) {
+        println("elf_read() returned %u", elf_rd_status);
+        return -6;
+    }
+
+    // allocate memory
+    let exec_buf: uint8* = alloc<uint8>(elf_file.memsz);
+    defer dealloc(exec_buf);
+    
+    // resolve symbols, relocate if necessary, and load sectors to memory
+    elf64_load(&elf_file, exec_buf as uint64);
+
+    // check for relocation errors
+    if (elf_file.relerrs > 0) {
+        println("relocation errors: %u", elf_file.relerrs);
+        return -7;
+    }
+    
+    // get entry symbol
+    let entry = elf64_locate_symbol(&elf_file, "main") as fn (int64, uint8**) -> int64;
+    if (entry == null) {
+        println("could not find symbol \"main\"!");
+        return -8;
+    }
+    
+    // execute
+    run_command(entry, argc, argv);
+    
+    // cleanup
+    elf64_unload(&elf_file);
+
+    return 0;
 }
 
 /**
@@ -208,27 +257,23 @@ fn console_parse_command(argc: int64, argv: uint8**) {
     
     if (strcmp(argv[0], "cd") == 0) {
         console_cd(argc, argv);
-    } else if (strcmp(argv[0], "elf") == 0) {
-        console_run_command(command_elf, argc, argv);
     } else if (strcmp(argv[0], "ls") == 0) {
-        console_run_command(command_ls, argc, argv);
-    } else if (strcmp(argv[0], "exit") == 0) {
-        console_run_command(command_exit, argc, argv);
-    } else if (strcmp(argv[0], "echo") == 0) {
-        console_run_command(command_echo, argc, argv);
-    } else if (strcmp(argv[0], "sleep") == 0) {
-        console_run_command(command_sleep, argc, argv);
-    } else if (strcmp(argv[0], "msleep") == 0) {
-        console_run_command(command_msleep, argc, argv);
+        console_ls(argc, argv);
     } else if (strcmp(argv[0], "cat") == 0) {
-        console_run_command(command_cat, argc, argv);
-    } else if (strcmp(argv[0], "stat") == 0) {
-        console_run_command(command_stat, argc, argv);
+        run_command(command_cat, argc, argv);
     } else if (strcmp(argv[0], "mount") == 0) {
-        console_run_command(command_mount, argc, argv);
+        run_command(command_mount, argc, argv);
     } else if (strcmp(argv[0], "help") == 0) {
-        console_run_command(command_help, argc, argv);
+        run_command(command_help, argc, argv);
     } else {
+        let i: uint64 = 0;
+        while (i < len(dirs)) {
+            if (try_run(dirs[i], argc, argv) == 0)
+                return;
+
+            i = i + 1;
+        }
+
         println("command \"%s\" not found!", argv[0]);
     }
 }
@@ -246,8 +291,8 @@ fn console_parse_command(argc: int64, argv: uint8**) {
 fn console(pathname: uint8*) {
     printk("[console] starting console at \"%s\"...\n", pathname);
 
-    open(pathname, FS_FILE_ATTRS_READ);
-    open(pathname, FS_FILE_ATTRS_WRITE);
+    open(pathname, open_mode::READ);
+    open(pathname, open_mode::WRITE);
 
     while (true) {
         let i: uint64;

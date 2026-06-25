@@ -2,22 +2,25 @@ import "system/fs";
 
 const NUM_SYSCALLS = 256;
 
-const SYSCALL_EXIT: uint64 = 0;
-const SYSCALL_YIELD: uint64 = 1;
-const SYSCALL_GETPID: uint64 = 2;
-const SYSCALL_WAITPID: uint64 = 3;
-const SYSCALL_FORK: uint64 = 4;
-const SYSCALL_SLEEP: uint64 = 5;
-const SYSCALL_MSLEEP: uint64 = 6;
-const SYSCALL_TIME: uint64 = 7;
-const SYSCALL_UPTIME: uint64 = 8;
-const SYSCALL_OPEN: uint64 = 9;
-const SYSCALL_CLOSE: uint64 = 10;
-const SYSCALL_READ: uint64 = 11;
-const SYSCALL_WRITE: uint64 = 12;
-const SYSCALL_FSTAT: uint64 = 13;
-const SYSCALL_STAT: uint64 = 14;
-const SYSCALL_GETCWD: uint64 = 15;
+enum syscall: uint64 {
+    EXIT = 0,
+    YIELD = 1,
+    GETPID = 2,
+    WAITPID = 3,
+    FORK = 4,
+    SLEEP = 5,
+    MSLEEP = 6,
+    TIME = 7,
+    UPTIME = 8,
+    OPEN = 9,
+    OPENAT = 10,
+    CLOSE = 11,
+    READ = 12,
+    WRITE = 13,
+    FSTAT = 14,
+    STAT = 15,
+    GETCWD = 16,
+}
 
 /**
  * Voluntarily yields the CPU to the scheduler via SYSCALL_YIELD (svc #0).
@@ -28,7 +31,7 @@ const SYSCALL_GETCWD: uint64 = 15;
  * @return 0 on return from the scheduler.
  */
 @inline fn yield() -> int64 {
-    return @asm @clobbers("x0", "memory") (SYSCALL_YIELD) -> int64 {
+    return @asm @clobbers("x0", "memory") (syscall::YIELD) -> int64 {
         "mov x0, $0"
         "svc #0"
         "mov $out, x0"
@@ -43,7 +46,7 @@ const SYSCALL_GETCWD: uint64 = 15;
  * @param status: exit status passed in x1 (logged by syscall_exit_handler).
  */
 @inline fn exit(status: int64) {
-    @asm @clobbers("x0", "x1", "memory") (SYSCALL_EXIT, status) {
+    @asm @clobbers("x0", "x1", "memory") (syscall::EXIT, status) {
         "mov x0, $0"
         "mov x1, $1"
         "svc #0"
@@ -58,7 +61,7 @@ const SYSCALL_GETCWD: uint64 = 15;
  * @return PID of the current process, or -1 if no process is currently scheduled.
  */
 @inline fn getpid() -> int64 {
-    return @asm @clobbers("x0") (SYSCALL_GETPID) -> int64 {
+    return @asm @clobbers("x0") (syscall::GETPID) -> int64 {
         "mov x0, $0"
         "svc #0"
         "mov $out, x0"
@@ -76,7 +79,7 @@ const SYSCALL_GETCWD: uint64 = 15;
  *         currently scheduled.
  */
 @inline fn waitpid(pid: int64) -> int64 {
-    return @asm @clobbers("x0", "x1", "memory") (SYSCALL_WAITPID, pid) -> int64 {
+    return @asm @clobbers("x0", "x1", "memory") (syscall::WAITPID, pid) -> int64 {
         "mov x0, $0"
         "mov x1, $1"
         "svc #0"
@@ -92,7 +95,7 @@ const SYSCALL_GETCWD: uint64 = 15;
  * @return child PID in the parent, 0 in the child, or -1 on failure.
  */
 @inline fn fork() -> int64 {
-    return @asm @clobbers("x0", "memory") (SYSCALL_FORK) -> int64 {
+    return @asm @clobbers("x0", "memory") (syscall::FORK) -> int64 {
         "mov x0, $0"
         "svc #0"
         "mov $out, x0"
@@ -109,7 +112,7 @@ const SYSCALL_GETCWD: uint64 = 15;
  * @return 0 on wakeup, or -1 if no process is currently scheduled.
  */
 @inline fn sleep(seconds: uint64) -> int64 {
-    return @asm @clobbers("x0", "x1", "memory") (SYSCALL_SLEEP, seconds) -> int64 {
+    return @asm @clobbers("x0", "x1", "memory") (syscall::SLEEP, seconds) -> int64 {
         "mov x0, $0"
         "mov x1, $1"
         "svc #0"
@@ -128,7 +131,7 @@ const SYSCALL_GETCWD: uint64 = 15;
  * @return 0 on wakeup, or -1 if no process is currently scheduled.
  */
 @inline fn msleep(mseconds: uint64) -> int64 {
-    return @asm @clobbers("x0", "x1", "memory") (SYSCALL_MSLEEP, mseconds) -> int64 {
+    return @asm @clobbers("x0", "x1", "memory") (syscall::MSLEEP, mseconds) -> int64 {
         "mov x0, $0"
         "mov x1, $1"
         "svc #0"
@@ -143,7 +146,7 @@ const SYSCALL_GETCWD: uint64 = 15;
  * @return current Unix timestamp, or -1 on failure.
  */
 @inline fn time() -> uint64 {
-    return @asm @clobbers("x0", "memory") (SYSCALL_TIME) -> uint64 {
+    return @asm @clobbers("x0", "memory") (syscall::TIME) -> uint64 {
         "mov x0, $0"
         "svc #0"
         "mov $out, x0"
@@ -158,7 +161,7 @@ const SYSCALL_GETCWD: uint64 = 15;
  * @return system uptime in milliseconds
  */
 @inline fn uptime() -> uint64 {
-    return @asm @clobbers("x0", "memory") (SYSCALL_UPTIME) -> uint64 {
+    return @asm @clobbers("x0", "memory") (syscall::UPTIME) -> uint64 {
         "mov x0, $0"
         "svc #0"
         "mov $out, x0"
@@ -175,10 +178,22 @@ const SYSCALL_GETCWD: uint64 = 15;
  * @return the new file descriptor, or -1 on failure.
  */
 @inline fn open(path: uint8*, attrs: uint32) -> int64 {
-    return @asm @clobbers("x0", "x1", "x2", "memory") (SYSCALL_OPEN, path, attrs) -> int64 {
+    return @asm @clobbers("x0", "x1", "x2", "memory") (syscall::OPEN, path, attrs) -> int64 {
         "mov x0, $0"
         "mov x1, $1"
         "mov x2, $2"
+        "svc #0"
+        "mov $out, x0"
+    };
+}
+
+@inline fn openat(dirfd: int64, path: uint8*, attrs: uint32) -> int64 {
+    return @asm @clobbers("x0", "x1", "x2", "x3", "memory")
+        (syscall::OPENAT, dirfd, path, attrs) -> int64 {
+        "mov x0, $0"
+        "mov x1, $1"
+        "mov x2, $2"
+        "mov x3, $3"
         "svc #0"
         "mov $out, x0"
     };
@@ -193,7 +208,7 @@ const SYSCALL_GETCWD: uint64 = 15;
  * @return 0 on success, -1 on failure.
  */
 @inline fn close(fd: int64) -> int64 {
-    return @asm @clobbers("x0", "x1", "memory") (SYSCALL_CLOSE, fd) -> int64 {
+    return @asm @clobbers("x0", "x1", "memory") (syscall::CLOSE, fd) -> int64 {
         "mov x0, $0"
         "mov x1, $1"
         "svc #0"
@@ -213,7 +228,7 @@ const SYSCALL_GETCWD: uint64 = 15;
  */
 @inline fn read(fd: int64, buffer: uint8*, count: uint64) -> int64 {
     return @asm @clobbers("x0", "x1", "x2", "x3", "memory")
-        (SYSCALL_READ, fd, buffer, count) -> int64 {
+        (syscall::READ, fd, buffer, count) -> int64 {
         "mov x0, $0"
         "mov x1, $1"
         "mov x2, $2"
@@ -235,7 +250,7 @@ const SYSCALL_GETCWD: uint64 = 15;
  */
 @inline fn write(fd: int64, buffer: uint8*, count: uint64) -> int64 {
     return @asm @clobbers("x0", "x1", "x2", "x3", "memory")
-        (SYSCALL_WRITE, fd, buffer, count) -> int64 {
+        (syscall::WRITE, fd, buffer, count) -> int64 {
         "mov x0, $0"
         "mov x1, $1"
         "mov x2, $2"
@@ -256,7 +271,7 @@ const SYSCALL_GETCWD: uint64 = 15;
  */
 @inline fn fstat(fd: int64, stat: struct file_stat*) -> int64 {
     return @asm @clobbers("x0", "x1", "x2", "memory")
-        (SYSCALL_FSTAT, fd, stat) -> int64 {
+        (syscall::FSTAT, fd, stat) -> int64 {
         "mov x0, $0"
         "mov x1, $1"
         "mov x2, $2"
@@ -278,7 +293,7 @@ const SYSCALL_GETCWD: uint64 = 15;
  */
 @inline fn stat(path: uint8*, stat: struct file_stat*) -> int64 {
     return @asm @clobbers("x0", "x1", "x2", "memory")
-        (SYSCALL_STAT, path, stat) -> int64 {
+        (syscall::STAT, path, stat) -> int64 {
         "mov x0, $0"
         "mov x1, $1"
         "mov x2, $2"
@@ -299,7 +314,7 @@ const SYSCALL_GETCWD: uint64 = 15;
  */
 @inline fn getcwd(buf: uint8*, size: uint64) -> int64 {
     return @asm @clobbers("x0", "x1", "x2", "memory")
-        (SYSCALL_GETCWD, buf, size) -> int64 {
+        (syscall::GETCWD, buf, size) -> int64 {
         "mov x0, $0"
         "mov x1, $1"
         "mov x2, $2"
