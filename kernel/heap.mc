@@ -1,6 +1,6 @@
 import "debug";
 import "cpu";
-import "memory";
+// import "memory";
 
 struct heap_block_header {
 	size: uint64;
@@ -131,7 +131,7 @@ fn heap_acquire(self: struct heap*, size: uint64) -> uint8* {
 		current = current->next;
 	}
 	
-    dprintk("[heap] kmalloc: out of memory!\n");
+    dprintk("[heap] acquire: out of memory!\n");
 
     let head = self->head;
     until (head == null) {

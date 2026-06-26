@@ -1,5 +1,6 @@
 import "debug";
 import "cpu";
+import "mm";
 import "memory";
 
 // E_IDENT
@@ -538,7 +539,7 @@ fn elf64_load(file: struct elf64_file*, address: uint64) -> int32 {
     dprintk("[elf] rebased %d symbols!\n", rebased);
 
     // build a GOT: one slot per symbol holding its resolved (rebased) address
-    file->got = alloc<uint64>(file->stnum);
+    file->got = kalloc<uint64>(file->stnum);
     {
         let g: uint64 = 0;
         while (g < file->stnum) {
@@ -564,7 +565,7 @@ fn elf64_load(file: struct elf64_file*, address: uint64) -> int32 {
 }
 
 fn elf64_unload(file: struct elf64_file*) {
-    dealloc(file->got);
+    kdealloc(file->got);
 }
 
 fn elf64_locate_symbol(file: struct elf64_file*, const sym_name: uint8*) -> uint8* {

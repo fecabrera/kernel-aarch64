@@ -1,22 +1,9 @@
 import "debug";
 import "memory";
+import "mm";
 import "stack";
 import "libc/stdio";
 import "libc/string";
-
-enum node_attrs: uint32 {
-    DIR              = (0 << 0),
-    FILE             = (1 << 0),
-    // RESERVED         = (1 << 1),
-    LINK             = (1 << 2),
-    HIDDEN           = (1 << 3),
-    READ             = (1 << 4),
-    WRITE            = (1 << 5),
-    EXECUTE          = (1 << 6),
-    TYPE_MASK        = (node_attrs::FILE),
-    PERMISSIONS_MASK = (node_attrs::READ | node_attrs::WRITE | node_attrs::EXECUTE),
-    FLAG_MASK        = (node_attrs::LINK | node_attrs::HIDDEN),
-}
 
 enum fs_error: int64 {
     NOT_FOUND            = -2,
@@ -135,7 +122,7 @@ fn fs_remove_child(node: struct fs_node*, name: uint8*) -> int32 {
  */
 fn fs_create_node(name: uint8*, file_size: uint64, attrs: uint32, info: uint8*,
                   mount: struct fs_mount*, next: struct fs_node*, child: struct fs_node*) -> struct fs_node * {
-    let node: struct fs_node* = alloc<struct fs_node>(1);
+    let node: struct fs_node* = kalloc<struct fs_node>(1);
 
     node->name = null;
     node->file_size = file_size;
@@ -167,8 +154,8 @@ fn fs_destroy_node(node: struct fs_node*) {
     if (node->next != null)
         fs_destroy_node(node->next);
 
-    dealloc(node->name);
-    dealloc(node);
+    kdealloc(node->name);
+    kdealloc(node);
 }
 
 /**
@@ -337,17 +324,17 @@ fn fs_get_node_file_size(node: struct fs_node*) -> uint64 {
 
 /**
  * Replaces the name of an existing fs_node with a new name string.
- * The old name is freed via dealloc; the new name is duplicated into a heap-allocated buffer.
+ * The old name is freed via kdealloc; the new name is duplicated into a heap-allocated buffer.
  *
  * @param node:      pointer to the node to rename
  * @param name:      new null-terminated name string (duplicated into a heap-allocated buffer)
  */
 fn fs_node_rename(node: struct fs_node*, name: uint8*) {
     if (node->name != null)
-        dealloc(node->name);
+        kdealloc(node->name);
 
     let _name_size: uint64 = strlen(name);
-    let _name: uint8* = alloc<uint8>(_name_size + 1);
+    let _name: uint8* = kalloc<uint8>(_name_size + 1);
     strncpy(_name, name, _name_size);
     _name[_name_size] = '\0';
 
@@ -396,7 +383,7 @@ fn fs_dump_node(node: struct fs_node*, prefix: uint8*) {
 
         if (node->name != null and prefix != null) {
             let _strlen: uint64 = strlen(prefix) + strlen(node->name) + 2;
-            _prefix = alloc<uint8*>(_strlen);
+            _prefix = kalloc<uint8*>(_strlen);
             sprintf(_prefix, "%s/%s", prefix, node->name);
         } else if (prefix != null) {
             _prefix = prefix;
@@ -408,7 +395,7 @@ fn fs_dump_node(node: struct fs_node*, prefix: uint8*) {
             fs_dump_node(node->child, _prefix);
 
         if (prefix != null and node->name != null)
-            dealloc(_prefix);
+            kdealloc(_prefix);
     }
 
     if (node->next != null)

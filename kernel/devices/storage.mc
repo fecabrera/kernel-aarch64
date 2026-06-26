@@ -1,4 +1,5 @@
 import "debug";
+import "mm";
 import "memory";
 import "io";
 import "libc/stdio";
@@ -54,8 +55,8 @@ fn storage_read(buffer: uint8*, count: uint64, offset: uint64, slot: uint64) -> 
             slot, first_sector, last_sector, sectors_to_read);
 
     // allocate temporary buffer
-    let tmp: uint8* = alloc<uint8>(sectors_to_read * VIRTIO_MMIO_BLK_SECTOR_SIZE);
-    defer dealloc(tmp);
+    let tmp: uint8* = kalloc<uint8>(sectors_to_read * VIRTIO_MMIO_BLK_SECTOR_SIZE);
+    defer kdealloc(tmp);
 
     // read boot sectors
     let i: uint64 = 0;

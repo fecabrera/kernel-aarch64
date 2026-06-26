@@ -19,6 +19,9 @@ init/bin/
 # static libs
 **/*.a
 
+#
+**/*.mci
+
 # IDE config
 .vscode/
 .cache/

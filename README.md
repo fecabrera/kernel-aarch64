@@ -27,25 +27,19 @@ brew install dtc
 ## Build
 
 ```sh
-make
+./build.sh
 ```
 
-Enable debug logging (activates `dprintk` output):
-
-```sh
-make CFLAGS_EXTRA=-DDEBUG
-```
-
-Targets:
-
-- `make build` — kernel only (`kernel.elf`, `kernel.img`)
-- `make user` — the user programs (`init/bin/helloworld`, `echo`, `sleep`, `msleep`, `stat`), each `ld -r`-linked against `libmc.a`/`libc.a`
-- `make` / `make all` — kernel + user programs + `init.img` (100MB FAT32 ramdisk populated from `init/`)
+`build.sh` compiles the C helpers, the kernel, **both** builds of `libmc` (the
+kernel-side build with `-D IS_KERNEL`, and the user-side build archived into
+`user/libmc.a` + `user/libc.a`), then the user apps in `user/apps/`, links
+`kernel.elf`, and writes the `init.img` FAT32 ramdisk (populated from `init/`).
+`./clean.sh` removes the build artifacts.
 
 ## Run
 
 ```sh
-make run
+./run.sh
 ```
 
 ## mcc port status
@@ -59,6 +53,13 @@ boilerplate for type-safe, reusable code. mc code links against C through
 `@extern` bindings, so the migration proceeds subsystem by subsystem and uses
 `libmc` (mcc's standard library) in place of the in-tree C utilities.
 
+`libmc` is built twice from one source: the **kernel-side** build (`-D IS_KERNEL`)
+routes its allocator (`libc/stdlib.mc`'s `malloc`/`free`/…) to the kernel heap
+(`kmalloc`/`kfree`), while the **user-side** build routes the same calls to the
+`acqmem`/`rszmem`/`relmem` memory syscalls. So kernel code and loaded user
+programs share the same container/string/stdio code without a user program ever
+linking kernel internals (heap, UART, `printk`) — see "ELF loader / user programs".
+
 **Ported to `.mc`** (`kernel/`, `src/console.mc`):
 
 - VFS — node tree + mount system (`filesystem/fs.mc`, `filesystem/vfs.mc`)
@@ -71,11 +72,11 @@ boilerplate for type-safe, reusable code. mc code links against C through
 - Drivers — GIC, PL031 RTC, ARM generic timer, PL011 UART, virtio MMIO (`interrupts/gic.mc`, `interrupts/drivers/pl031.mc`, `interrupts/drivers/timer.mc`, `interrupts/drivers/pl011.mc`, `interrupts/drivers/virtio_mmio.mc`)
 - Kernel log — `printk`/`dprintk` (`debug.mc`) and the PL011 print path (`pl011_vprintf`), formatting via stb_sprintf bound through `libc/stdio.mc`
 - Device handlers — serial, storage (`devices/`)
-- Memory management — free-list heap allocator (`heap.mc`: `struct heap` with block split/merge), plus the kernel heap, DTB memory probe, and `kmalloc`/`kfree`/`krealloc`/`kmalloc_aligned` wrappers (`mm.mc`)
-- Interactive console / shell (`console.mc`) — fixed built-ins plus a PATH-style lookup that loads and runs ELF user programs (`user/`)
+- Memory management — free-list heap allocator (`heap.mc`: `struct heap` with block split/merge), plus the kernel heap, DTB memory probe, the `kmalloc`/`kfree`/`krealloc`/`kmalloc_aligned` wrappers and the `kalloc<T>`/`kalloc_aligned<T>`/`kresize<T>`/`kdealloc<T>` generics over it (`mm.mc`)
+- Interactive console / shell (`console.mc`) — fixed built-ins plus a PATH-style lookup that loads and runs ELF user programs (`user/apps/`)
 - CPU helpers (`cpu.mc`) — register accessors (cntpct/cntfrq/cntp_ctl/cntp_tval, vbar_el1), wfi/wfe, halt/hang, irq enable/disable, and bswap, all via inline `@asm`
 - Boot entry / init sequence (`kernel.mc`) — `kernel_init` subsystem bring-up and the `init` (pid 1) entry point
-- ELF64 loader — loads & runs relocatable objects (`ET_REL`) in-kernel: section layout, symbol rebasing, per-symbol GOT, and the core AArch64 relocations (`elf/elf64.mc`, `src/commands/elf.mc`)
+- ELF64 loader — loads & runs relocatable objects (`ET_REL`) in-kernel: section layout, symbol rebasing, per-symbol GOT, and the core AArch64 relocations (`elf/elf64.mc`; loading driven by `console.mc`'s `try_run`)
 
 **Still C, bound from mc via `@extern`** (port targets):
 
@@ -233,6 +234,7 @@ boilerplate for type-safe, reusable code. mc code links against C through
 - `uptime()` returns system uptime in milliseconds, computed from `cntpct_el0` ticks since boot.
 - `open(path, attrs)` / `close(fd)` / `read(fd, buf, count)` / `write(fd, buf, count)` / `fstat(fd, stat)` operate on the calling process's per-process fd table (see "File descriptors" below).
 - `getcwd(buf, size)` writes the calling process's current working directory as an absolute path into `buf`, resolved by walking the `..` chain to the root (`fs_get_absolute_dir`).
+- `acqmem(size, align)` / `rszmem(ptr, size, align)` / `relmem(ptr)` are the user-side memory syscalls that back the user build of `libmc`'s `malloc`/`realloc`/`free`. The `svc` wrappers and syscall numbers (17/18/19) exist; the kernel-side handlers are reserved but **not yet wired up**.
 
 ### **File descriptors**
 
@@ -244,10 +246,11 @@ boilerplate for type-safe, reusable code. mc code links against C through
 
 ### **ELF loader / user programs**
 
-- Loads relocatable ELF64 objects (`ET_REL`, built with `ld -r` against `libmc.a`/`libc.a` so they are self-contained) and runs them in-kernel, `insmod`-style. The shell built-ins are a small fixed set (`cd`, `ls`, `cat`, `mount`, `help`); any other command name is looked up as a program — the console searches each entry in `dirs` (currently `bin`) for an object named `argv[0]`, loads it, and runs its `main(argc, argv)`. The user programs live under `user/` and are bundled into `init.img` as `init/bin/*` (`echo`, `sleep`, `msleep`, `stat`, `helloworld`).
+- Loads relocatable ELF64 objects (`ET_REL`) and runs them in-kernel, `insmod`-style. Each app in `user/apps/<name>/` is compiled against the **user-side** `libmc` and `ld -r`-linked with `user/libmc.a` + `user/libc.a` into a self-contained object at `init/bin/<name>`, then bundled into `init.img`. Because the user build of `libmc` routes allocation to the `acqmem`/`rszmem`/`relmem` syscalls (not `kmalloc`), these objects no longer drag in kernel internals (the heap, UART, `printk`) — the decoupling that the dual `libmc` build exists for.
+- The shell built-ins are a small fixed set (`cd`, `ls`, `cat`, `mount`, `help`); any other command name is looked up as a program — `console.mc`'s `try_run` searches each entry in `dirs` (currently `bin`) for an object named `argv[0]`, loads it, and runs its `main(argc, argv)`.
 - `elf_read` parses the header/section/symbol tables and sums the load size; `elf64_load(file, base)` lays sections out at `base + sh_addr`, rebases the symbol table to runtime addresses (`base + section.sh_addr + st_value`), builds a per-symbol GOT, then applies relocations against the copied image. `elf64_locate_symbol(file, name)` returns a symbol's runtime address; `elf64_unload` frees the GOT.
 - Relocations handled: `ABS64`, `ADR_PREL_PG_HI21`, `ADD_ABS_LO12_NC`, `LDST{8,16,32,64,128}_ABS_LO12_NC`, `CALL26`/`JUMP26`, `PREL32`/`PREL64`, and the GOT pair `ADR_GOT_PAGE`/`LD64_GOT_LO12_NC`. Unhandled relocation types and references to unresolved (`UNDEF`) symbols are logged and counted in `file->relerrs`; the console refuses to run an object with `relerrs > 0` rather than executing a partially-linked image.
-- Not yet implemented: I-cache maintenance before execution (relies on QEMU's unified caches), `UNDEF`-symbol resolution against a kernel export table (so modules can call kernel functions instead of statically bundling everything), PLTs for out-of-range branches, and exec-buffer lifetime tracking on unload.
+- Not yet implemented: I-cache maintenance before execution (relies on QEMU's unified caches), `UNDEF`-symbol resolution against a kernel export table, PLTs for out-of-range branches, and exec-buffer lifetime tracking on unload. The `acqmem`/`rszmem`/`relmem` syscalls the user allocator targets are also not yet handled kernel-side.
 
 ## Source layout
 
@@ -258,20 +261,26 @@ C headers the C still includes — `cpu.h`'s endian macros, `virtio_mmio.h`'s
 register structs, and the still-vestigial `arch/irq.h`) and `libc/` (the
 freestanding C standard library). `libmc/` is mcc's standard library;
 `start.S`/`vectors.S` stay hand-written assembly and call `kernel_init` (in
-`kernel.mc`). Each C tree is `include/` (headers) + `src/` (sources).
+`kernel.mc`). Each C tree is `include/` (headers) + `src/` (sources). The build
+is driven by `build.sh`/`clean.sh`/`run.sh` (no Makefile); `build.sh` compiles
+`libmc` once for the kernel (`-D IS_KERNEL`, objects linked into `kernel.elf`)
+and once for userspace (archived into `user/libmc.a`, with `.mci` interfaces
+under `user/libmc/`).
 
 ```
-init/               — files bundled into init.img at build time (FAT32 ramdisk)
-  bin/              — built user programs (helloworld, echo, sleep, msleep, stat); gitignored, produced by the user/* Makefile targets
+build.sh, clean.sh, run.sh — build / clean / run-in-QEMU scripts (replace the Makefile)
 
-user/               — user-program sources, each built with `ld -r` against libmc.a/libc.a into a self-contained ELF object
-  helloworld/, echo/, sleep/, msleep/, stat/ — main(argc, argv) per program
+init/               — files bundled into init.img at build time (FAT32 ramdisk)
+  bin/              — built user programs (helloworld, echo, cat, sleep, msleep, stat); gitignored, produced by build.sh from user/apps/
+
+user/               — userspace tree
+  apps/             — user-program sources, one folder per program (helloworld, echo, cat, sleep, msleep, stat); each is compiled against the user-side libmc and `ld -r`-linked with user/libmc.a + user/libc.a into a self-contained init/bin/<name>
+  libmc/            — user-side libmc objects + .mci interfaces (built with the syscall-backed allocator); archived as user/libmc.a
+  libc.a            — user-side libc archive
 
 src/                — entry points (assembly stubs + top-level mc)
   kernel.mc         — kernel_init: subsystem bring-up (DTB, memory, IRQ, VFS, I/O, serial, storage, scheduler, timer); init(): pid 1 entry point, runs console("/dev/serial")
-  console.mc        — console()/console_parse_command(): interactive terminal loop with cwd-aware prompt and argc/argv tokenization (quoted strings, backslash escapes), fork-per-command dispatch (cd dispatched directly); built-ins: cd, ls, cat, mount, help; any other name is loaded & run as an ELF program from the `dirs` search path (try_run); line input via libmc/std readline
-  commands/         — built-in command handlers used by console.mc
-    cat.mc          — `cat <path>`: print a file's contents
+  console.mc        — console()/console_parse_command(): interactive terminal loop with cwd-aware prompt and argc/argv tokenization (quoted strings, backslash escapes), fork-per-command dispatch (cd dispatched directly); built-ins: cd, ls, mount, help; any other name is loaded & run as an ELF program from the `dirs` search path (try_run); line input via libmc/std readline
   start.S           — AArch64 boot stub, saves DTB pointer, zeros BSS
   vectors.S         — exception vector table, save/restore_context macros
 
@@ -286,7 +295,7 @@ kernel/             — mc kernel modules (logic + @extern bindings to the C bel
   debug.mc          — printk (always on) / dprintk (DEBUG-gated via @if), thin wrappers over pl011_vprintf
   utf16.mc          — utf16lencpy/utf16bencpy bindings
   heap.mc           — free-list heap allocator: heap_init/heap_acquire/heap_release/heap_resize over a struct heap, with block splitting and adjacent-free coalescing; heap_check integrity validator (DEBUG-gated)
-  mm.mc             — kernel memory management: 16 MiB static kernel heap, mem_init (reads RAM base/size from the DTB at boot), kmalloc/kfree/krealloc/kmalloc_aligned wrappers over the kernel heap
+  mm.mc             — kernel memory management: 16 MiB static kernel heap, mem_init (reads RAM base/size from the DTB at boot), kmalloc/kfree/krealloc/kmalloc_aligned wrappers and the typed kalloc<T>/kalloc_aligned<T>/kresize<T>/kdealloc<T> generics over the kernel heap
   devices/
     serial.mc       — /dev/serial driver: serial_init, serial_read (pl011_getc+wfi), serial_write (pl011_putc)
     storage.mc      — block driver: storage_init scans virtio slots, registers /dev/sd<letter>; storage_read/write handlers
@@ -318,9 +327,9 @@ libmc/              — mcc standard library (generic, type-parametric)
   ascii.mc
   hashing/          — splitmix64, fnv1a, crc32, murmur3
   iteration/        — pair
-  libc/             — freestanding ctype, stdlib, string, limits; stdio binds the stb_sprintf family (vsprintf/snprintf/vsprintfcb) and implements printf/vprintf/getchar/putchar over the read/write syscalls
+  libc/             — freestanding ctype, string, limits; stdio binds the stb_sprintf family (vsprintf/snprintf/vsprintfcb) and implements printf/vprintf/getchar/putchar over the read/write syscalls; stdlib provides the malloc/realloc/free interface that memory.mc builds on, switched via `@if (IS_KERNEL)` between the kernel heap (kmalloc/kfree) and the acqmem/rszmem/relmem memory syscalls
   system/           — user-facing syscall surface, linked into both the kernel and loaded user programs
-    syscall.mc      — svc #0 wrappers: yield/exit/getpid/waitpid/fork/sleep/msleep/time/uptime/open/close/read/write/fstat/stat/getcwd, all via inline @asm
+    syscall.mc      — svc #0 wrappers: yield/exit/getpid/waitpid/fork/sleep/msleep/time/uptime/open/openat/close/read/write/fstat/stat/getcwd/acqmem/rszmem/relmem, all via inline @asm
     fs.mc           — shared open-file types: file_descriptor, file_stat, and the FS_FILE_ATTRS_*/FILE_IO_ERROR_* constants
 
 lib/                — C helpers bound from mc via @extern (FDT + UTF-16)

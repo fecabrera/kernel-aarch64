@@ -52,6 +52,7 @@ fn writechar(c: uint8) {
  *
  * @param str: string to write
  */
+@inline
 fn writestr(const str: struct string) {
     write(STDOUT_FILENO, str.data, str.length);
 }
@@ -61,6 +62,7 @@ fn writestr(const str: struct string) {
  *
  * @param str: string to write
  */
+@inline
 fn writeln(const str: struct string) {
     writestr(str);
     writechar('\n');

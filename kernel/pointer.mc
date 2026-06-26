@@ -1,4 +1,5 @@
 import "debug";
+import "mm";
 
 /**
  * A reference-counted owner of a heap-allocated T. Shared owners hold the same
@@ -20,8 +21,8 @@ struct pointer<T> {
  * @return the new pointer<T> (caller is the first owner)
  */
 fn create_pointer<T>() -> struct pointer<T>* {
-    let ptr: struct pointer<T>* = alloc<struct pointer<T>>(1);
-    ptr->value = alloc<T>(1);
+    let ptr: struct pointer<T>* = kalloc<struct pointer<T>>(1);
+    ptr->value = kalloc<T>(1);
     ptr->count = 1;
     dprintk("[ptr] created pointer at %p, count = %llu\n", ptr->value, ptr->count);
     return ptr;
@@ -55,7 +56,7 @@ fn pointer_release<T>(ptr: struct pointer<T>*) {
     dprintk("[ptr] released pointer at %p, count = %llu\n", ptr->value, ptr->count);
     if (ptr->count == 0) {
         dprintk("[ptr] pointer at %p has skedaddled itself\n", ptr->value);
-        dealloc(ptr->value);
-        dealloc(ptr);
+        kdealloc(ptr->value);
+        kdealloc(ptr);
     }
 }

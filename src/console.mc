@@ -12,13 +12,11 @@ import "filesystem/drivers/fat32";
 import "libc/ctype";
 import "libc/stdlib";
 import "system/syscall";
-import "commands/cat";
 
 @static
 let available_commands: uint8*[][2] = [
     ["ls [path]", "list a folder's entries"],
     ["cd <path>", "change the working directory"],
-    ["cat <path>", "print a file"],
     ["mount <device> [mountpoint]", "mount a FAT32 block device"],
     ["help", "show this message"],
 ];
@@ -238,14 +236,13 @@ fn try_run(const dir: uint8*, argc: int64, argv: uint8**) -> int32 {
 
 /**
  * Dispatches a parsed command. Built-ins run in the console process (cd, which
- * mutates the console's own cwd) or a forked child (ls, cat, mount, help):
+ * mutates the console's own cwd) or a forked child (ls, mount, help):
  * ls [path] (list a folder's entries), cd <path> (change the working
- * directory), cat <path> (print a file), mount <device> [mountpoint]
- * (fat32_mount; mountpoint defaults to /volumes/<label>), help (list commands).
- * Anything else is treated as an external program: each entry in `dirs` is
- * searched for an ELF object named argv[0] (via try_run), which is loaded,
- * relocated, and run. Unknown commands print a "not found!" message; empty
- * input is ignored.
+ * directory), mount <device> [mountpoint] (fat32_mount; mountpoint defaults to
+ * /volumes/<label>), help (list commands). Anything else is treated as an
+ * external program: each entry in `dirs` is searched for an ELF object named
+ * argv[0] (via try_run), which is loaded, relocated, and run. Unknown commands
+ * print a "not found!" message; empty input is ignored.
  *
  * @param argc: number of arguments
  * @param argv: null-terminated argument strings; argv[0] is the command name
@@ -259,8 +256,6 @@ fn console_parse_command(argc: int64, argv: uint8**) {
         console_cd(argc, argv);
     } else if (strcmp(argv[0], "ls") == 0) {
         console_ls(argc, argv);
-    } else if (strcmp(argv[0], "cat") == 0) {
-        run_command(command_cat, argc, argv);
     } else if (strcmp(argv[0], "mount") == 0) {
         run_command(command_mount, argc, argv);
     } else if (strcmp(argv[0], "help") == 0) {

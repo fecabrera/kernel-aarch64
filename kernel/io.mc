@@ -1,5 +1,6 @@
 import "debug";
 import "cpu";
+import "mm";
 import "dict";
 import "filesystem/fs";
 import "filesystem/vfs";
@@ -74,7 +75,7 @@ fn io_register_module(name: uint8*, attrs: uint32, drv_info: uint64,
         return -1;
     }
 
-    let mod: struct io_module* = alloc<struct io_module>(1);
+    let mod: struct io_module* = kalloc<struct io_module>(1);
     mod->drv_info = drv_info;
     mod->read = read;
     mod->write = write;

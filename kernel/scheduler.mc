@@ -3,6 +3,7 @@ import "cpu";
 import "process";
 import "queue";
 import "set";
+import "mm";
 import "filesystem/file";
 import "interrupts/drivers/timer";
 
@@ -136,7 +137,7 @@ fn scheduler_set_current_process(proc: struct process*) {
 fn scheduler_spawn(entry: fn ()) -> int64 {
     dprintk("[scheduler] spawn()\n");
 
-    let proc: struct process* = alloc<struct process>(1);
+    let proc: struct process* = kalloc<struct process>(1);
 
     dprintk("[scheduler] creating process\n");
     process_create(proc, DEFAULT_STACK_BLOCK_COUNT);
@@ -402,7 +403,7 @@ fn syscall_fork_handler(ctx: struct cpu_context*) -> struct cpu_context* {
 
     dprintk("[scheduler] fork(%i), ctx->x0 = %llu\n", proc->pid, ctx->x[0]);
 
-    let child: struct process* = alloc<struct process>(1);
+    let child: struct process* = kalloc<struct process>(1);
     process_duplicate(child, proc);
     scheduler_enqueue(child);
 

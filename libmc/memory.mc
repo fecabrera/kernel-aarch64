@@ -1,5 +1,5 @@
-import "mm";
 import "libc/string";
+import "libc/stdlib";
 
 /**
  * Allocates heap space for n elements of type T.
@@ -9,7 +9,7 @@ import "libc/string";
  * @return pointer to the first element; the memory is uninitialized
  */
 fn alloc<T>(n: uint64) -> T* {
-    return kmalloc(n * sizeof(T)) as T*;
+    return malloc(n * sizeof(T)) as T*;
 }
 
 /**
@@ -23,7 +23,7 @@ fn alloc<T>(n: uint64) -> T* {
  * @return pointer to the first element; the memory is uninitialized
  */
 fn alloc_aligned<T>(n: uint64, align: uint64) -> T* {
-    return kmalloc_aligned(n * sizeof(T), align) as T*;
+    return malloc_aligned(n * sizeof(T), align) as T*;
 }
 
 /**
@@ -39,7 +39,7 @@ fn alloc_aligned<T>(n: uint64, align: uint64) -> T* {
  */
 @inline
 fn resize<T>(p: T*, n: uint64) -> T* {
-    return krealloc(p, n * sizeof(T)) as T*;
+    return realloc(p, n * sizeof(T)) as T*;
 }
 
 /**
@@ -49,7 +49,7 @@ fn resize<T>(p: T*, n: uint64) -> T* {
  */
 @inline
 fn dealloc<T>(p: T*) {
-    kfree(p);
+    free(p);
 }
 
 /**

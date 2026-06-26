@@ -1,5 +1,6 @@
 import "debug";
 import "fs";
+import "mm";
 import "list";
 import "dict";
 
@@ -59,9 +60,9 @@ fn vfs_create_mountpoint(mountpoint: uint8*, device: uint8*, info: uint8*,
         return null;
     }
 
-    let fs_mp: struct fs_mount* = alloc<struct fs_mount>(1);
+    let fs_mp: struct fs_mount* = kalloc<struct fs_mount>(1);
 
-    fs_mp->mountpoint = alloc<uint8>(strlen(mountpoint) + 1);
+    fs_mp->mountpoint = kalloc<uint8>(strlen(mountpoint) + 1);
     strcpy(fs_mp->mountpoint, mountpoint);
 
     fs_mp->info = info;
@@ -70,7 +71,7 @@ fn vfs_create_mountpoint(mountpoint: uint8*, device: uint8*, info: uint8*,
     fs_mp->write = write;
 
     if (device != null) {
-        fs_mp->device = alloc<uint8*>(strlen(device) + 1);
+        fs_mp->device = kalloc<uint8*>(strlen(device) + 1);
         strcpy(fs_mp->device, device);
     } else {
         fs_mp->device = null;
@@ -120,12 +121,12 @@ fn vfs_destroy_mountpoint(mountpoint: uint8*) -> int32 {
         fs_remove_child(parent_ref->child, mp->root->name);
 
     fs_destroy_node(mp->root);
-    dealloc(mp->mountpoint);
+    kdealloc(mp->mountpoint);
     if (mp->device != null)
-        dealloc(mp->device);
+        kdealloc(mp->device);
     if (mp->info != null)
-        dealloc(mp->info);
-    dealloc(mp);
+        kdealloc(mp->info);
+    kdealloc(mp);
 
     dprintk("[vfs] \"%s\" unmounted successfully\n", mountpoint);
 

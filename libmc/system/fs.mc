@@ -6,6 +6,20 @@ enum open_mode: uint32 {
     EXEC  = (1 << 3),
 }
 
+enum node_attrs: uint32 {
+    DIR              = (0 << 0),
+    FILE             = (1 << 0),
+    // RESERVED         = (1 << 1),
+    LINK             = (1 << 2),
+    HIDDEN           = (1 << 3),
+    READ             = (1 << 4),
+    WRITE            = (1 << 5),
+    EXECUTE          = (1 << 6),
+    TYPE_MASK        = (node_attrs::FILE),
+    PERMISSIONS_MASK = (node_attrs::READ | node_attrs::WRITE | node_attrs::EXECUTE),
+    FLAG_MASK        = (node_attrs::LINK | node_attrs::HIDDEN),
+}
+
 enum io_error: int64 {
     INVALID_DESCRIPTOR = -1,
     NOT_FOUND          = -2,

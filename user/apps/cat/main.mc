@@ -1,9 +1,9 @@
 import "std";
 import "memory";
 import "system/syscall";
-import "filesystem/file";
+import "system/fs";
 
-fn command_cat(argc: int64, argv: uint8**) -> int64 {
+fn main(argc: int64, argv: uint8**) -> int64 {
     if (argc < 2) {
         println("usage: %s <path>", argv[0]);
         return -1;

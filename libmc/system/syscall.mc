@@ -3,23 +3,26 @@ import "system/fs";
 const NUM_SYSCALLS = 256;
 
 enum syscall: uint64 {
-    EXIT = 0,
-    YIELD = 1,
-    GETPID = 2,
+    EXIT    = 0,
+    YIELD   = 1,
+    GETPID  = 2,
     WAITPID = 3,
-    FORK = 4,
-    SLEEP = 5,
-    MSLEEP = 6,
-    TIME = 7,
-    UPTIME = 8,
-    OPEN = 9,
-    OPENAT = 10,
-    CLOSE = 11,
-    READ = 12,
-    WRITE = 13,
-    FSTAT = 14,
-    STAT = 15,
-    GETCWD = 16,
+    FORK    = 4,
+    SLEEP   = 5,
+    MSLEEP  = 6,
+    TIME    = 7,
+    UPTIME  = 8,
+    OPEN    = 9,
+    OPENAT  = 10,
+    CLOSE   = 11,
+    READ    = 12,
+    WRITE   = 13,
+    FSTAT   = 14,
+    STAT    = 15,
+    GETCWD  = 16,
+    ACQMEM  = 17,
+    RSZMEM  = 18,
+    RELMEM  = 19,
 }
 
 /**
@@ -320,5 +323,37 @@ enum syscall: uint64 {
         "mov x2, $2"
         "svc #0"
         "mov $out, x0"
+    };
+}
+
+@inline fn acqmem(size: uint64, align: uint64) -> uint8* {
+    return @asm @clobbers("x0", "x1", "x2", "memory")
+        (syscall::ACQMEM, size, align) -> uint8* {
+        "mov x0, $0"
+        "mov x1, $1"
+        "mov x2, $2"
+        "svc #0"
+        "mov $out, x0"
+    };
+}
+
+@inline fn rszmem(ptr: uint8*, size: uint64, align: uint64) -> uint8* {
+    return @asm @clobbers("x0", "x1", "x2", "memory")
+        (syscall::RSZMEM, ptr, size, align) -> uint8* {
+        "mov x0, $0"
+        "mov x1, $1"
+        "mov x2, $2"
+        "mov x3, $3"
+        "svc #0"
+        "mov $out, x0"
+    };
+}
+
+@inline fn relmem(ptr: uint8*) {
+    @asm @clobbers("x0", "x1", "memory")
+        (syscall::RELMEM, ptr) {
+        "mov x0, $0"
+        "mov x1, $1"
+        "svc #0"
     };
 }

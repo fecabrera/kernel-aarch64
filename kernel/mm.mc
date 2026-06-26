@@ -110,3 +110,54 @@ fn krealloc(ptr: uint8*, new_size: uint64) -> uint8* {
 fn kfree(ptr: uint8*) -> int32 {
     return heap_release(&kheap, ptr);
 }
+
+/**
+ * Allocates heap space for n elements of type T.
+ *
+ * @param n: number of elements to allocate space for
+ *
+ * @return pointer to the first element; the memory is uninitialized
+ */
+fn kalloc<T>(n: uint64) -> T* {
+    return kmalloc(n * sizeof(T)) as T*;
+}
+
+/**
+ * Allocates heap space for n elements of type T with the given alignment.
+ * The result is directly kdealloc-able. align must be a power-of-two multiple
+ * of 8.
+ *
+ * @param n:     number of elements to allocate space for
+ * @param align: required alignment in bytes
+ *
+ * @return pointer to the first element; the memory is uninitialized
+ */
+fn kalloc_aligned<T>(n: uint64, align: uint64) -> T* {
+    return kmalloc_aligned(n * sizeof(T), align) as T*;
+}
+
+/**
+ * Resizes a block previously returned by kalloc<T> to hold n elements of type
+ * T, preserving its contents up to the smaller of the old and new sizes.
+ * Returns the (possibly relocated) pointer; the old pointer must not be used
+ * afterward. Passing null allocates a fresh block.
+ *
+ * @param p: pointer returned by kalloc<T>, or null
+ * @param n: new number of elements
+ *
+ * @return pointer to the resized block
+ */
+@inline
+fn kresize<T>(p: T*, n: uint64) -> T* {
+    return krealloc(p, n * sizeof(T)) as T*;
+}
+
+/**
+ * Releases memory previously returned by kalloc.
+ *
+ * @param p: pointer returned by kalloc<T>; null is allowed and does nothing
+ */
+@inline
+fn kdealloc<T>(p: T*) {
+    kfree(p);
+}

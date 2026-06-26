@@ -1,5 +1,5 @@
 import "std";
-import "filesystem/fs";
+import "system/fs";
 import "system/syscall";
 
 @private

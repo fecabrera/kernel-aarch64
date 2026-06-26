@@ -282,8 +282,8 @@ fn fat32_read_cluster(pathname: uint8*, bs_info: struct fat32_bs_info*, cluster:
     let n_entries_per_sector: uint16 = bs_info->n_bytes_per_sector / 32;
 
     // allocate buffer
-    let buf: uint8* = alloc<uint8>(bs_info->n_bytes_per_sector as uint64);
-    defer dealloc(buf);
+    let buf: uint8* = kalloc<uint8>(bs_info->n_bytes_per_sector as uint64);
+    defer kdealloc(buf);
 
     let status = vfs_read(pathname, buf, bs_info->n_bytes_per_sector as uint64,
                           sector as uint64 * bs_info->n_bytes_per_sector);
@@ -347,8 +347,8 @@ fn fat32_read_cluster(pathname: uint8*, bs_info: struct fat32_bs_info*, cluster:
         // bytecopy(dir_name, dir_entry->name, 11);
         
 
-        let lfn_dir_name = alloc<uint8>(n_lfn_entries as uint64 * 13 + 1);
-        defer dealloc(lfn_dir_name);
+        let lfn_dir_name = kalloc<uint8>(n_lfn_entries as uint64 * 13 + 1);
+        defer kdealloc(lfn_dir_name);
         set_bytes(lfn_dir_name, 0, n_lfn_entries as uint64 * 13 + 1);
 
         let i: uint32 = 0;
@@ -382,20 +382,20 @@ fn fat32_read_cluster(pathname: uint8*, bs_info: struct fat32_bs_info*, cluster:
         let name: uint8*;
         if (n_lfn_entries) {
             let l = strlen(lfn_dir_name);
-            name = alloc<uint8>(l + 1);
+            name = kalloc<uint8>(l + 1);
             strncpy(name, lfn_dir_name, l + 1);
         } else {
-            name = alloc<uint8>(13);
+            name = kalloc<uint8>(13);
             let name_l = strntrimend(name, dir_name, 8);
             if (strntrimend(&name[name_l + 1], &dir_name[8], 3) > 0)
                 name[name_l] = '.';
             else
                 name[name_l] = '\0';
         }
-        defer dealloc(name);
+        defer kdealloc(name);
 
         if (strncmp(name, ".", 2) != 0 and strncmp(name, "..", 3) != 0) {
-            let entry_ref = alloc<struct fat32_entry_reference>(1);
+            let entry_ref = kalloc<struct fat32_entry_reference>(1);
             entry_ref->cluster = cluster;
             entry_ref->offset = _offset as uint32;
             entry_ref->n_lfn_entries = n_lfn_entries;
@@ -494,8 +494,8 @@ fn fat32_build_fs_tree(pathname: uint8*, bs_info: struct fat32_bs_info*,
  * @param cluster_chains: output queue; must be initialized by the caller
  */
 fn fat32_build_cluster_chains(bs_info: struct fat32_bs_info*, cluster_chains: struct queue<uint32>*) {
-    let visited_clusters: bool* = alloc<bool>(bs_info->n_fat_entries as uint64);
-    defer dealloc(visited_clusters);
+    let visited_clusters: bool* = kalloc<bool>(bs_info->n_fat_entries as uint64);
+    defer kdealloc(visited_clusters);
     set_items(visited_clusters, false, bs_info->n_fat_entries as uint64);
 
     let i: uint32 = bs_info->root_cluster;
@@ -565,7 +565,7 @@ fn fat32_mount(device_path: uint8*, mountpoint: uint8*) -> int64 {
     // parse boot sector
     dprintk("[fat32] parsing boot sector...\n");
 
-    let bs_info = alloc<struct fat32_bs_info>(1);
+    let bs_info = kalloc<struct fat32_bs_info>(1);
     
     fat32_parse_boot_sector(bs, bs_info);
 
@@ -581,7 +581,7 @@ fn fat32_mount(device_path: uint8*, mountpoint: uint8*) -> int64 {
         root = vfs_create_dir("/volumes", bs_info->volume_label, 0, null);
         if (root == null) {
             dprintk("[fat32] vfs_create_dir() returned NULL!\n");
-            dealloc(bs_info);
+            kdealloc(bs_info);
             return FAT32_MOUNT_ERROR_MOUNTPOINT_NOT_FOUND;
         }
 
@@ -595,7 +595,7 @@ fn fat32_mount(device_path: uint8*, mountpoint: uint8*) -> int64 {
 
         if (root == null) {
             dprintk("[fat32] vfs_get_node_for_path() returned NULL!\n");
-            dealloc(bs_info);
+            kdealloc(bs_info);
             return FAT32_MOUNT_ERROR_MOUNTPOINT_NOT_FOUND;
         }
 
@@ -606,7 +606,7 @@ fn fat32_mount(device_path: uint8*, mountpoint: uint8*) -> int64 {
     // check if root is a folder
     if ((root->attrs & node_attrs::TYPE_MASK) != node_attrs::DIR) {
         dprintk("[fat32] root is not a folder!\n");
-        dealloc(bs_info);
+        kdealloc(bs_info);
         return FAT32_MOUNT_ERROR_MOUNTPOINT_IS_NOT_A_FOLDER;
     }
     
@@ -617,7 +617,7 @@ fn fat32_mount(device_path: uint8*, mountpoint: uint8*) -> int64 {
     if (vfs_mp == null) {
         dprintk("[fat32] vfs_create_mountpoint() returned NULL!\n");
         
-        dealloc(bs_info);
+        kdealloc(bs_info);
         fs_destroy_node(root);
         
         return FAT32_MOUNT_ERROR_CANNOT_CREATE_VFS_MOUNT;
@@ -627,12 +627,12 @@ fn fat32_mount(device_path: uint8*, mountpoint: uint8*) -> int64 {
     dprintk("[fat32] reading FAT table...\n");
 
     let fat_table_size = bs_info->table_size_32 * bs_info->n_bytes_per_sector;
-    let fat_table = alloc<uint8>(fat_table_size as uint64);
+    let fat_table = kalloc<uint8>(fat_table_size as uint64);
     status = read_fat_table(device_path, bs_info, fat_table);
     if (status < 0) {
         dprintk("[fat32] read_fat_table() returned %d!\n", status);
 
-        dealloc(fat_table);
+        kdealloc(fat_table);
         vfs_destroy_mountpoint(mountpoint);
 
         return FAT32_MOUNT_ERROR_CANNOT_READ_FAT_TABLE;
@@ -647,7 +647,7 @@ fn fat32_mount(device_path: uint8*, mountpoint: uint8*) -> int64 {
     if (status < 0) {
         dprintk("[fat32] fat32_build_fs_tree() returned %i!\n", status);
         
-        dealloc(fat_table);
+        kdealloc(fat_table);
         vfs_destroy_mountpoint(mountpoint);
 
         return FAT32_MOUNT_ERROR_CANNOT_BUILD_FS_TREE;
@@ -689,7 +689,7 @@ fn fat32_unmount(device_path: uint8*) -> int64 {
     // steps:
     //   1. get fs_mount
     //   2. get bs_info
-    //   3. dealloc(bs_info->fat_table)
+    //   3. kdealloc(bs_info->fat_table)
     //   4. unmount fs_mount
     return -1;
 }
@@ -722,8 +722,8 @@ fn fat32_read(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint
     let dir_entry_size: uint32 = sizeof(struct fat32_dir_entry) as uint32;
     let dir_entry_offset: uint32 = dir_entry_sector * bs_info->n_bytes_per_sector +
                                 (entry_ref->offset + entry_ref->n_lfn_entries) * dir_entry_size;
-    let dir_entry = alloc<uint8>(dir_entry_size as uint64) as struct fat32_dir_entry*;
-    defer dealloc(dir_entry);
+    let dir_entry = kalloc<uint8>(dir_entry_size as uint64) as struct fat32_dir_entry*;
+    defer kdealloc(dir_entry);
 
     dprintk("[fat32] count=%d, offset=%p\n", dir_entry_size, dir_entry_offset);
     let status = vfs_read(fs_mp->device, dir_entry as uint8*, dir_entry_size as uint64, dir_entry_offset as uint64);
@@ -772,8 +772,8 @@ fn fat32_read(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint
     }
 
     // read contents
-    let tmp: uint8* = alloc<uint8>(n_data_sectors_to_read * bs_info->n_bytes_per_sector);
-    defer dealloc(tmp);
+    let tmp: uint8* = kalloc<uint8>(n_data_sectors_to_read * bs_info->n_bytes_per_sector);
+    defer kdealloc(tmp);
 
     {
         let i: uint64 = 0;
