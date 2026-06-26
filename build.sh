@@ -46,7 +46,17 @@ user_app_compile() {
 	$LD -e entry -r ${1}/*.o user/libmc.a user/libc.a user/libcrt.a -o init/bin/$(basename -- "$1") || exit 1
 }
 
-mkdir -p user/libcrt user/libc user/libmc user/libmc/hashing user/libmc/iteration user/libmc/libc user/libmc/system
+# user lib dirs
+mkdir -p user/libcrt
+mkdir -p user/libc
+mkdir -p user/libmc
+mkdir -p user/libmc/hashing
+mkdir -p user/libmc/iteration
+mkdir -p user/libmc/libc
+mkdir -p user/libmc/system
+
+# user bin dir
+mkdir -p init/bin
 
 # lib
 for file in lib/src/*.c; do c_compile $file; done
