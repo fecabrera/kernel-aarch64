@@ -17,9 +17,11 @@ import "system/syscall";
     fn realloc(ptr: uint8*, new_size: uint64) -> uint8* {
         return krealloc(ptr, new_size);
     }
-    
-    // @extern @symbol("krealloc")
-    // fn realloc_align(ptr: uint8*, new_size: uint64, align: uint64) -> uint8*;
+
+    @inline    
+    fn realloc_aligned(ptr: uint8*, new_size: uint64, align: uint64) -> uint8* {
+        return krealloc_aligned(ptr, new_size, align);
+    }
     
     @inline
     fn free(ptr: uint8*) {

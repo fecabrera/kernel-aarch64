@@ -28,6 +28,9 @@ fn kernel_init() {
     // Initialize syscall system
     syscall_init();
 
+    // Register syscalls for heap memory acquisition, resizing and release
+    register_mem_syscalls();
+    
     // Initialize interrupts
     gic_init();
     irq_init();
@@ -55,5 +58,32 @@ fn kernel_init() {
 }
 
 fn init() {
-    console("/dev/serial");
+    let storage_dev = "/dev/sda";
+    let io_dev = "/dev/serial";
+
+    let status: int64;
+    
+    printk("[init] opening stdin at \"%s\"...\n", io_dev);
+    status = open(io_dev, open_mode::READ);
+    if (status < 0) {
+        printk("[init] open() returned %lld\n", status);
+        hang();
+    }
+
+    printk("[init] opening stdout at \"%s\"...\n", io_dev);
+    status = open(io_dev, open_mode::WRITE);
+    if (status < 0) {
+        printk("[init] open() returned %lld\n", status);
+        hang();
+    }
+
+    printk("[init] mounting \"%s\"...\n", storage_dev);
+    status = fat32_mount(storage_dev, "/");
+    if (status < 0) {
+        printk("[init] fat32_mount() returned %lld!\n", status);
+        hang();
+    }
+
+    printk("[init] starting console...\n");
+    console();
 }

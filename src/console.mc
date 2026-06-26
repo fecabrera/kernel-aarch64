@@ -283,12 +283,7 @@ fn console_parse_command(argc: int64, argv: uint8**) {
  *
  * @param pathname: VFS path of the device to use for I/O (e.g. "/dev/serial")
  */
-fn console(pathname: uint8*) {
-    printk("[console] starting console at \"%s\"...\n", pathname);
-
-    open(pathname, open_mode::READ);
-    open(pathname, open_mode::WRITE);
-
+fn console() {
     while (true) {
         let i: uint64;
 

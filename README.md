@@ -72,7 +72,7 @@ linking kernel internals (heap, UART, `printk`) — see "ELF loader / user progr
 - Drivers — GIC, PL031 RTC, ARM generic timer, PL011 UART, virtio MMIO (`interrupts/gic.mc`, `interrupts/drivers/pl031.mc`, `interrupts/drivers/timer.mc`, `interrupts/drivers/pl011.mc`, `interrupts/drivers/virtio_mmio.mc`)
 - Kernel log — `printk`/`dprintk` (`debug.mc`) and the PL011 print path (`pl011_vprintf`), formatting via stb_sprintf bound through `libc/stdio.mc`
 - Device handlers — serial, storage (`devices/`)
-- Memory management — free-list heap allocator (`heap.mc`: `struct heap` with block split/merge), plus the kernel heap, DTB memory probe, the `kmalloc`/`kfree`/`krealloc`/`kmalloc_aligned` wrappers and the `kalloc<T>`/`kalloc_aligned<T>`/`kresize<T>`/`kdealloc<T>` generics over it (`mm.mc`)
+- Memory management — free-list heap allocator (`heap.mc`: `struct heap` with block split/merge) and a fixed-block stack pool (`pool.mc`), wired up in `mm.mc`: the kernel heap, DTB memory probe, `kmalloc`/`kfree`/`krealloc`/`kmalloc_aligned` + the `kalloc<T>`/`kalloc_aligned<T>`/`kresize<T>`/`kdealloc<T>` generics, the `stack_alloc`/`stack_free` pool for process stacks, and the `acqmem`/`rszmem`/`relmem` memory-syscall handlers
 - Interactive console / shell (`console.mc`) — fixed built-ins plus a PATH-style lookup that loads and runs ELF user programs (`user/apps/`)
 - CPU helpers (`cpu.mc`) — register accessors (cntpct/cntfrq/cntp_ctl/cntp_tval, vbar_el1), wfi/wfe, halt/hang, irq enable/disable, and bswap, all via inline `@asm`
 - Boot entry / init sequence (`kernel.mc`) — `kernel_init` subsystem bring-up and the `init` (pid 1) entry point
@@ -209,8 +209,8 @@ linking kernel internals (heap, UART, `printk`) — see "ELF loader / user progr
 - `serial_init()` registers a `/dev/serial` I/O module backed by the PL011 UART. Must be called after `io_init()`.
 - `serial_read` blocks reading `count` bytes from the UART by calling `pl011_getc` in a loop, spinning on `wfi()` until each byte arrives; returns `count`.
 - `serial_write` writes `count` bytes to the UART one byte at a time via `pl011_putc`; returns `count`.
-- `console(pathname)` in `console.mc` opens `pathname` as its stdin/stdout (fds 0/1), then runs an interactive terminal loop, prompting with the current working directory's name (or `/` at the root) followed by `"# "`, tokenizing each input line into `argc/argv` (whitespace-delimited; double-quoted strings are single tokens; backslash escapes any character, including `\"` inside quotes), and dispatching to `console_parse_command`. Lines with an unterminated quote or trailing backslash are rejected with an error.
-- `console_parse_command(argc, argv)` forks a child process for each command (parent waits via `waitpid`), except `cd`, which is dispatched directly so it can mutate the console process's own cwd. Built-ins: `ls [path]` (lists a folder's entries relative to the cwd, skipping hidden `.`/`..`; defaults to `/`), `cd <path>` (changes the cwd to a child folder, following `.`/`..` links), `cat <path>` (resolves relative to the cwd, validates the node is a file, then reads and prints it), `echo [args...]` (print first arg), `mount <device> [mountpoint]` (`fat32_mount`; mountpoint defaults to `/volumes/<label>`), `exit [status]` (`exit`), `help` (list commands); unknown commands print a "not found!" message.
+- `console()` in `console.mc` runs an interactive terminal loop (stdin/stdout, fds 0/1, are opened by `init()` before it is called), prompting with the current working directory's name (or `/` at the root) followed by `"# "`, tokenizing each input line into `argc/argv` (whitespace-delimited; double-quoted strings are single tokens; backslash escapes any character, including `\"` inside quotes), and dispatching to `console_parse_command`. Lines with an unterminated quote or trailing backslash are rejected with an error.
+- `console_parse_command(argc, argv)` runs built-ins (`cd` directly so it can mutate the console process's own cwd; `ls`/`mount`/`help` in a forked child the parent `waitpid`s on): `ls [path]` (lists a folder's entries relative to the cwd, skipping hidden `.`/`..`; defaults to `/`), `cd <path>` (changes the cwd to a child folder, following `.`/`..` links), `mount <device> [mountpoint]` (`fat32_mount`; mountpoint defaults to `/volumes/<label>`), `help` (list commands). Any other command name is resolved as an ELF program on the `dirs` search path (`try_run`); unknown commands print a "not found!" message.
 - Line input is handled by `libmc/std.mc`'s `readchar()` (blocks on stdin, discarding ANSI escape sequences) and `readline(buffer)` (reads one line via `readchar`, echoing characters and handling backspace and CR; returns character count).
 
 ### **Storage devices**
@@ -234,7 +234,7 @@ linking kernel internals (heap, UART, `printk`) — see "ELF loader / user progr
 - `uptime()` returns system uptime in milliseconds, computed from `cntpct_el0` ticks since boot.
 - `open(path, attrs)` / `close(fd)` / `read(fd, buf, count)` / `write(fd, buf, count)` / `fstat(fd, stat)` operate on the calling process's per-process fd table (see "File descriptors" below).
 - `getcwd(buf, size)` writes the calling process's current working directory as an absolute path into `buf`, resolved by walking the `..` chain to the root (`fs_get_absolute_dir`).
-- `acqmem(size, align)` / `rszmem(ptr, size, align)` / `relmem(ptr)` are the user-side memory syscalls that back the user build of `libmc`'s `malloc`/`realloc`/`free`. The `svc` wrappers and syscall numbers (17/18/19) exist; the kernel-side handlers are reserved but **not yet wired up**.
+- `acqmem(size, align)` / `rszmem(ptr, size, align)` / `relmem(ptr)` (syscalls 17/18/19) are the user-side memory syscalls that back the user build of `libmc`'s `malloc`/`realloc`/`free`. Their handlers (registered by `register_mem_syscalls`) currently serve user allocations straight from the kernel heap (`kmalloc`/`krealloc`/`kfree`).
 
 ### **File descriptors**
 
@@ -242,7 +242,7 @@ linking kernel internals (heap, UART, `printk`) — see "ELF loader / user progr
 - A `file_descriptor` (`filesystem/file.mc`) is the open-file layer: it binds an `fs_node` to a read/write position (`pos`) and an access mode (`FS_FILE_ATTRS_READ/WRITE/EXEC`). `file_read`/`file_write` check the mode, dispatch to `fs_read`/`fs_write` at `pos`, then advance `pos`; `file_stat` returns size + mode.
 - Descriptors are reference-counted via `pointer<file_descriptor>` (`kernel/pointer.mc`): `open` creates one (count 1), `close` clears the slot and `pointer_release`s it, and `fork` `pointer_acquire`s each entry so parent and child share the same descriptor (and `pos`), freed when the last owner closes/exits.
 - The `open`/`close`/`read`/`write`/`fstat` syscalls resolve into `process_open/close/read/write_file` / `process_file_stat`, which index the fd table and call the `file_*` layer — completing the loop syscall → `file_*` → `fs_*` → mount handler.
-- `printf`/`vprintf` (`libc/stdio.mc`) format with stb_sprintf and stream to `STDOUT_FILENO` via the `write` syscall, so they require the caller to have that fd open. The console opens stdin/stdout on its device at startup (fds 0/1) and forked command children inherit them, so command output flows printf → `write` → fd table → `fs_write` → device.
+- `printf`/`vprintf` (`libc/stdio.mc`) format with stb_sprintf and stream to `STDOUT_FILENO` via the `write` syscall, so they require the caller to have that fd open. `init()` (pid 1) opens stdin/stdout on `/dev/serial` at startup (fds 0/1) and forked command children inherit them, so command output flows printf → `write` → fd table → `fs_write` → device.
 
 ### **ELF loader / user programs**
 
@@ -250,7 +250,7 @@ linking kernel internals (heap, UART, `printk`) — see "ELF loader / user progr
 - The shell built-ins are a small fixed set (`cd`, `ls`, `cat`, `mount`, `help`); any other command name is looked up as a program — `console.mc`'s `try_run` searches each entry in `dirs` (currently `bin`) for an object named `argv[0]`, loads it, and runs its `main(argc, argv)`.
 - `elf_read` parses the header/section/symbol tables and sums the load size; `elf64_load(file, base)` lays sections out at `base + sh_addr`, rebases the symbol table to runtime addresses (`base + section.sh_addr + st_value`), builds a per-symbol GOT, then applies relocations against the copied image. `elf64_locate_symbol(file, name)` returns a symbol's runtime address; `elf64_unload` frees the GOT.
 - Relocations handled: `ABS64`, `ADR_PREL_PG_HI21`, `ADD_ABS_LO12_NC`, `LDST{8,16,32,64,128}_ABS_LO12_NC`, `CALL26`/`JUMP26`, `PREL32`/`PREL64`, and the GOT pair `ADR_GOT_PAGE`/`LD64_GOT_LO12_NC`. Unhandled relocation types and references to unresolved (`UNDEF`) symbols are logged and counted in `file->relerrs`; the console refuses to run an object with `relerrs > 0` rather than executing a partially-linked image.
-- Not yet implemented: I-cache maintenance before execution (relies on QEMU's unified caches), `UNDEF`-symbol resolution against a kernel export table, PLTs for out-of-range branches, and exec-buffer lifetime tracking on unload. The `acqmem`/`rszmem`/`relmem` syscalls the user allocator targets are also not yet handled kernel-side.
+- Not yet implemented: I-cache maintenance before execution (relies on QEMU's unified caches), `UNDEF`-symbol resolution against a kernel export table, PLTs for out-of-range branches, and exec-buffer lifetime tracking on unload.
 
 ## Source layout
 
@@ -279,7 +279,7 @@ user/               — userspace tree
   libc.a            — user-side libc archive
 
 src/                — entry points (assembly stubs + top-level mc)
-  kernel.mc         — kernel_init: subsystem bring-up (DTB, memory, IRQ, VFS, I/O, serial, storage, scheduler, timer); init(): pid 1 entry point, runs console("/dev/serial")
+  kernel.mc         — kernel_init: subsystem bring-up (DTB, memory + mem syscalls, IRQ, VFS, I/O, serial, storage, scheduler, timer); init(): pid 1 entry point — opens stdin/stdout on /dev/serial, mounts /dev/sda at /, then runs console()
   console.mc        — console()/console_parse_command(): interactive terminal loop with cwd-aware prompt and argc/argv tokenization (quoted strings, backslash escapes), fork-per-command dispatch (cd dispatched directly); built-ins: cd, ls, mount, help; any other name is loaded & run as an ELF program from the `dirs` search path (try_run); line input via libmc/std readline
   start.S           — AArch64 boot stub, saves DTB pointer, zeros BSS
   vectors.S         — exception vector table, save/restore_context macros
@@ -295,7 +295,8 @@ kernel/             — mc kernel modules (logic + @extern bindings to the C bel
   debug.mc          — printk (always on) / dprintk (DEBUG-gated via @if), thin wrappers over pl011_vprintf
   utf16.mc          — utf16lencpy/utf16bencpy bindings
   heap.mc           — free-list heap allocator: heap_init/heap_acquire/heap_release/heap_resize over a struct heap, with block splitting and adjacent-free coalescing; heap_check integrity validator (DEBUG-gated)
-  mm.mc             — kernel memory management: 16 MiB static kernel heap, mem_init (reads RAM base/size from the DTB at boot), kmalloc/kfree/krealloc/kmalloc_aligned wrappers and the typed kalloc<T>/kalloc_aligned<T>/kresize<T>/kdealloc<T> generics over the kernel heap
+  mm.mc             — kernel memory management: 16 MiB static kernel heap + 16 MiB stack pool, mem_init (heap/pool init + reads RAM base/size from the DTB at boot), kmalloc/kfree/krealloc(_aligned)/kmalloc_aligned + typed kalloc<T>/kalloc_aligned<T>/kresize<T>/kdealloc<T> generics, stack_alloc/stack_free, and the acqmem/rszmem/relmem syscall handlers (register_mem_syscalls)
+  pool.mc           — intrusive free-list fixed-block pool allocator: pool_init/pool_alloc/pool_free (backs the process stack pool)
   devices/
     serial.mc       — /dev/serial driver: serial_init, serial_read (pl011_getc+wfi), serial_write (pl011_putc)
     storage.mc      — block driver: storage_init scans virtio slots, registers /dev/sd<letter>; storage_read/write handlers
