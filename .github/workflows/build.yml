@@ -30,7 +30,9 @@ jobs:
           cd ..
 
       - name: Build
-        run: make MCCPATH=mcc all
+        run: |
+          chmod a+x ./build.sh
+          MCCPATH=mcc ./build.sh
 
       - name: Upload kernel binaries
         uses: actions/upload-artifact@v4

@@ -1,4 +1,5 @@
 #!/bin/bash
+MCCPATH=${MCCPATH:-~/Documents/lang}
 MCC="python -m mcc"
 CC="aarch64-elf-gcc"
 MCFLAGS="--target aarch64-unknown-none-elf \
@@ -18,7 +19,7 @@ KERNEL_FLAGS="-I kernel -I libmc -D IS_KERNEL"
 
 kernel_compile() {
     # create object files
-    PYTHONPATH=~/Documents/lang $MCC $MCFLAGS $KERNEL_FLAGS $1 -o "${1%.mc}.o"
+    PYTHONPATH=$MCCPATH $MCC $MCFLAGS $KERNEL_FLAGS $1 -o "${1%.mc}.o"
 }
 
 asm_compile() {
@@ -31,15 +32,15 @@ c_compile() {
 
 user_lib_compile() {
     # create object files
-    PYTHONPATH=~/Documents/lang $MCC $MCFLAGS $USER_FLAGS $1 -o "user/${1%.mc}.o"
+    PYTHONPATH=$MCCPATH $MCC $MCFLAGS $USER_FLAGS $1 -o "user/${1%.mc}.o"
     
     # create interfaces
-    PYTHONPATH=~/Documents/lang $MCC $MCFLAGS $USER_FLAGS --emit-interface $1 -o "user/${1%.mc}.mci"
+    PYTHONPATH=$MCCPATH $MCC $MCFLAGS $USER_FLAGS --emit-interface $1 -o "user/${1%.mc}.mci"
 }
 
 user_app_compile() {
     # create object files
-    PYTHONPATH=~/Documents/lang $MCC $MCFLAGS -I user/libmc $1/*.mc
+    PYTHONPATH=$MCCPATH $MCC $MCFLAGS -I user/libmc $1/*.mc
 
     # link
 	$LD -r ${1}/*.o user/libmc.a user/libc.a -o init/bin/$(basename -- "$1")
