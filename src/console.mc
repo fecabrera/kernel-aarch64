@@ -3,6 +3,7 @@ import "std";
 import "list";
 import "string";
 import "memory";
+import "range";
 import "scheduler";
 import "filesystem/file";
 import "filesystem/fs";
@@ -27,9 +28,8 @@ let dirs: uint8*[] = ["/bin"];
 fn command_help(argc: int64, argv: uint8**) -> int64 {
     println("available commands:");
 
-    let i: uint64 = 0;
-    while (i < len(available_commands)) {
-        defer i = i + 1;
+    let r = struct range { end = len(available_commands) };
+    for i in &r {
         let command = available_commands[i];
         println("    %-28s %s", command[0], command[1]);
     }
@@ -74,9 +74,6 @@ fn console_ls(argc: int64, argv: uint8**) -> int64 {
         return -2;
     }
 
-    until ((node->attrs & node_attrs::LINK) == 0)
-        node = node->child;
-
     let current = node->child;
     until (current == null) {
         defer current = current->next;
@@ -90,15 +87,15 @@ fn console_ls(argc: int64, argv: uint8**) -> int64 {
 }
 
 /**
- * Changes the calling process's current working directory to the named child
- * of its cwd. Unlike the other built-ins, cd is dispatched directly (not via
- * console_run_command) so the cwd update lands in the console process itself
- * rather than a short-lived forked child. The target must be an immediate child
- * folder of the current directory; LINK nodes (e.g. "." / "..") are followed to
- * their target.
+ * Changes the calling process's current working directory to argv[1], resolved
+ * via vfs_get_node_for_path (absolute from the VFS root, else relative to the
+ * cwd; LINK nodes such as "." / ".." are followed by the resolver). Unlike the
+ * other built-ins, cd is dispatched directly (not via console_run_command) so the
+ * cwd update lands in the console process itself rather than a short-lived forked
+ * child. The target must resolve to a folder.
  *
  * @param argc: number of arguments
- * @param argv: argv[0] is the command name; argv[1] is the destination folder
+ * @param argv: argv[0] is the command name; argv[1] is the destination path
  *
  * @return 0 on success, -1 if no path was given, -2 if the path is not found or
  *         is not a folder
@@ -124,9 +121,6 @@ fn console_cd(argc: int64, argv: uint8**) -> int64 {
         println("\"%s\" is not a folder!", path);
         return -2;
     }
-
-    until((node->attrs & node_attrs::LINK) == 0)
-        node = node->child;
 
     proc->cwd = node;
     return 0;
@@ -230,12 +224,10 @@ fn console_parse_command(argc: int64, argv: uint8**) {
     } else if (strcmp(argv[0], "help") == 0) {
         run_command(command_help, argc, argv);
     } else {
-        let i: uint64 = 0;
-        while (i < len(dirs)) {
+        let r = struct range { end = len(dirs) };
+        for i in &r {
             if (try_run(dirs[i], argc, argv) == 0)
                 return;
-
-            i = i + 1;
         }
 
         println("command \"%s\" not found!", argv[0]);
@@ -286,10 +278,8 @@ fn console() {
         string_init(&vec);
         defer string_destroy(&vec);
 
-        i = 0;
-        while (i <= n) {
-            defer i = i + 1;
-
+        let r = struct range { end = n + 1 };
+        for i in &r {
             let c: uint8 = buffer[i];
             let arg: uint8*;
 

@@ -1,6 +1,7 @@
 import "debug";
 import "cpu";
 import "dtb";
+import "range";
 import "libc/stdio";
 import "interrupts/irq";
 import "interrupts/gic";
@@ -225,10 +226,9 @@ fn pl011_vprintf(format: uint8*, args: va_list) {
 @private
 fn pl011_printf_cb(buf: uint8*, user: uint8*, count: int32) -> uint8* {
     let ctx = user as struct pl011_printf_ctx*;
-    let i: int32 = 0;
-    while (i < count) {
+    let r = struct range { end = count };
+    for i in &r {
         pl011_putc(buf[i]);
-        i = i + 1;
     }
     ctx->length = ctx->length + count;
     return ctx->tmp;

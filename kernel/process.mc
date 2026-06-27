@@ -2,6 +2,7 @@ import "cpu";
 import "list";
 import "mm";
 import "memory";
+import "range";
 import "pointer";
 import "filesystem/fs";
 import "filesystem/vfs";
@@ -402,15 +403,12 @@ fn setup_args(proc: struct process*, argc: int64, argv: uint8**) {
     let p: uint64 = (proc->stack as uint64) + proc->stack_size;
 
     // 1. copy each string to the top, recording its new address
-    {
-        let i: int64 = 0;
-        while (i < argc) {
-            let l = strlen(argv[i]) + 1;
-            p = p - l;
-            bytecopy(p as uint8*, argv[i], l);
-            ptrs[i] = p;
-            i = i + 1;
-        }
+    let r = struct range { end = argc };
+    for i in &r {
+        let l = strlen(argv[i]) + 1;
+        p = p - l;
+        bytecopy(p as uint8*, argv[i], l);
+        ptrs[i] = p;
     }
 
     // 2. build the argv[] pointer array (argc + 1, null-terminated), 8-aligned
@@ -418,14 +416,10 @@ fn setup_args(proc: struct process*, argc: int64, argv: uint8**) {
     p = p - (argc as uint64 + 1) * 8;
     let new_argv = p as uint64*;
 
-    {
-        let i: int64 = 0;
-        while (i < argc) {
-            new_argv[i] = ptrs[i];
-            i = i + 1;
-        }
-        new_argv[argc] = 0;
+    for i in &r {
+        new_argv[i] = ptrs[i];
     }
+    new_argv[argc] = 0;
 
     // 3. drop SP to 16-byte alignment and place the ctx frame below it
     let sp = p & (~15) as uint64;

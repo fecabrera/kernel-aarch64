@@ -134,11 +134,16 @@ fn vfs_destroy_mountpoint(mountpoint: uint8*) -> int32 {
 }
 
 /**
- * Resolves pathname via vfs_get_node_for_path and returns the matching fs_node.
+ * Resolves pathname to an fs_node, walking the tree component by component and
+ * following any LINK nodes encountered (including the final component) to their
+ * targets. Absolute paths (leading '/') and a null `root` resolve from the VFS
+ * root; otherwise resolution starts at `root`.
  *
- * @param pathname: null-terminated absolute path to resolve
+ * @param pathname: null-terminated path to resolve
+ * @param root:     node to resolve `pathname` against; the VFS root if null
  *
- * @return pointer to the fs_node, or null if not found
+ * @return the resolved fs_node — always a real file/dir, never a LINK — or null
+ *         if any path component does not exist
  */
 fn vfs_get_node_for_path(pathname: uint8*, root: struct fs_node*) -> struct fs_node* {
     let current = root;
@@ -151,12 +156,22 @@ fn vfs_get_node_for_path(pathname: uint8*, root: struct fs_node*) -> struct fs_n
     let i: uint64 = 0;
     let j: uint64 = 0;
     until (current == null) {
+        // follow links
+        until (current == null or (current->attrs & node_attrs::LINK) == 0) {
+            current = current->child;
+        }
+
         // end of string
         if (pathname[i] == '\0') {
             if (j > 0)
                 // pathname is of type "/abc/def", `current` holds "/abc" so we
                 // need to find "def"
                 current = fs_get_child(current, str);
+
+            // follow links
+            until (current == null or (current->attrs & node_attrs::LINK) == 0) {
+                current = current->child;
+            }
 
             // pathname is of type "/abc/def/" which needs to be resolved to
             // "/abc/def" `current` already holds "/abc/def" so return it

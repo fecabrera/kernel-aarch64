@@ -1,5 +1,6 @@
 import "debug";
 import "memory";
+import "range";
 import "cpu";
 import "utf16";
 import "libc/string";
@@ -296,7 +297,7 @@ fn fat32_read_cluster(pathname: uint8*, bs_info: struct fat32_bs_info*, cluster:
     let offset: uint16 = 0;
     while (offset < n_entries_per_sector) {
         defer offset = offset + 1;
-        
+
         let dir_entry = &first_entry[offset];
 
         if (dir_entry->name[0] == FAT32_DIRENT_END) return 1;
@@ -337,24 +338,18 @@ fn fat32_read_cluster(pathname: uint8*, bs_info: struct fat32_bs_info*, cluster:
 
         let dir_name: uint8[12];
         set_bytes(dir_name, 0, 12);
-        {
-            let i: uint16 = 0;
-            while (i < 11) {
-                dir_name[i] = tolower(dir_entry->name[i] as int32) as uint8;
-                i = i + 1;
-            }
-        }
-        // bytecopy(dir_name, dir_entry->name, 11);
         
+        let r = struct range<uint16> { end = 11 };
+        for i in &r {
+            dir_name[i] = tolower(dir_entry->name[i] as int32) as uint8;
+        }
 
         let lfn_dir_name = kalloc<uint8>(n_lfn_entries as uint64 * 13 + 1);
         defer kdealloc(lfn_dir_name);
         set_bytes(lfn_dir_name, 0, n_lfn_entries as uint64 * 13 + 1);
 
-        let i: uint32 = 0;
-        while (i < n_lfn_entries) {
-            defer i = i + 1;
-
+        let entries = struct range { end = n_lfn_entries };
+        for i in &entries {
             let lfn_entry = stack_pop(&lfn_entries);
             
             let _lfn_dir_name: uint16[14];
@@ -451,11 +446,8 @@ fn fat32_build_fs_tree(pathname: uint8*, bs_info: struct fat32_bs_info*,
     defer set_destroy(&parent_nodes);
 
     // read clusters
-    let n_chains = cluster_chains.length;
-    let i: uint64 = 0;
-    while (i < n_chains) {
-        defer i = i + 1;
-
+    let chains = struct range { end = cluster_chains.length };
+    for i in &chains {
         // dprintk("[fat32] reading chain for cluster %d/%d\n", i, bs_info->n_fat_entries);
         let cluster = queue_pop(&cluster_chains);
 
@@ -763,35 +755,29 @@ fn fat32_read(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint
 
     // follow fat_table
     let cluster_to_read: uint32 = data_cluster;
-    {
-        let i: uint64 = 0;
-        while (i < first_data_sector_to_read) {
-            cluster_to_read = bs_info->fat_table[cluster_to_read];
-            i = i + 1;
-        }
+
+    let clusters = struct range { end = first_data_sector_to_read };
+    for i in &clusters {
+        cluster_to_read = bs_info->fat_table[cluster_to_read];
     }
 
     // read contents
     let tmp: uint8* = kalloc<uint8>(n_data_sectors_to_read * bs_info->n_bytes_per_sector);
     defer kdealloc(tmp);
 
-    {
-        let i: uint64 = 0;
-        while (i < n_data_sectors_to_read) {
-            // first data sector of the file contents
-            let data_sector: uint32 = bs_info->first_data_sector + (cluster_to_read - bs_info->root_cluster);
-            let data_offset: uint32 = data_sector * bs_info->n_bytes_per_sector;
+    let sectors = struct range { end = n_data_sectors_to_read };
+    for i in &sectors {
+        // first data sector of the file contents
+        let data_sector: uint32 = bs_info->first_data_sector + (cluster_to_read - bs_info->root_cluster);
+        let data_offset: uint32 = data_sector * bs_info->n_bytes_per_sector;
 
-            dprintk("[fat32] cluster_to_read=%d, data_sector=%d, data_offset=%p\n",
-                    cluster_to_read, data_sector, data_offset);
-            vfs_read(fs_mp->device, &tmp[i * bs_info->n_bytes_per_sector],
-                    bs_info->n_bytes_per_sector as uint64, data_offset as uint64);
+        dprintk("[fat32] cluster_to_read=%d, data_sector=%d, data_offset=%p\n",
+                cluster_to_read, data_sector, data_offset);
+        vfs_read(fs_mp->device, &tmp[i * bs_info->n_bytes_per_sector],
+                bs_info->n_bytes_per_sector as uint64, data_offset as uint64);
 
-            // update cluster_to_read
-            cluster_to_read = bs_info->fat_table[cluster_to_read];
-
-            i = i + 1;
-        }
+        // update cluster_to_read
+        cluster_to_read = bs_info->fat_table[cluster_to_read];
     }
 
     // copy data to buffer, clamping to the bytes that actually remain in the file

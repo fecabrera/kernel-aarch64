@@ -3,6 +3,7 @@ import "cpu";
 import "process";
 import "queue";
 import "set";
+import "range";
 import "mm";
 import "filesystem/file";
 import "interrupts/drivers/timer";
@@ -78,18 +79,19 @@ fn scheduler_enqueue(proc: struct process*) -> int32 {
     proc->state = proc_state::READY;
     queue_push(&ready_queue, proc);
 
-    dprintk("[scheduler] enqueue(), q = { ", proc->pid);
-    let i: uint64 = 0;
-    while (i < ready_queue.length) {
-        let proc = queue_at(&ready_queue, i);
-        dprintk("%i ", proc->pid);
-        i = i + 1;
-    }
     let current_pid: int64 = 0;
     if (current != null)
         current_pid = current->pid;
-    dprintk("}, current = %i\n", current_pid);
 
+    @if (DEBUG) {
+        dprintk("[scheduler] enqueue(), q = { ", proc->pid);
+        let r = struct range { end = ready_queue.length };
+        for i in &r {
+            let proc = queue_at(&ready_queue, i);
+            dprintk("%lld ", proc->pid);
+        }
+        dprintk("}, current = %lld\n", current_pid);
+    }
     return 0;
 }
 
@@ -197,10 +199,9 @@ fn scheduler_handler(ctx: struct cpu_context*, ms_elapsed: uint64) -> struct cpu
 
         let procs = ready_queue.data as struct process**;
         
-        let i: uint64 = 0;
-        while (i < ready_queue.length) {
+        let r = struct range { end = ready_queue.length };
+        for i in &r {
             dprintk("%i ", procs[i]->pid);
-            i = i + 1;
         }
 
         dprintk("}, ");

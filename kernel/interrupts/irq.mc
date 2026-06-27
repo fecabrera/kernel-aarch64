@@ -3,6 +3,7 @@ import "cpu";
 import "syscall";
 import "scheduler";
 import "set";
+import "range";
 import "interrupts/gic";
 
 const ESR_EC_SHIFT = 26;
@@ -44,10 +45,9 @@ const NUM_IRQS = 256;
 fn ctx_dump(ctx: struct cpu_context*) {
     printk("\n=== ctx dump ===\n");
     {
-        let i: int32 = 0;
-        while(i < 15) {
+        let r = struct range<int32> { end = 15 };
+        for i in &r {
             printk("x%i  = %p\n", i, ctx->x[i]);
-            i = i + 1;
         }
     }
     printk("lr  = %p\n", ctx->lr);

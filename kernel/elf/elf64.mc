@@ -2,6 +2,7 @@ import "debug";
 import "cpu";
 import "mm";
 import "memory";
+import "range";
 
 // E_IDENT
 
@@ -492,8 +493,8 @@ fn elf_read(buf: uint8*, size: uint64, file: struct elf64_file*) -> int32 {
     // load string table
     file->shstrtab = elf64_get_shstrtab(buf, file->shdr, file->ehdr->e_shstrndx);
     
-    let i: uint16 = 0;
-    while (i < file->ehdr->e_shnum) {
+    let r = struct range { end = file->ehdr->e_shnum };
+    for i in &r {
         let el = &file->shdr[i];
         case (el->sh_type) {
         when elf64_sht::SYMTAB:
@@ -501,7 +502,6 @@ fn elf_read(buf: uint8*, size: uint64, file: struct elf64_file*) -> int32 {
             file->symtab = elf64_shdr_get_data(buf, el) as struct elf64_sym*;
             file->strtab = elf64_shdr_get_data(buf, &file->shdr[el->sh_link]);
         }
-        i = i + 1;
     }
     
     // align sections and calculate bytes to allocate
@@ -526,11 +526,10 @@ fn elf64_load(file: struct elf64_file*, address: uint64) -> int32 {
     let rebased: int32 = {
         let total: int32 = 0;
 
-        let i: uint64 = 1;
-        while (i < file->stnum) {
+        let r = struct range { start = 1, end = file->stnum };
+        for i in &r {
             if (elf64_try_rebase_symbol(&file->symtab[i], address, file->strtab, file->shdr))
                 total = total + 1;
-            i = i + 1;
         }
 
         emit total;
@@ -549,10 +548,9 @@ fn elf64_load(file: struct elf64_file*, address: uint64) -> int32 {
     }
 
     // copy entries to the allocated memory
-    let i: uint16 = 0;
-    while (i < file->shnum) {
+    let r = struct range { end = file->shnum };
+    for i in &r {
         elf64_try_relocate_section(&file->shdr[i], file->buf, address);
-        i = i + 1;
     }
 
     // patch references now that every section and symbol has a runtime address
@@ -569,8 +567,8 @@ fn elf64_unload(file: struct elf64_file*) {
 }
 
 fn elf64_locate_symbol(file: struct elf64_file*, const sym_name: uint8*) -> uint8* {
-    let i: uint64 = 1;
-    while (i < file->stnum) {
+    let r = struct range { start = 1, end = file->stnum };
+    for i in &r {
         let sym = &file->symtab[i];
         let name = elf64_get_symbol_name(sym, file->strtab);
 
@@ -578,8 +576,6 @@ fn elf64_locate_symbol(file: struct elf64_file*, const sym_name: uint8*) -> uint
             dprintk("[elf] found symbol \"%s\" at 0x%p\n", sym_name, sym->st_value);
             return sym->st_value as uint8*;
         }
-        
-        i = i + 1;
     }
     return null;
 }
@@ -598,10 +594,8 @@ fn elf64_calculate_and_pad(file: struct elf64_file*) -> int32 {
         }
         
         let total: uint64 = 0;
-        let i: uint16 = 0;
-        while (i < file->shnum) {
-            defer i = i + 1;
-
+        let r = struct range { end = file->shnum };
+        for i in &r {
             let shdr = &file->shdr[i];
 
             if ((shdr->sh_flags & elf64_shf::ALLOC) == 0)
@@ -769,10 +763,8 @@ fn elf64_apply_one_relocation(rela: struct elf64_rela*, symtab: struct elf64_sym
 fn elf64_apply_relocations(file: struct elf64_file*, base_addr: uint64) {
     file->relerrs = 0;
 
-    let i: uint16 = 0;
-    while (i < file->shnum) {
-        defer i = i + 1;
-
+    let r = struct range { end = file->shnum };
+    for i in &r {
         let rela_shdr = &file->shdr[i];
         if (rela_shdr->sh_type != elf64_sht::RELA)
             continue;
@@ -786,9 +778,8 @@ fn elf64_apply_relocations(file: struct elf64_file*, base_addr: uint64) {
         let count = rela_shdr->sh_size / sizeof(struct elf64_rela);
         let site_base = base_addr + target->sh_addr;
 
-        let j: uint64 = 0;
-        while (j < count) {
-            defer j = j + 1;
+        let r = struct range { end = count };
+        for j in &r {
             if (!elf64_apply_one_relocation(&entries[j], file->symtab, file->strtab, file->got, site_base))
                 file->relerrs = file->relerrs + 1;
         }
@@ -841,10 +832,9 @@ fn elf64_dump_phdr(phdr: struct elf64_phdr*, phnum: uint16) {
             "type", "flags", "offset", "vaddr", "paddr", "fsize",
             "msize", "align");
 
-    let i: uint16 = 0;
-    while (i < phnum) {
+    let r = struct range { end = phnum };
+    for i in &r {
         elf64_dump_phdr_entry(&phdr[i]);
-        i = i + 1;
     }
     dprintk("\n");
 }
@@ -863,10 +853,9 @@ fn elf64_dump_shdr(shdr: struct elf64_shdr*, shnum: uint16, shstrtab: uint8*) {
             "name", "type", "flags", "addr", "offset", "size",
             "link", "info", "align", "size");
 
-    let i: uint16 = 0;
-    while (i < shnum) {
+    let r = struct range { end = shnum };
+    for i in &r {
         elf64_dump_shdr_entry(&shdr[i], shstrtab);
-        i = i + 1;
     }
     dprintk("\n");
 }
@@ -885,10 +874,9 @@ fn elf64_dump_symtab(symtab: struct elf64_sym*, symtab_num: uint64, strtab: uint
     dprintk("%-30s %-2s %-2s %-4s %-16s %-16s\n",
             "name", "i", "o", "idx", "value", "size");
 
-    let i: uint64 = 0;
-    while (i < symtab_num) {
+    let r = struct range { end = symtab_num };
+    for i in &r {
         elf64_dump_symtab_entry(&symtab[i], strtab);
-        i = i + 1;
     }
     dprintk("\n");
 }

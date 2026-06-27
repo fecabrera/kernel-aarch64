@@ -1,6 +1,7 @@
 import "debug";
 import "cpu";
 import "io";
+import "range";
 import "interrupts/drivers/pl011";
 
 /**
@@ -29,9 +30,8 @@ fn serial_init() {
  */
 fn serial_read(buffer: uint8*, count: uint64, offset: uint64, drv_info: uint64) -> int64 {
     let c: uint8;
-    let i: uint64 = 0;
-    while (i < count) {
-        defer i = i + 1;
+    let r = struct range { end = count };
+    for i in &r {
         // _wfi_while(pl011_getc(&c));
         while (pl011_getc(&c))
             wfi();
@@ -52,9 +52,8 @@ fn serial_read(buffer: uint8*, count: uint64, offset: uint64, drv_info: uint64) 
  * @return count
  */
 fn serial_write(buffer: uint8*, count: uint64, offset: uint64, drv_info: uint64) -> int64 {
-    let i: uint64 = 0;
-    while (i < count) {
-        defer i = i + 1;
+    let r = struct range { end = count };
+    for i in &r {
         pl011_putc(buffer[i]);
     }
     return count as int64;

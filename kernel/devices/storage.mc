@@ -59,10 +59,8 @@ fn storage_read(buffer: uint8*, count: uint64, offset: uint64, slot: uint64) -> 
     defer kdealloc(tmp);
 
     // read boot sectors
-    let i: uint64 = 0;
-    while (i < sectors_to_read) {
-        defer i = i + 1;
-
+    let r = struct range { end = sectors_to_read };
+    for i in &r {
         // calculate sector to read
         let sector: uint64 = first_sector + i;
 
