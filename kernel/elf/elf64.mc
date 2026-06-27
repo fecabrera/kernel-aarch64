@@ -539,12 +539,10 @@ fn elf64_load(file: struct elf64_file*, address: uint64) -> int32 {
 
     // build a GOT: one slot per symbol holding its resolved (rebased) address
     file->got = kalloc<uint64>(file->stnum);
-    {
-        let g: uint64 = 0;
-        while (g < file->stnum) {
-            file->got[g] = file->symtab[g].st_value;
-            g = g + 1;
-        }
+    
+    let g = struct range { end = file->stnum };
+    for i in &g {
+        file->got[i] = file->symtab[i].st_value;
     }
 
     // copy entries to the allocated memory

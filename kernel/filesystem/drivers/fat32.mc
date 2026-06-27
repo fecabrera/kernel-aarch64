@@ -490,10 +490,8 @@ fn fat32_build_cluster_chains(bs_info: struct fat32_bs_info*, cluster_chains: st
     defer kdealloc(visited_clusters);
     set_items(visited_clusters, false, bs_info->n_fat_entries as uint64);
 
-    let i: uint32 = bs_info->root_cluster;
-    while (i < bs_info->n_fat_entries) {
-        defer i = i + 1;
-
+    let entries = struct range { start = bs_info->root_cluster, end = bs_info->n_fat_entries };
+    for i in &entries {
         let cluster_value = bs_info->fat_table[i] & 0x0FFFFFFF;
         
         if (visited_clusters[i]) continue;
@@ -653,17 +651,15 @@ fn read_fat_table(pathname: uint8*, bs_info: struct fat32_bs_info*, fat_table: u
     let fat_table_addr: uint64 = bs_info->first_fat_sector as uint64 * bs_info->n_bytes_per_sector;
     dprintk("[fat32] will read %d sectors\n", bs_info->table_size_32);
 
-    let i: uint64 = 0;
-    while (i < bs_info->table_size_32) {
-        let offset: uint64 = i * bs_info->n_bytes_per_sector;
+    let r = struct range { end = bs_info->table_size_32 };
+    for i in &r {
+        let offset = i * bs_info->n_bytes_per_sector;
         dprintk("[fat32] reading sector %d/%d, addr=%p\n",
                 i + 1, bs_info->table_size_32, fat_table_addr + offset);
 
         if (vfs_read(pathname, &fat_table[offset], bs_info->n_bytes_per_sector as uint64,
                      fat_table_addr + offset) < 0)
             return -1;
-
-        i = i + 1;
     }
     return bs_info->table_size_32 as int32;
 }

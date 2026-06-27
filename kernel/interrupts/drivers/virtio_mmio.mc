@@ -2,6 +2,7 @@ import "debug";
 import "cpu";
 import "dtb";
 import "memory";
+import "range";
 import "interrupts/irq";
 import "interrupts/gic";
 
@@ -191,10 +192,9 @@ fn virtio_mmio_init() {
     set_bytes(_handlers, 0, 32);
     set_bytes(_devices, 0, 32);
 
-    let slot: int8 = 0;
-    while (slot < 32) {
-        virtio_mmio_probe_device(slot);
-        slot = slot + 1;
+    let slots = struct range<int8> { end = 32 };
+    for i in &slots {
+        virtio_mmio_probe_device(i);
     }
 }
 
@@ -317,11 +317,10 @@ fn virtio_mmio_probe_device(slot: int8) -> int32 {
  * @return slot index of the first matching device, or -1 if none found
  */
 fn virtio_mmio_find_next_slot(device_id: uint32, start: int8) -> int8 {
-    let idx: int8 = start + 1;
-    while (idx < 32) {
-        defer idx = idx + 1;
-        if (_devices[idx].device_id == device_id)
-            return idx;
+    let r = struct range { start = start + 1, end = 32 };
+    for i in &r {
+        if (_devices[i].device_id == device_id)
+            return i;
     }
 
     return -1;
