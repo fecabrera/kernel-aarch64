@@ -7,6 +7,9 @@ import "filesystem/fs";
 import "filesystem/vfs";
 import "filesystem/file";
 import "system/proc";
+import "elf/elf64";
+
+const MAX_ARGS = 64;
 
 // Magic planted at the bottom 8 bytes of every task stack. The stack grows down
 // toward stack[0]; if this value is ever clobbered the stack has (nearly)
@@ -124,6 +127,55 @@ fn process_duplicate(dest: struct process*, src: struct process*) -> int32 {
 }
 
 /**
+ * Verifies the bottom-of-stack canary planted at process creation is intact.
+ * A clobbered canary means the stack has grown down past its allocation and
+ * (nearly) overflowed into the adjacent heap block. Halts on detection so the
+ * fault is attributed to the offending process rather than surfacing later as
+ * mysterious heap corruption. Debug-only; compiles out of normal builds.
+ *
+ * @param proc: process whose stack to validate
+ */
+fn process_check_stack(proc: struct process*) {
+    @if (DEBUG) {
+        if (proc != null and *(proc->stack as uint64*) != STACK_CANARY) {
+            printk("[process] stack overflow detected in pid %lld (stack=%p)!\n",
+                   proc->pid, proc->stack);
+            halt();
+        }
+    }
+}
+
+/**
+ * Frees the task stack and nulls out stack and ctx pointers.
+ * Requires proc->state == proc_state::DEAD.
+ *
+ * @param proc: process to destroy; must be in proc_state::DEAD state
+ *
+ * @return 0 on success, -1 if proc->state != proc_state::DEAD
+ */
+fn process_destroy(proc: struct process*) -> int32 {
+    if (proc->state != proc_state::DEAD)
+        return -1;
+
+    stack_free(proc->stack, proc->stack_size / STACK_POOL_BLK_SIZE);
+
+    proc->stack = null;
+    proc->stack_size = 0;
+    proc->ctx = null;
+    proc->cwd = null;
+
+    destroy_image(proc);
+
+    for dtor in &proc->dtor_ptrs {
+        pointer_release(dtor);
+    }
+
+    list_destroy(&proc->dtor_ptrs);
+
+    return 0;
+}
+
+/**
  * Configures the process entry point and initial SPSR.
  * Must be called before the process is enqueued in the scheduler.
  *
@@ -145,6 +197,91 @@ fn get_next_pid() -> proc_pid {
     let pid = next_pid;
     next_pid = next_pid + 1;
     return pid;
+}
+
+/**
+ * Core of exec: loads the ELF object at `node` into a fresh process image and
+ * redirects proc to it. Reads the file, validates the ELF header, parses it,
+ * allocates a new image sized to its memsz (replacing any previous one), applies
+ * relocations, locates libcrt's "entry" symbol, then rebuilds proc's stack/context
+ * (via setup_args + process_set_entry) so the next scheduling resumes the new
+ * program at entry with argc/argv in x0/x1. On success the old image and stack
+ * contents are abandoned, execve-style. Shared by process_exec and process_exec_at.
+ *
+ * @param proc: process to replace the image of
+ * @param node: VFS node of the executable to load
+ * @param argc: number of arguments to pass
+ * @param argv: argument vector; argv[0] is the program name
+ *
+ * @return 0 on success, or an exec_err (NOT_ENOUGH_MEMORY, IO_ERROR, INVALID_ELF,
+ *         PARSING_ERROR, CANNOT_REPLACE_IMAGE, RELOCATION_ERROR, ENTRY_NOT_FOUND)
+ */
+@private
+fn process_exec_node(proc: struct process*, node: struct fs_node*, argc: int64, argv: uint8**) -> exec_err {
+    // allocate buffer
+    let size = node->file_size;
+    let buf: uint8* = alloc<uint8>(size);
+    if (buf == null)
+        return exec_err::NOT_ENOUGH_MEMORY;
+
+    // read file
+    let rd_status = fs_read(node, buf, size, 0);
+    if (rd_status < 0) {
+        dprintk("[process] fs_read() returned %lld!\n", rd_status);
+        dealloc(buf);
+        return exec_err::IO_ERROR;
+    }
+
+    // check if it's a valid elf header
+    if (!is_elf(buf)) {
+        dprintk("[process] \"%s\" is not an ELF file!\n", argv[0]);
+        dealloc(buf);
+        return exec_err::INVALID_ELF;
+    }
+
+    // parse elf file
+    let elf_file: struct elf64_file;
+    let elf_rd_status = elf_read(buf, size, &elf_file);
+    if (elf_rd_status < 0) {
+        dprintk("[process] elf_read() returned %u\n", elf_rd_status);
+        dealloc(buf);
+        return exec_err::PARSING_ERROR;
+    }
+
+    // create process image
+    let ri_status = replace_image(proc, elf_file.memsz);
+    if (ri_status < 0) {
+        dprintk("[process] replace_image() returned %lld!\n", ri_status);
+        dealloc(buf);
+        return exec_err::CANNOT_REPLACE_IMAGE;
+    }
+    
+    // resolve symbols, relocate if necessary, and load sectors to memory
+    elf64_load(&elf_file, proc->image as uint64);
+
+    // check for relocation errors
+    if (elf_file.relerrs > 0) {
+        dprintk("[process] relocation errors: %u\n", elf_file.relerrs);
+        dealloc(buf);
+        return exec_err::RELOCATION_ERROR;
+    }
+
+    dealloc(buf);
+
+    // get entry symbol (libcrt's "entry" wraps main and calls exit on return)
+    let entry = elf64_locate_symbol(&elf_file, "entry") as fn ();
+    if (entry == null) {
+        dprintk("[process] could not find symbol \"entry\"!\n");
+        return exec_err::ENTRY_NOT_FOUND;
+    }
+
+    // build a fresh context at the top of the existing stack and point it at the
+    // new program, execve-style: the old stack contents are abandoned, control
+    // resumes at entry in EL1h with argc/argv in x0/x1.
+    setup_args(proc, argc, argv);
+    process_set_entry(proc, entry);
+
+    return 0;
 }
 
 /**
@@ -199,6 +336,37 @@ fn create_image(proc: struct process*, size: uint64) -> int32 {
 }
 
 /**
+ * Frees proc's current image (if any) and allocates a fresh `size`-byte one.
+ * Used by exec to swap in a new program's image.
+ *
+ * @param proc: process whose image to replace
+ * @param size: size of the new image in bytes
+ *
+ * @return 0 on success, -1 if the heap is exhausted
+ */
+@private
+fn replace_image(proc: struct process*, size: uint64) -> int32 {
+    destroy_image(proc);
+    return create_image(proc, size);
+}
+
+/**
+ * Frees proc's image buffer (if allocated) and clears the image/image_size
+ * fields. Safe to call when proc has no image.
+ *
+ * @param proc: process whose image to free
+ */
+@private
+fn destroy_image(proc: struct process*) {
+    if (proc->image != null) {
+        kdealloc(proc->image);
+
+        proc->image = null;
+        proc->image_size = 0;
+    }
+}
+
+/**
  * Places proc's context frame near the top of its stack and zeroes it. Must be
  * called after create_stack (needs proc->stack and proc->stack_size).
  *
@@ -212,6 +380,60 @@ fn init_ctx(proc: struct process*) {
     // (16-byte aligned).
     proc->ctx = &proc->stack[proc->stack_size - 272] as struct cpu_context*;
     bytezero(proc->ctx, 1);
+}
+
+/**
+ * Lays argc/argv out at the very top of proc's stack and repositions the context
+ * frame just below them, so a freshly exec'd program finds its arguments on a
+ * clean stack. Copies each argument string to the top (descending), builds an
+ * 8-aligned, null-terminated argv pointer array beneath them, then drops the SP
+ * to 16-byte alignment and places the (zeroed) ctx 272 bytes below that. argc and
+ * the new argv go in the frame's x0/x1. The args sit above the initial SP, so the
+ * program's downward-growing stack never overwrites them. Caps argc at MAX_ARGS.
+ *
+ * @param proc: process whose stack/context to set up
+ * @param argc: number of arguments
+ * @param argv: source argument vector (read before the stack is overwritten)
+ */
+@private
+fn setup_args(proc: struct process*, argc: int64, argv: uint8**) {
+    let ptrs: uint64[MAX_ARGS];
+
+    let p: uint64 = (proc->stack as uint64) + proc->stack_size;
+
+    // 1. copy each string to the top, recording its new address
+    {
+        let i: int64 = 0;
+        while (i < argc) {
+            let l = strlen(argv[i]) + 1;
+            p = p - l;
+            bytecopy(p as uint8*, argv[i], l);
+            ptrs[i] = p;
+            i = i + 1;
+        }
+    }
+
+    // 2. build the argv[] pointer array (argc + 1, null-terminated), 8-aligned
+    p = p & (~7) as uint64;
+    p = p - (argc as uint64 + 1) * 8;
+    let new_argv = p as uint64*;
+
+    {
+        let i: int64 = 0;
+        while (i < argc) {
+            new_argv[i] = ptrs[i];
+            i = i + 1;
+        }
+        new_argv[argc] = 0;
+    }
+
+    // 3. drop SP to 16-byte alignment and place the ctx frame below it
+    let sp = p & (~15) as uint64;
+    proc->ctx = (sp - 272) as struct cpu_context*;
+    bytezero(proc->ctx, 1);
+
+    proc->ctx->x[0] = argc as uint64;
+    proc->ctx->x[1] = new_argv as uint64;
 }
 
 /**
@@ -279,60 +501,6 @@ fn dup_image(dest: struct process*, src: struct process*) -> int32 {
 
     // deep copy image
     bytecopy(dest->image, src->image, dest->image_size);
-
-    return 0;
-}
-
-/**
- * Verifies the bottom-of-stack canary planted at process creation is intact.
- * A clobbered canary means the stack has grown down past its allocation and
- * (nearly) overflowed into the adjacent heap block. Halts on detection so the
- * fault is attributed to the offending process rather than surfacing later as
- * mysterious heap corruption. Debug-only; compiles out of normal builds.
- *
- * @param proc: process whose stack to validate
- */
-fn process_check_stack(proc: struct process*) {
-    @if (DEBUG) {
-        if (proc != null and *(proc->stack as uint64*) != STACK_CANARY) {
-            printk("[process] stack overflow detected in pid %lld (stack=%p)!\n",
-                   proc->pid, proc->stack);
-            halt();
-        }
-    }
-}
-
-/**
- * Frees the task stack and nulls out stack and ctx pointers.
- * Requires proc->state == proc_state::DEAD.
- *
- * @param proc: process to destroy; must be in proc_state::DEAD state
- *
- * @return 0 on success, -1 if proc->state != proc_state::DEAD
- */
-fn process_destroy(proc: struct process*) -> int32 {
-    if (proc->state != proc_state::DEAD)
-        return -1;
-
-    stack_free(proc->stack, proc->stack_size / STACK_POOL_BLK_SIZE);
-
-    proc->stack = null;
-    proc->stack_size = 0;
-    proc->ctx = null;
-    proc->cwd = null;
-
-    if (proc->image != null) {
-        kdealloc(proc->image);
-        
-        proc->image = null;
-        proc->image_size = 0;
-    }
-
-    for dtor in &proc->dtor_ptrs {
-        pointer_release(dtor);
-    }
-
-    list_destroy(&proc->dtor_ptrs);
 
     return 0;
 }
@@ -512,6 +680,37 @@ fn process_stat(proc: struct process*, path: uint8*, st: struct file_stat*) -> i
 }
 
 /**
+ * Like process_stat, but resolves path relative to the directory node behind an
+ * open descriptor (dirfd) in proc's fd table rather than the cwd. Lets the
+ * console test whether a program exists in a search directory it has open.
+ *
+ * @param proc:  process whose fd table holds dirfd
+ * @param dirfd: descriptor of an open directory to resolve path against
+ * @param path:  path to stat, relative to dirfd
+ * @param st:    caller-allocated file_stat to fill
+ *
+ * @return 0 on success, INVALID_DESCRIPTOR if dirfd is not open, NOT_FOUND if the
+ *         path does not resolve
+ */
+fn process_stat_at(proc: struct process*, dirfd: int64, path: uint8*, st: struct file_stat*) -> int64 {
+    dprintk("[process] statat(%lld, %lld, %s, %p)\n",
+            proc->pid, dirfd, path, st);
+
+    let dtor_ptrs = &proc->dtor_ptrs;
+    let dtor: struct pointer<struct file_descriptor>*;
+    if (!list_get(dtor_ptrs, dirfd as uint64, &dtor)) {
+        dprintk("[process] invalid fd!\n");
+        return io_error::INVALID_DESCRIPTOR;
+    }
+
+    let node = vfs_get_node_for_path(path, dtor->value->fd_node);
+    if (node == null)
+        return io_error::NOT_FOUND;
+
+    return file_node_stat(node, st);
+}
+
+/**
  * Writes the absolute path of the process's current working directory into buf
  * via fs_get_absolute_dir.
  *
@@ -530,18 +729,60 @@ fn process_get_cwd(proc: struct process*, buf: uint8*, size: uint64) -> int64 {
 }
 
 /**
- * Replaces the process's image with the program at `path`, passing it argc/argv
- * (execve-style: on success the old code/data/page are torn down and control
- * transfers to the new program, so the call does not return). Currently a stub.
+ * Replaces the process's image with the program at `path` (resolved relative to
+ * the VFS root if absolute, else proc's cwd), passing it argc/argv. execve-style:
+ * on success the old image and stack contents are abandoned and the next
+ * scheduling resumes the new program at its entry point, so from the caller's
+ * perspective the call does not return.
  *
  * @param proc: process whose image is replaced
  * @param path: VFS path of the executable to load
  * @param argc: number of arguments to pass to the new program
- * @param argv: null-terminated argument vector; argv[0] is the program name
+ * @param argv: argument vector; argv[0] is the program name
  *
- * @return does not return on success; a negative error on failure (currently
- *         always -1, not implemented)
+ * @return does not return on success; an exec_err on failure (FILE_NOT_FOUND if
+ *         the path does not resolve, otherwise as process_exec_node)
  */
-fn process_exec(proc: struct process*, path: uint8*, argc: int64, argv: uint8**) -> int64 {
-    return -1; // not implemented
+fn process_exec(proc: struct process*, path: uint8*, argc: int64,
+                argv: uint8**) -> exec_err {
+    let root = path[0] == '/' ? vfs_root() : proc->cwd;
+    let node = vfs_get_node_for_path(path, root);
+    if (node == null) {
+        dprintk("[process] \"%s\" not found!\n", path);
+        return exec_err::FILE_NOT_FOUND;
+    }
+
+    return process_exec_node(proc, node, argc, argv);
+}
+
+/**
+ * Like process_exec, but resolves `path` relative to an already-open directory
+ * descriptor (dirfd) in proc's fd table rather than the cwd. Lets the console
+ * exec a program by re-using the directory it opened to find it.
+ *
+ * @param proc:  process whose image is replaced
+ * @param dirfd: descriptor of an open directory to resolve path against
+ * @param path:  path of the executable, relative to dirfd
+ * @param argc:  number of arguments to pass to the new program
+ * @param argv:  argument vector; argv[0] is the program name
+ *
+ * @return does not return on success; FILE_NOT_FOUND if dirfd is invalid or the
+ *         path does not resolve, otherwise as process_exec_node
+ */
+fn process_exec_at(proc: struct process*, dirfd: int64, path: uint8*,
+                   argc: int64, argv: uint8**) -> exec_err {
+    let dtor_ptrs = &proc->dtor_ptrs;
+    let dtor: struct pointer<struct file_descriptor>*;
+    if (!list_get(dtor_ptrs, dirfd as uint64, &dtor)) {
+        dprintk("[process] invalid fd!\n");
+        return exec_err::FILE_NOT_FOUND;
+    }
+
+    let node = vfs_get_node_for_path(path, dtor->value->fd_node);
+    if (node == null) {
+        dprintk("[process] \"%s\" not found!\n", path);
+        return exec_err::FILE_NOT_FOUND;
+    }
+
+    return process_exec_node(proc, node, argc, argv);
 }

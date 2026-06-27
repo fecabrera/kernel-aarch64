@@ -63,27 +63,27 @@ fn init() {
 
     let status: int64;
     
-    printk("[init] opening stdin at \"%s\"...\n", io_dev);
+    dprintk("[init] opening stdin at \"%s\"...\n", io_dev);
     status = open(io_dev, open_mode::READ);
     if (status < 0) {
         printk("[init] open() returned %lld\n", status);
         hang();
     }
 
-    printk("[init] opening stdout at \"%s\"...\n", io_dev);
+    dprintk("[init] opening stdout at \"%s\"...\n", io_dev);
     status = open(io_dev, open_mode::WRITE);
     if (status < 0) {
         printk("[init] open() returned %lld\n", status);
         hang();
     }
 
-    printk("[init] mounting \"%s\"...\n", storage_dev);
+    dprintk("[init] mounting \"%s\"...\n", storage_dev);
     status = fat32_mount(storage_dev, "/");
     if (status < 0) {
         printk("[init] fat32_mount() returned %lld!\n", status);
         hang();
     }
-
+    
     printk("[init] starting console...\n");
     console();
 }

@@ -33,8 +33,10 @@ import "interrupts/drivers/timer";
  *   syscall::WRITE            → syscall_write_handler
  *   syscall::FSTAT            → syscall_fstat_handler
  *   syscall::STAT             → syscall_stat_handler
+ *   syscall::STATAT           → syscall_statat_handler
  *   syscall::GETCWD           → syscall_getcwd_handler
  *   syscall::EXEC             → syscall_exec_handler
+ *   syscall::EXECAT           → syscall_execat_handler
  */
 fn scheduler_init() {
     idle_ctx = &idle_stack[DEFAULT_STACK_SIZE - 272] as struct cpu_context*;
@@ -58,8 +60,10 @@ fn scheduler_init() {
     syscall_register_handler(syscall::WRITE, syscall_write_handler);
     syscall_register_handler(syscall::FSTAT, syscall_fstat_handler);
     syscall_register_handler(syscall::STAT, syscall_stat_handler);
+    syscall_register_handler(syscall::STATAT, syscall_statat_handler);
     syscall_register_handler(syscall::GETCWD, syscall_getcwd_handler);
     syscall_register_handler(syscall::EXEC, syscall_exec_handler);
+    syscall_register_handler(syscall::EXECAT, syscall_execat_handler);
 }
 
 /**
@@ -669,10 +673,39 @@ fn syscall_stat_handler(ctx: struct cpu_context*) -> struct cpu_context* {
     let path = ctx->x[1] as uint8*;
     let st = ctx->x[2] as struct file_stat*;
 
-    dprintk("[scheduler] stat(), ctx->x0 = %llu, ctx->x1 = %llu ctx->x2 = %llu\n",
+    dprintk("[scheduler] stat(), ctx->x0 = %llu, ctx->x1 = %p, ctx->x2 = %llu\n",
             ctx->x[0], ctx->x[1], ctx->x[2]);
 
     ctx->x[0] = process_stat(proc, path, st) as uint64;
+
+    return ctx;
+}
+
+/**
+ * Handles syscall::STATAT. Like syscall_stat_handler, but resolves the path in x2
+ * relative to the open directory descriptor dirfd (x1) via process_stat_at and
+ * fills the file_stat at x3. Returns the result in x0. No context switch.
+ *
+ * @param ctx: saved context of the calling process
+ *
+ * @return ctx with x0 set to 0 on success, or a negative error
+ */
+fn syscall_statat_handler(ctx: struct cpu_context*) -> struct cpu_context* {
+    let proc = scheduler_get_current_process();
+    if (proc == null) {
+        dprintk("[scheduler] no current process!\n");
+        ctx->x[0] = -1 as uint64;
+        return ctx;
+    }
+
+    let dirfd = ctx->x[1] as int64;
+    let path = ctx->x[2] as uint8*;
+    let st = ctx->x[3] as struct file_stat*;
+
+    dprintk("[scheduler] statat(), ctx->x0 = %llu, ctx->x1 = %llu, ctx->x2 = %p, ctx->x3 = %lld\n",
+            ctx->x[0], ctx->x[1], ctx->x[2], ctx->x[3]);
+
+    ctx->x[0] = process_stat_at(proc, dirfd, path, st) as uint64;
 
     return ctx;
 }
@@ -727,8 +760,52 @@ fn syscall_exec_handler(ctx: struct cpu_context*) -> struct cpu_context* {
     let path = ctx->x[1] as uint8*;
     let argc = ctx->x[2] as int64;
     let argv = ctx->x[3] as uint8**;
+    
+    dprintk("[scheduler] exec(), ctx->x0 = %lld, ctx->x1 = %p, ctx->x2 = %lld, ctx->x3 = %p\n",
+            ctx->x[0], ctx->x[1], ctx->x[2], ctx->x[3]);
 
-    ctx->x[0] = process_exec(proc, path, argc, argv) as uint64;
+    let status = process_exec(proc, path, argc, argv);
+    if (status < 0) {
+        ctx->x[0] = status as uint64;
+        return ctx;
+    }
+    
+    return proc->ctx;
+}
 
-    return proc->ctx;    
+/**
+ * Handles syscall::EXECAT. Like syscall_exec_handler, but resolves the program
+ * path (x2) relative to the open directory descriptor dirfd (x1), passing argc
+ * (x3) and argv (x4) via process_exec_at, then resumes the process on its rebuilt
+ * context. On success the old image is gone, so x0 carries the negative error
+ * code only on failure.
+ *
+ * @param ctx: saved context of the calling process
+ *
+ * @return the process's context to resume (proc->ctx), with x0 = a negative error
+ *         on failure
+ */
+fn syscall_execat_handler(ctx: struct cpu_context*) -> struct cpu_context* {
+    let proc = scheduler_get_current_process();
+    if (proc == null) {
+        dprintk("[scheduler] no current process!\n");
+        ctx->x[0] = -1 as uint64;
+        return ctx;
+    }
+
+    let dirfd = ctx->x[1] as int64;
+    let path = ctx->x[2] as uint8*;
+    let argc = ctx->x[3] as int64;
+    let argv = ctx->x[4] as uint8**;
+
+    dprintk("[scheduler] execat(), dirfd = %lld, path = %p, argc = %lld, argv = %p\n",
+            ctx->x[1], ctx->x[2], ctx->x[3], ctx->x[4]);
+
+    let status = process_exec_at(proc, dirfd, path, argc, argv);
+    if (status < 0) {
+        ctx->x[0] = status as uint64;
+        return ctx;
+    }
+
+    return proc->ctx;
 }

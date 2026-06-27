@@ -20,12 +20,14 @@ enum syscall: uint64 {
     WRITE    = 13,
     FSTAT    = 14,
     STAT     = 15,
-    GETDENTS = 16,
-    GETCWD   = 17,
-    ACQMEM   = 18,
-    RSZMEM   = 19,
-    RELMEM   = 20,
-    EXEC     = 21,
+    STATAT   = 16,
+    GETDENTS = 17,
+    GETCWD   = 18,
+    ACQMEM   = 19,
+    RSZMEM   = 20,
+    RELMEM   = 21,
+    EXEC     = 22,
+    EXECAT   = 23,
 }
 
 /**
@@ -309,6 +311,30 @@ enum syscall: uint64 {
 }
 
 /**
+ * Like stat, but resolves path relative to the open directory descriptor dirfd
+ * via syscall::STATAT (svc #0) instead of the process cwd. Traps into EL1, where
+ * syscall_statat_handler fills the file_stat. Used to test whether a file exists
+ * in a given directory without opening it.
+ *
+ * @param dirfd: descriptor of an open directory to resolve path against
+ * @param path:  null-terminated path to stat, relative to dirfd
+ * @param stat:  caller-allocated file_stat to fill
+ *
+ * @return 0 on success, or a negative error.
+ */
+@inline fn statat(dirfd: int64, path: uint8*, stat: struct file_stat*) -> int64 {
+    return @asm @clobbers("x0", "x1", "x2", "x3", "memory")
+        (syscall::STATAT, dirfd, path, stat) -> int64 {
+        "mov x0, $0"
+        "mov x1, $1"
+        "mov x2, $2"
+        "mov x3, $3"
+        "svc #0"
+        "mov $out, x0"
+    };
+}
+
+/**
  * Reads directory entries from the open directory fd into buf via
  * syscall::GETDENTS (svc #0). Fills buf with consecutive variable-length dirent
  * records (walk them via d_size) up to count bytes.
@@ -395,15 +421,41 @@ enum syscall: uint64 {
  * @param argc: number of arguments to pass to the new program
  * @param argv: null-terminated argument vector; argv[0] is the program name
  *
- * @return does not return on success; a negative error code on failure.
+ * @return does not return on success; an exec_err on failure.
  */
-@inline fn exec(path: uint8*, argc: int64, argv: uint8**) -> int64 {
+@inline fn exec(path: uint8*, argc: int64, argv: uint8**) -> exec_err {
     return @asm @clobbers("x0", "x1", "x2", "x3", "memory")
-        (syscall::EXEC, path, argc, argv) -> int64 {
+        (syscall::EXEC, path, argc, argv) -> exec_err {
         "mov x0, $0"
         "mov x1, $1"
         "mov x2, $2"
         "mov x3, $3"
+        "svc #0"
+        "mov $out, x0"
+    };
+}
+
+/**
+ * Like exec, but resolves path relative to the open directory descriptor dirfd
+ * via syscall::EXECAT (svc #0). Traps into EL1, where syscall_execat_handler
+ * loads the new program and resumes the process at its entry point. On success
+ * the call does not return.
+ *
+ * @param dirfd: descriptor of an open directory to resolve path against
+ * @param path:  path to the executable, relative to dirfd
+ * @param argc:  number of arguments to pass to the new program
+ * @param argv:  null-terminated argument vector; argv[0] is the program name
+ *
+ * @return does not return on success; an exec_err on failure.
+ */
+@inline fn execat(dirfd: int64, path: uint8*, argc: int64, argv: uint8**) -> exec_err {
+    return @asm @clobbers("x0", "x1", "x2", "x3", "x4", "memory")
+        (syscall::EXECAT, dirfd, path, argc, argv) -> exec_err {
+        "mov x0, $0"
+        "mov x1, $1"
+        "mov x2, $2"
+        "mov x3, $3"
+        "mov x4, $4"
         "svc #0"
         "mov $out, x0"
     };

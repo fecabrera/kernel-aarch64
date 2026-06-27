@@ -69,7 +69,7 @@ linking kernel internals (heap, UART, `printk`) — see "ELF loader / user progr
 - Process management (`process.mc`)
 - Syscall dispatch table + `svc` wrappers (`syscall.mc`, `system/syscall.mc`; wrappers emit `svc #0` via inline `@asm`)
 - Exception/IRQ dispatch — sync/irq/fiq/serr handlers, IRQ registry, vbar_el1 setup (`interrupts/irq.mc`)
-- Scheduler — ready/wait/sleep queues, scheduler_handler, spawn/enqueue/dequeue, and all syscall handlers (exit/yield/getpid/waitpid/fork/sleep/msleep) (`scheduler.mc`)
+- Scheduler — ready/wait/sleep queues, scheduler_handler, spawn/enqueue/dequeue, and all syscall handlers (exit/yield/getpid/waitpid/fork/sleep/msleep/exec/execat) (`scheduler.mc`)
 - Drivers — GIC, PL031 RTC, ARM generic timer, PL011 UART, virtio MMIO (`interrupts/gic.mc`, `interrupts/drivers/pl031.mc`, `interrupts/drivers/timer.mc`, `interrupts/drivers/pl011.mc`, `interrupts/drivers/virtio_mmio.mc`)
 - Kernel log — `printk`/`dprintk` (`debug.mc`) and the PL011 print path (`pl011_vprintf`), formatting via stb_sprintf bound through `libc/stdio.mc`
 - Device handlers — serial, storage (`devices/`)
@@ -77,7 +77,7 @@ linking kernel internals (heap, UART, `printk`) — see "ELF loader / user progr
 - Interactive console / shell (`console.mc`) — fixed built-ins plus a PATH-style lookup that loads and runs ELF user programs (`user/apps/`)
 - CPU helpers (`cpu.mc`) — register accessors (cntpct/cntfrq/cntp_ctl/cntp_tval, vbar_el1), wfi/wfe, halt/hang, irq enable/disable, and bswap, all via inline `@asm`
 - Boot entry / init sequence (`kernel.mc`) — `kernel_init` subsystem bring-up and the `init` (pid 1) entry point
-- ELF64 loader — loads & runs relocatable objects (`ET_REL`) in-kernel: section layout, symbol rebasing, per-symbol GOT, and the core AArch64 relocations (`elf/elf64.mc`; loading driven by `console.mc`'s `try_run`)
+- ELF64 loader — loads & runs relocatable objects (`ET_REL`) as processes: section layout, symbol rebasing, per-symbol GOT, and the core AArch64 relocations (`elf/elf64.mc`; driven by `process.mc`'s `process_exec`, reached from `console.mc`'s `try_run` via fork+execat)
 
 **Still C, bound from mc via `@extern`** (port targets):
 
@@ -234,10 +234,11 @@ linking kernel internals (heap, UART, `printk`) — see "ELF loader / user progr
 - `time()` returns the current Unix timestamp from the RTC.
 - `uptime()` returns system uptime in milliseconds, computed from `cntpct_el0` ticks since boot.
 - `open(path, attrs)` / `close(fd)` / `read(fd, buf, count)` / `write(fd, buf, count)` / `fstat(fd, stat)` operate on the calling process's per-process fd table (see "File descriptors" below).
+- `stat(path, stat)` fills `stat` with metadata for `path` (relative to the cwd) without needing an open fd; `statat(dirfd, path, stat)` resolves `path` relative to an open directory descriptor instead — the console uses it to test whether a program exists in a search dir before fork+exec.
 - `getdents(fd, buf, count)` reads packed variable-length `dirent` records from an open directory into `buf` (walk them via each record's `d_size`). *(handler not yet registered)*
 - `getcwd(buf, size)` writes the calling process's current working directory as an absolute path into `buf`, resolved by walking the `..` chain to the root (`fs_get_absolute_dir`).
-- `acqmem(size, align)` / `rszmem(ptr, size, align)` / `relmem(ptr)` (syscalls 18/19/20) are the user-side memory syscalls that back the user build of `libmc`'s `malloc`/`realloc`/`free`. Their handlers (registered by `register_mem_syscalls`) currently serve user allocations straight from the kernel heap (`kmalloc`/`krealloc`/`kfree`).
-- `exec(path, argc, argv)` (syscall 21) is intended to replace the calling process's image with the program at `path` (execve-style). The wrapper and `syscall_exec_handler` exist, but `process_exec` is currently a stub that returns `-1`.
+- `acqmem(size, align)` / `rszmem(ptr, size, align)` / `relmem(ptr)` (syscalls 19/20/21) are the user-side memory syscalls that back the user build of `libmc`'s `malloc`/`realloc`/`free`. Their handlers (registered by `register_mem_syscalls`) currently serve user allocations straight from the kernel heap (`kmalloc`/`krealloc`/`kfree`).
+- `exec(path, argc, argv)` (syscall 22) / `execat(dirfd, path, argc, argv)` (syscall 23) replace the calling process's image with the program at `path` (execve-style). `process_exec`/`process_exec_at` read and parse the ELF object, swap in a fresh process image sized to its memsz, apply relocations, then rebuild the process's stack — copying `argv` to the top of the stack — and context so the next scheduling resumes the new program at libcrt's `entry` (which calls `main` then `exit`). On success the call does not return; on failure it yields an `exec_err` (see `system/proc.mc`). `execat` resolves `path` against an open directory fd instead of the cwd, which is how the console runs programs from its `dirs` search path.
 
 ### **File descriptors**
 
@@ -249,11 +250,11 @@ linking kernel internals (heap, UART, `printk`) — see "ELF loader / user progr
 
 ### **ELF loader / user programs**
 
-- Loads relocatable ELF64 objects (`ET_REL`) and runs them in-kernel, `insmod`-style. Each app in `user/apps/<name>/` is compiled against the **user-side** `libmc` and `ld -r`-linked with `user/libmc.a` + `user/libc.a` into a self-contained object at `init/bin/<name>`, then bundled into `init.img`. Because the user build of `libmc` routes allocation to the `acqmem`/`rszmem`/`relmem` syscalls (not `kmalloc`), these objects no longer drag in kernel internals (the heap, UART, `printk`) — the decoupling that the dual `libmc` build exists for.
-- The shell built-ins are a small fixed set (`cd`, `ls`, `cat`, `mount`, `help`); any other command name is looked up as a program — `console.mc`'s `try_run` searches each entry in `dirs` (currently `bin`) for an object named `argv[0]`, loads it, and runs its `main(argc, argv)`.
+- Loads relocatable ELF64 objects (`ET_REL`) and runs them as real processes. Each app in `user/apps/<name>/` is compiled against the **user-side** `libmc` and `ld -r`-linked with `user/libmc.a` + `user/libc.a` into a self-contained object at `init/bin/<name>`, then bundled into `init.img`. Because the user build of `libmc` routes allocation to the `acqmem`/`rszmem`/`relmem` syscalls (not `kmalloc`), these objects no longer drag in kernel internals (the heap, UART, `printk`) — the decoupling that the dual `libmc` build exists for.
+- The shell built-ins are a small fixed set (`cd`, `ls`, `mount`, `help`); any other command name is looked up as a program — `console.mc`'s `try_run` opens each entry in `dirs` (currently `/bin`), then `fork`s and has the child `execat` the object named `argv[0]` while the parent `waitpid`s. `exec`/`execat` (see "Syscall interface") load the object into a fresh process image, rebuild the stack with `argv` copied to the top, and resume at libcrt's `entry` — so a program runs in its own process with its own context, not as an in-kernel function call.
 - `elf_read` parses the header/section/symbol tables and sums the load size; `elf64_load(file, base)` lays sections out at `base + sh_addr`, rebases the symbol table to runtime addresses (`base + section.sh_addr + st_value`), builds a per-symbol GOT, then applies relocations against the copied image. `elf64_locate_symbol(file, name)` returns a symbol's runtime address; `elf64_unload` frees the GOT.
 - Relocations handled: `ABS64`, `ADR_PREL_PG_HI21`, `ADD_ABS_LO12_NC`, `LDST{8,16,32,64,128}_ABS_LO12_NC`, `CALL26`/`JUMP26`, `PREL32`/`PREL64`, and the GOT pair `ADR_GOT_PAGE`/`LD64_GOT_LO12_NC`. Unhandled relocation types and references to unresolved (`UNDEF`) symbols are logged and counted in `file->relerrs`; the console refuses to run an object with `relerrs > 0` rather than executing a partially-linked image.
-- Not yet implemented: I-cache maintenance before execution (relies on QEMU's unified caches), `UNDEF`-symbol resolution against a kernel export table, PLTs for out-of-range branches, and exec-buffer lifetime tracking on unload.
+- Not yet implemented: I-cache maintenance before execution (relies on QEMU's unified caches), `UNDEF`-symbol resolution against a kernel export table, PLTs for out-of-range branches, and GOT teardown on the exec path (`process_exec_node` does not `elf64_unload`, so each exec leaks its per-symbol GOT).
 
 ## Source layout
 
@@ -283,7 +284,7 @@ user/               — userspace tree
 
 src/                — entry points (assembly stubs + top-level mc)
   kernel.mc         — kernel_init: subsystem bring-up (DTB, memory + mem syscalls, IRQ, VFS, I/O, serial, storage, scheduler, timer); init(): pid 1 entry point — opens stdin/stdout on /dev/serial, mounts /dev/sda at /, then runs console()
-  console.mc        — console()/console_parse_command(): interactive terminal loop with cwd-aware prompt and argc/argv tokenization (quoted strings, backslash escapes), fork-per-command dispatch (cd dispatched directly); built-ins: cd, ls, mount, help; any other name is loaded & run as an ELF program from the `dirs` search path (try_run); line input via libmc/std readline
+  console.mc        — console()/console_parse_command(): interactive terminal loop with cwd-aware prompt and argc/argv tokenization (quoted strings, backslash escapes), fork-per-command dispatch (cd dispatched directly); built-ins: cd, ls, mount, help; any other name is fork+execat'd as an ELF program from the `dirs` search path (try_run); line input via libmc/std readline
   start.S           — AArch64 boot stub, saves DTB pointer, zeros BSS
   vectors.S         — exception vector table, save/restore_context macros
 
@@ -333,9 +334,9 @@ libmc/              — mcc standard library (generic, type-parametric)
   iteration/        — pair
   libc/             — freestanding ctype, string, limits; stdio binds the stb_sprintf family (vsprintf/snprintf/vsprintfcb) and implements printf/vprintf/getchar/putchar over the read/write syscalls; stdlib provides the malloc/realloc/free interface that memory.mc builds on, switched via `@if (IS_KERNEL)` between the kernel heap (kmalloc/kfree) and the acqmem/rszmem/relmem memory syscalls
   system/           — user-facing syscall surface, linked into both the kernel and loaded user programs
-    syscall.mc      — svc #0 wrappers: yield/exit/getpid/waitpid/fork/sleep/msleep/time/uptime/open/openat/close/read/write/fstat/stat/getdents/getcwd/acqmem/rszmem/relmem/exec, all via inline @asm; the syscall enum numbering the kernel handlers dispatch on
+    syscall.mc      — svc #0 wrappers: yield/exit/getpid/waitpid/fork/sleep/msleep/time/uptime/open/openat/close/read/write/fstat/stat/statat/getdents/getcwd/acqmem/rszmem/relmem/exec/execat, all via inline @asm; the syscall enum numbering the kernel handlers dispatch on
     fs.mc           — shared fs types: file_stat, the dirent/dent_type directory-entry types, io_error, and the FS_FILE_ATTRS_* constants
-    proc.mc         — proc_pid (pid_t) type shared across the kernel and the syscall ABI
+    proc.mc         — proc_pid (pid_t) type and the exec_err result enum, shared across the kernel and the syscall ABI
 
 lib/                — C helpers bound from mc via @extern (FDT + UTF-16)
   include/
