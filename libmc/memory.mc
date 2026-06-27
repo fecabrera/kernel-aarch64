@@ -1,5 +1,6 @@
 import "libc/string";
 import "libc/stdlib";
+import "range";
 
 /**
  * Allocates heap space for n elements of type T.
@@ -88,6 +89,29 @@ fn copy_bytes<T>(dst: T*, src: T*, n: uint64) {
 }
 
 /**
+ * Copies n elements of type T from src to dst one item at a time.
+ *
+ * @param dst: destination, with room for at least n elements
+ * @param src: source to read from
+ * @param n:   number of elements to copy
+ * @return number of elements copied (n)
+ */
+@inline
+fn copy<T>(dst: T*, src: T*, n: uint64) -> uint64 {
+    let r = struct range { end = n };
+    for i in &r {
+        dst[i] = src[i];
+    }
+    return n;
+}
+
+// deprecated
+@inline
+fn copy_items<T>(dst: T*, src: T*, n: uint64) {
+    copy(dst, src, n);
+}
+
+/**
  * Zeroes the n elements of type T at dst by clearing every byte, in a single
  * memset. The element size is computed from T, so callers count elements, not
  * bytes. Shorthand for set_bytes(dst, 0, n).
@@ -114,29 +138,6 @@ fn zero<T>(dst: T*, n: uint64) {
 }
 
 /**
- * Copies n elements of type T from src to dst one item at a time.
- *
- * @param dst: destination, with room for at least n elements
- * @param src: source to read from
- * @param n:   number of elements to copy
- */
-@inline
-fn copy<T>(dst: T*, src: T*, n: uint64) -> uint64 {
-    let i: uint64 = 0;
-    while (i < n) {
-        dst[i] = src[i];
-        i = i + 1;
-    }
-    return i;
-}
-
-// deprecated
-@inline
-fn copy_items<T>(dst: T*, src: T*, n: uint64) {
-    copy(dst, src, n);
-}
-
-/**
  * Fills the n elements of type T at dst with the byte `value`, in a single
  * memset. The element size is computed from T, so callers count elements,
  * not bytes; pass 0 to zero the region.
@@ -158,10 +159,10 @@ fn set_bytes<T>(dst: T*, value: uint8, n: uint64) {
  * @param value: the value written to each element
  * @param n:     number of elements to set
  */
+@inline
 fn set_items<T>(dst: T*, value: T, n: uint64) {
-    let i: uint64 = 0;
-    while (i < n) {
+    let r = struct range { end = n };
+    for i in &r {
         dst[i] = value;
-        i = i + 1;
     }
 }
