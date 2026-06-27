@@ -164,6 +164,16 @@ fn kalloc<T>(n: uint64) -> T* {
 }
 
 /**
+ * Allocates heap space for a single element of type T -- shorthand for
+ * alloc<T>(1).
+ *
+ * @return pointer to the element; the memory is uninitialized
+ */
+fn knew<T>() -> T* {
+    return alloc<T>(1);
+}
+
+/**
  * Allocates heap space for n elements of type T with the given alignment.
  * The result is directly kdealloc-able. align must be a power-of-two multiple
  * of 8.

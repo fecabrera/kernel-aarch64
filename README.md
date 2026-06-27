@@ -34,6 +34,7 @@ brew install dtc
 kernel-side build with `-D IS_KERNEL`, and the user-side build archived into
 `user/libmc.a` + `user/libc.a`), then the user apps in `user/apps/`, links
 `kernel.elf`, and writes the `init.img` FAT32 ramdisk (populated from `init/`).
+Each compile/link/archive step is echoed and aborts the build on first failure.
 `./clean.sh` removes the build artifacts.
 
 ## Run
@@ -72,7 +73,7 @@ linking kernel internals (heap, UART, `printk`) — see "ELF loader / user progr
 - Drivers — GIC, PL031 RTC, ARM generic timer, PL011 UART, virtio MMIO (`interrupts/gic.mc`, `interrupts/drivers/pl031.mc`, `interrupts/drivers/timer.mc`, `interrupts/drivers/pl011.mc`, `interrupts/drivers/virtio_mmio.mc`)
 - Kernel log — `printk`/`dprintk` (`debug.mc`) and the PL011 print path (`pl011_vprintf`), formatting via stb_sprintf bound through `libc/stdio.mc`
 - Device handlers — serial, storage (`devices/`)
-- Memory management — free-list heap allocator (`heap.mc`: `struct heap` with block split/merge) and a fixed-block stack pool (`pool.mc`), wired up in `mm.mc`: the kernel heap, DTB memory probe, `kmalloc`/`kfree`/`krealloc`/`kmalloc_aligned` + the `kalloc<T>`/`kalloc_aligned<T>`/`kresize<T>`/`kdealloc<T>` generics, the `stack_alloc`/`stack_free` pool for process stacks, and the `acqmem`/`rszmem`/`relmem` memory-syscall handlers
+- Memory management — free-list heap allocator (`heap.mc`: `struct heap` with block split/merge) and a fixed-block stack pool (`pool.mc`), wired up in `mm.mc`: the kernel heap, DTB memory probe, `kmalloc`/`kfree`/`krealloc`/`kmalloc_aligned` + the `kalloc<T>`/`knew<T>`/`kalloc_aligned<T>`/`kresize<T>`/`kdealloc<T>` generics (`knew<T>()` is shorthand for `kalloc<T>(1)`), the `stack_alloc`/`stack_free` pool for process stacks, and the `acqmem`/`rszmem`/`relmem` memory-syscall handlers
 - Interactive console / shell (`console.mc`) — fixed built-ins plus a PATH-style lookup that loads and runs ELF user programs (`user/apps/`)
 - CPU helpers (`cpu.mc`) — register accessors (cntpct/cntfrq/cntp_ctl/cntp_tval, vbar_el1), wfi/wfe, halt/hang, irq enable/disable, and bswap, all via inline `@asm`
 - Boot entry / init sequence (`kernel.mc`) — `kernel_init` subsystem bring-up and the `init` (pid 1) entry point
@@ -297,7 +298,7 @@ kernel/             — mc kernel modules (logic + @extern bindings to the C bel
   debug.mc          — printk (always on) / dprintk (DEBUG-gated via @if), thin wrappers over pl011_vprintf
   utf16.mc          — utf16lencpy/utf16bencpy bindings
   heap.mc           — free-list heap allocator: heap_init/heap_acquire/heap_release/heap_resize over a struct heap, with block splitting and adjacent-free coalescing; heap_check integrity validator (DEBUG-gated)
-  mm.mc             — kernel memory management: 16 MiB static kernel heap + 16 MiB stack pool, mem_init (heap/pool init + reads RAM base/size from the DTB at boot), kmalloc/kfree/krealloc(_aligned)/kmalloc_aligned + typed kalloc<T>/kalloc_aligned<T>/kresize<T>/kdealloc<T> generics, stack_alloc/stack_free, and the acqmem/rszmem/relmem syscall handlers (register_mem_syscalls)
+  mm.mc             — kernel memory management: 16 MiB static kernel heap + 16 MiB stack pool, mem_init (heap/pool init + reads RAM base/size from the DTB at boot), kmalloc/kfree/krealloc(_aligned)/kmalloc_aligned + typed kalloc<T>/knew<T>/kalloc_aligned<T>/kresize<T>/kdealloc<T> generics, stack_alloc/stack_free, and the acqmem/rszmem/relmem syscall handlers (register_mem_syscalls)
   pool.mc           — intrusive free-list fixed-block pool allocator: pool_init/pool_alloc/pool_free (backs the process stack pool)
   devices/
     serial.mc       — /dev/serial driver: serial_init, serial_read (pl011_getc+wfi), serial_write (pl011_putc)
@@ -320,7 +321,7 @@ kernel/             — mc kernel modules (logic + @extern bindings to the C bel
     elf64.mc        — ELF64 relocatable-object loader: header/section/symbol parsing (elf_read), section layout + symbol rebasing + per-symbol GOT + AArch64 relocations with UNDEF-symbol/unknown-type rejection into relerrs (elf64_load), elf64_locate_symbol, elf64_unload; elf64_dump helpers and the full e_ident/ehdr/phdr/shdr/sym/rela type definitions
 
 libmc/              — mcc standard library (generic, type-parametric)
-  memory.mc         — alloc<T>/alloc_aligned<T>/resize<T>/dealloc<T>, bytecopy/copy/set_bytes/set_items, bytezero<T>/zero<T> (copy_bytes/copy_items kept as deprecated shims)
+  memory.mc         — alloc<T>/new<T>/alloc_aligned<T>/resize<T>/dealloc<T> (new<T>() is shorthand for alloc<T>(1)), bytecopy/copy/set_bytes/set_items, bytezero<T>/zero<T> (copy_bytes/copy_items kept as deprecated shims)
   list.mc           — dynamic list<T> with list_it/list_next cursor (for-in)
   string.mc         — growable byte string (list<uint8> specialization, @inline wrappers)
   dict.mc           — string-keyed dict<V> (open addressing, dict_it/dict_next cursor)

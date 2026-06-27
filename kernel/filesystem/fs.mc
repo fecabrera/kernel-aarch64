@@ -122,7 +122,7 @@ fn fs_remove_child(node: struct fs_node*, name: uint8*) -> int32 {
  */
 fn fs_create_node(name: uint8*, file_size: uint64, attrs: uint32, info: uint8*,
                   mount: struct fs_mount*, next: struct fs_node*, child: struct fs_node*) -> struct fs_node * {
-    let node: struct fs_node* = kalloc<struct fs_node>(1);
+    let node: struct fs_node* = knew<struct fs_node>();
 
     node->name = null;
     node->file_size = file_size;

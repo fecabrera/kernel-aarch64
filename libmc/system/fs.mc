@@ -62,6 +62,6 @@ enum dent_type: uint16 {
 struct dirent {
     d_size: uint16;
     d_type: dent_type;
-    d_name: uint8*;
+    d_name: uint8[];
 }
 

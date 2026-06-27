@@ -395,7 +395,7 @@ fn fat32_read_cluster(pathname: uint8*, bs_info: struct fat32_bs_info*, cluster:
         defer kdealloc(name);
 
         if (strncmp(name, ".", 2) != 0 and strncmp(name, "..", 3) != 0) {
-            let entry_ref = kalloc<struct fat32_entry_reference>(1);
+            let entry_ref = knew<struct fat32_entry_reference>();
             entry_ref->cluster = cluster;
             entry_ref->offset = _offset as uint32;
             entry_ref->n_lfn_entries = n_lfn_entries;
@@ -565,7 +565,7 @@ fn fat32_mount(device_path: uint8*, mountpoint: uint8*) -> int64 {
     // parse boot sector
     dprintk("[fat32] parsing boot sector...\n");
 
-    let bs_info = kalloc<struct fat32_bs_info>(1);
+    let bs_info = knew<struct fat32_bs_info>();
     
     fat32_parse_boot_sector(bs, bs_info);
 

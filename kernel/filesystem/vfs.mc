@@ -60,7 +60,7 @@ fn vfs_create_mountpoint(mountpoint: uint8*, device: uint8*, info: uint8*,
         return null;
     }
 
-    let fs_mp: struct fs_mount* = kalloc<struct fs_mount>(1);
+    let fs_mp: struct fs_mount* = knew<struct fs_mount>();
 
     fs_mp->mountpoint = kalloc<uint8>(strlen(mountpoint) + 1);
     strcpy(fs_mp->mountpoint, mountpoint);

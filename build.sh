@@ -17,33 +17,38 @@ AR="aarch64-elf-ar"
 USER_FLAGS="-I libmc -I libcrt"
 KERNEL_FLAGS="-I kernel -I libmc -D IS_KERNEL"
 
+run_echo() {
+    echo "$@"
+    $@ || exit 1
+}
+
 kernel_compile() {
     # create object files
-    PYTHONPATH=$MCCPATH $MCC $MCFLAGS $KERNEL_FLAGS $1 -o "${1%.mc}.o" || exit 1
+    PYTHONPATH=$MCCPATH run_echo $MCC $MCFLAGS $KERNEL_FLAGS $1 -o "${1%.mc}.o"
 }
 
 asm_compile() {
-    $CC $CFLAGS -c $1 -o "${1%.S}.o" || exit 1
+    run_echo $CC $CFLAGS -c $1 -o "${1%.S}.o"
 }
 
 c_compile() {
-    $CC $CFLAGS -c $1 -o "${1%.c}.o" || exit 1
+    run_echo $CC $CFLAGS -c $1 -o "${1%.c}.o"
 }
 
 user_lib_compile() {
     # create object files
-    PYTHONPATH=$MCCPATH $MCC $MCFLAGS $USER_FLAGS $1 -o "user/${1%.mc}.o" || exit 1
+    PYTHONPATH=$MCCPATH run_echo $MCC $MCFLAGS $USER_FLAGS $1 -o "user/${1%.mc}.o"
     
     # create interfaces
-    PYTHONPATH=$MCCPATH $MCC $MCFLAGS $USER_FLAGS --emit-interface $1 -o "user/${1%.mc}.mci" || exit 1
+    PYTHONPATH=$MCCPATH run_echo $MCC $MCFLAGS $USER_FLAGS --emit-interface $1 -o "user/${1%.mc}.mci"
 }
 
 user_app_compile() {
     # create object files
-    PYTHONPATH=$MCCPATH $MCC $MCFLAGS -I user/libmc $1/*.mc || exit 1;
+    PYTHONPATH=$MCCPATH run_echo $MCC $MCFLAGS -I user/libmc $1/*.mc
 
     # link
-	$LD -e entry -r ${1}/*.o user/libmc.a user/libc.a user/libcrt.a -o init/bin/$(basename -- "$1") || exit 1
+	run_echo $LD -e entry -r ${1}/*.o user/libmc.a user/libc.a user/libcrt.a -o init/bin/$(basename -- "$1")
 }
 
 # user lib dirs
@@ -81,13 +86,13 @@ for file in libmc/**/*.mc; do user_lib_compile $file; done
 for file in libcrt/*.mc; do user_lib_compile $file; done
 
 # libmc.a
-$AR rcs user/libmc.a user/libmc/*.o user/libmc/**/*.o || exit 1
+run_echo $AR rcs user/libmc.a user/libmc/*.o user/libmc/**/*.o
 
 # libc.a
-$AR rcs user/libc.a libc/src/*.o || exit 1
+run_echo $AR rcs user/libc.a libc/src/*.o
 
 # libcrt.a
-$AR rcs user/libcrt.a user/libcrt/*.o || exit 1
+run_echo $AR rcs user/libcrt.a user/libcrt/*.o
 
 # user apps
 for dir in user/apps/*; do user_app_compile $dir; done
@@ -97,7 +102,7 @@ for file in src/*.S; do asm_compile $file; done
 for file in src/*.mc; do kernel_compile $file; done
 
 # link kernel
-$LD -T linker.ld -o kernel.elf src/*.o lib/src/*.o libc/src/*.o kernel/*.o kernel/**/*.o kernel/**/**/*.o libmc/*.o libmc/**/*.o || exit 1
+run_echo $LD -T linker.ld -o kernel.elf src/*.o lib/src/*.o libc/src/*.o kernel/*.o kernel/**/*.o kernel/**/**/*.o libmc/*.o libmc/**/*.o
 
 # init.img
 dd if=/dev/zero of=init.img bs=1M count=100

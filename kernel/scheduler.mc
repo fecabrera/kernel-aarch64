@@ -139,7 +139,7 @@ fn scheduler_set_current_process(proc: struct process*) {
 fn scheduler_spawn(entry: fn ()) -> int64 {
     dprintk("[scheduler] spawn()\n");
 
-    let proc: struct process* = kalloc<struct process>(1);
+    let proc: struct process* = knew<struct process>();
 
     dprintk("[scheduler] creating process\n");
     process_create(proc, DEFAULT_STACK_BLOCK_COUNT);
@@ -405,7 +405,7 @@ fn syscall_fork_handler(ctx: struct cpu_context*) -> struct cpu_context* {
 
     dprintk("[scheduler] fork(%i), ctx->x0 = %llu\n", proc->pid, ctx->x[0]);
 
-    let child: struct process* = kalloc<struct process>(1);
+    let child: struct process* = knew<struct process>();
     if (process_duplicate(child, proc) < 0) {
         kdealloc(child);
         ctx->x[0] = -1 as uint64;

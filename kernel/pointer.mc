@@ -21,8 +21,8 @@ struct pointer<T> {
  * @return the new pointer<T> (caller is the first owner)
  */
 fn create_pointer<T>() -> struct pointer<T>* {
-    let ptr: struct pointer<T>* = kalloc<struct pointer<T>>(1);
-    ptr->value = kalloc<T>(1);
+    let ptr: struct pointer<T>* = knew<struct pointer<T>>();
+    ptr->value = knew<T>();
     ptr->count = 1;
     dprintk("[ptr] created pointer at %p, count = %llu\n", ptr->value, ptr->count);
     return ptr;
