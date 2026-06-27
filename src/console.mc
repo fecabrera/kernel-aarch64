@@ -22,7 +22,7 @@ let available_commands: uint8*[][2] = [
 ];
 
 @static
-let dirs: uint8*[] = ["bin"];
+let dirs: uint8*[] = ["/bin"];
 
 @private
 fn command_help(argc: int64, argv: uint8**) -> int64 {
@@ -63,7 +63,8 @@ fn console_ls(argc: int64, argv: uint8**) -> int64 {
     
     let proc = scheduler_get_current_process();
     
-    let node = vfs_get_node_for_path(filename, proc->cwd);
+    let root = filename[0] == '/' ? vfs_root() : proc->cwd;
+    let node = vfs_get_node_for_path(filename, root);
     if (node == null) {
         println("\"%s\" not found!", filename);
         return -1;
@@ -109,16 +110,19 @@ fn console_cd(argc: int64, argv: uint8**) -> int64 {
         println("usage: %s <path>", argv[0]);
         return -1;
     }
-    
+
     let proc = scheduler_get_current_process();
-    let node = vfs_get_node_for_path(argv[1], proc->cwd);
+    
+    let path = argv[1];
+    let root = path[0] == '/' ? vfs_root() : proc->cwd;
+    let node = vfs_get_node_for_path(path, root);
     if (node == null) {
-        println("\"%s\" not found!", argv[1]);
+        println("\"%s\" not found!", path);
         return -2;
     }
 
     if ((node->attrs & node_attrs::TYPE_MASK) != node_attrs::DIR) {
-        println("\"%s\" is not a folder!", argv[1]);
+        println("\"%s\" is not a folder!", path);
         return -2;
     }
 

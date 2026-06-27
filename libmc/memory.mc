@@ -75,6 +75,30 @@ fn copy_bytes<T>(dst: T*, src: T*, n: uint64) {
 }
 
 /**
+ * Zeroes the n elements of type T at dst by clearing every byte, in a single
+ * memset. The element size is computed from T, so callers count elements, not
+ * bytes. Shorthand for set_bytes(dst, 0, n).
+ *
+ * @param dst: destination, with room for at least n elements
+ * @param n:   number of elements to zero
+ */
+fn bytezero<T>(dst: T*, n: uint64) {
+    set_bytes(dst, 0, n);
+}
+
+/**
+ * Zeroes the n elements of type T at dst one item at a time, writing a whole
+ * zero-valued T to each element rather than a byte pattern. Shorthand for
+ * set_items(dst, 0, n).
+ *
+ * @param dst: destination, with room for at least n elements
+ * @param n:   number of elements to zero
+ */
+fn zero<T>(dst: T*, n: uint64) {
+    set_items(dst, 0, n);
+}
+
+/**
  * Copies n elements of type T from src to dst one item at a time.
  *
  * @param dst: destination, with room for at least n elements

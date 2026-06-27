@@ -4,7 +4,8 @@ import "cpu";
 import "set";
 import "system/syscall";
 
-@static let _syscall_table: struct set<uint64, fn (struct cpu_context *) -> struct cpu_context*>;
+type syscall_fn = fn (struct cpu_context*) -> struct cpu_context*;
+@static let _syscall_table: struct set<uint64, syscall_fn>;
 
 /**
  * Initializes the syscall subsystem.
@@ -21,7 +22,7 @@ fn syscall_init() {
  * @param syscall_id: syscall number to handle (0–NUM_SYSCALLS-1)
  * @param fnc: function to call when the syscall is invoked
  */
-fn syscall_register_handler(syscall_id: uint64, fnc: fn (struct cpu_context*) -> struct cpu_context*) {
+fn syscall_register_handler(syscall_id: uint64, fnc: syscall_fn) {
     if (get_syscall_handler(syscall_id) == null) {
         set_syscall_handler(syscall_id, fnc);
         dprintk("[syscall] handler registered for syscall %i, addr = %p\n", syscall_id, fnc);
@@ -76,7 +77,7 @@ fn syscall_handler(ctx: struct cpu_context *) -> struct cpu_context* {
  * @return the registered handler, or null if none is registered
  */
 @static
-fn get_syscall_handler(syscall_id: uint64) -> fn (struct cpu_context*) -> struct cpu_context* {
+fn get_syscall_handler(syscall_id: uint64) -> syscall_fn {
     let fnc: fn (struct cpu_context*) -> struct cpu_context*;
     if (!set_get(&_syscall_table, syscall_id, &fnc))
         return null;
@@ -91,7 +92,7 @@ fn get_syscall_handler(syscall_id: uint64) -> fn (struct cpu_context*) -> struct
  * @param fnc:        handler to store
  */
 @static
-fn set_syscall_handler(syscall_id: uint64, fnc: fn (struct cpu_context*) -> struct cpu_context*) {
+fn set_syscall_handler(syscall_id: uint64, fnc: syscall_fn) {
     set_set(&_syscall_table, syscall_id, fnc);
 }
 

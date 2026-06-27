@@ -20,23 +20,24 @@ import "interrupts/drivers/timer";
  * Registers all scheduler syscall handlers. Must be called before irq_enable().
  *
  * Registered handlers:
- *   SYSCALL_EXIT             → syscall_exit_handler
- *   SYSCALL_YIELD            → syscall_yield_handler
- *   SYSCALL_GETPID           → syscall_getpid_handler
- *   SYSCALL_WAITPID          → syscall_waitpid_handler
- *   SYSCALL_FORK             → syscall_fork_handler
- *   SYSCALL_SLEEP            → syscall_sleep_handler
- *   SYSCALL_MSLEEP           → syscall_msleep_handler
- *   SYSCALL_OPEN             → syscall_open_handler
- *   SYSCALL_CLOSE            → syscall_close_handler
- *   SYSCALL_READ             → syscall_read_handler
- *   SYSCALL_WRITE            → syscall_write_handler
- *   SYSCALL_FSTAT            → syscall_fstat_handler
- *   SYSCALL_STAT             → syscall_stat_handler
- *   SYSCALL_GETCWD           → syscall_getcwd_handler
+ *   syscall::EXIT             → syscall_exit_handler
+ *   syscall::YIELD            → syscall_yield_handler
+ *   syscall::GETPID           → syscall_getpid_handler
+ *   syscall::WAITPID          → syscall_waitpid_handler
+ *   syscall::FORK             → syscall_fork_handler
+ *   syscall::SLEEP            → syscall_sleep_handler
+ *   syscall::MSLEEP           → syscall_msleep_handler
+ *   syscall::OPEN             → syscall_open_handler
+ *   syscall::CLOSE            → syscall_close_handler
+ *   syscall::READ             → syscall_read_handler
+ *   syscall::WRITE            → syscall_write_handler
+ *   syscall::FSTAT            → syscall_fstat_handler
+ *   syscall::STAT             → syscall_stat_handler
+ *   syscall::GETCWD           → syscall_getcwd_handler
+ *   syscall::EXEC             → syscall_exec_handler
  */
 fn scheduler_init() {
-    idle_ctx = (idle_stack as uint64 + DEFAULT_STACK_SIZE - 272) as struct cpu_context*;
+    idle_ctx = &idle_stack[DEFAULT_STACK_SIZE - 272] as struct cpu_context*;
     set_bytes(idle_ctx as uint8*, 0, 272);
 
     queue_init(&ready_queue, 10);
@@ -58,10 +59,11 @@ fn scheduler_init() {
     syscall_register_handler(syscall::FSTAT, syscall_fstat_handler);
     syscall_register_handler(syscall::STAT, syscall_stat_handler);
     syscall_register_handler(syscall::GETCWD, syscall_getcwd_handler);
+    syscall_register_handler(syscall::EXEC, syscall_exec_handler);
 }
 
 /**
- * Sets proc->state to PROC_READY and pushes it onto the tail of the ready queue.
+ * Sets proc->state to proc_state::READY and pushes it onto the tail of the ready queue.
  *
  * @param proc: process to enqueue; must be fully initialized (create_process
  *              and process_set_entry called)
@@ -69,7 +71,7 @@ fn scheduler_init() {
  * @return 0 on success
  */
 fn scheduler_enqueue(proc: struct process*) -> int32 {
-    proc->state = PROC_READY;
+    proc->state = proc_state::READY;
     queue_push(&ready_queue, proc);
 
     dprintk("[scheduler] enqueue(), q = { ", proc->pid);
@@ -88,7 +90,7 @@ fn scheduler_enqueue(proc: struct process*) -> int32 {
 }
 
 /**
- * Removes the head of the ready queue, marks the process PROC_DEAD, and
+ * Removes the head of the ready queue, marks the process proc_state::DEAD, and
  * returns it. Does not affect `current`.
  *
  * @return pointer to the dequeued process, or NULL if the queue is empty
@@ -98,7 +100,7 @@ fn scheduler_dequeue() -> struct process* {
         return null;
 
     let proc = queue_pop(&ready_queue);
-    proc->state = PROC_DEAD;
+    proc->state = proc_state::DEAD;
 
     dprintk("[scheduler] dequeue(%i)\n", proc->pid);
 
@@ -234,7 +236,7 @@ fn notify_sleepers() {
 
             set_remove(&sleep_queue, proc->pid);
 
-            proc->state = PROC_READY;
+            proc->state = proc_state::READY;
             proc->sleep_until = 0;
             proc->ctx->x[0] = 0;
 
@@ -267,7 +269,7 @@ fn notify_waiters(wait_pid: int64, exit_status: int64) {
 
         dprintk("[scheduler] _notify_waiter(%i), exit_status=%i\n", proc->pid, exit_status);
 
-        proc->state = PROC_READY;
+        proc->state = proc_state::READY;
         proc->wait_pid = 0;
         proc->ctx->x[0] = exit_status as uint64;
 
@@ -276,7 +278,7 @@ fn notify_waiters(wait_pid: int64, exit_status: int64) {
 }
 
 /**
- * Syscall handler for SYSCALL_EXIT. Marks current PROC_DEAD, notifies any
+ * Syscall handler for syscall::EXIT. Marks current proc_state::DEAD, notifies any
  * waiters (passing ctx->x1 as exit status), destroys the process, and calls
  * scheduler_handler to run the next task. Returns ctx unchanged if no process
  * is currently running.
@@ -294,7 +296,7 @@ fn syscall_exit_handler(ctx: struct cpu_context*) -> struct cpu_context* {
 
     dprintk("[scheduler] exit(%i), ctx->x0 = %llu, ctx->x1 = %llu\n", proc->pid, ctx->x[0], ctx->x[1]);
 
-    proc->state = PROC_DEAD;
+    proc->state = proc_state::DEAD;
 
     // notify waiters
     notify_waiters(proc->pid, ctx->x[1] as int64);
@@ -311,7 +313,7 @@ fn syscall_exit_handler(ctx: struct cpu_context*) -> struct cpu_context* {
 }
 
 /**
- * Syscall handler for SYSCALL_YIELD. Sets ctx->x0 = 0 and delegates to
+ * Syscall handler for syscall::YIELD. Sets ctx->x0 = 0 and delegates to
  * scheduler_handler to pick the next task.
  *
  * @param ctx: saved context of the yielding process
@@ -327,7 +329,7 @@ fn syscall_yield_handler(ctx: struct cpu_context*) -> struct cpu_context* {
 }
 
 /**
- * Syscall handler for SYSCALL_GETPID. Writes current->pid into ctx->x0.
+ * Syscall handler for syscall::GETPID. Writes current->pid into ctx->x0.
  * Does not perform a context switch.
  *
  * @param ctx: saved context of the calling process
@@ -350,7 +352,7 @@ fn syscall_getpid_handler(ctx: struct cpu_context*) -> struct cpu_context* {
 }
 
 /**
- * Syscall handler for SYSCALL_WAITPID. Saves ctx into current->ctx, moves
+ * Syscall handler for syscall::WAITPID. Saves ctx into current->ctx, moves
  * current to the wait queue, and calls scheduler_handler to run the next task.
  * The caller is resumed by _notify_waiters when the target process exits, with
  * ctx->x0 set to the exit status.
@@ -371,7 +373,7 @@ fn syscall_waitpid_handler(ctx: struct cpu_context*) -> struct cpu_context* {
         return ctx;
     }
 
-    proc->state = PROC_BLOCKED;
+    proc->state = proc_state::BLOCKED;
     proc->wait_pid = pid;
     proc->ctx = ctx;
 
@@ -382,7 +384,7 @@ fn syscall_waitpid_handler(ctx: struct cpu_context*) -> struct cpu_context* {
 }
 
 /**
- * Syscall handler for SYSCALL_FORK. Saves ctx into current->ctx, duplicates
+ * Syscall handler for syscall::FORK. Saves ctx into current->ctx, duplicates
  * the current process (stack and context), and enqueues the child. The child
  * resumes from the same point with ctx->x0 = 0; the parent receives the
  * child's PID in ctx->x0.
@@ -404,7 +406,12 @@ fn syscall_fork_handler(ctx: struct cpu_context*) -> struct cpu_context* {
     dprintk("[scheduler] fork(%i), ctx->x0 = %llu\n", proc->pid, ctx->x[0]);
 
     let child: struct process* = kalloc<struct process>(1);
-    process_duplicate(child, proc);
+    if (process_duplicate(child, proc) < 0) {
+        kdealloc(child);
+        ctx->x[0] = -1 as uint64;
+        return ctx;
+    }
+
     scheduler_enqueue(child);
 
     child->ctx->x[0] = 0;
@@ -414,7 +421,7 @@ fn syscall_fork_handler(ctx: struct cpu_context*) -> struct cpu_context* {
 }
 
 /**
- * Syscall handler for SYSCALL_SLEEP. Sets current->sleep_for to
+ * Syscall handler for syscall::SLEEP. Sets current->sleep_for to
  * ctx->x1 * 1000 ms, moves current to the sleep queue, and calls
  * scheduler_handler to run the next task. The process is woken by
  * _notify_sleepers inside scheduler_handler once sleep_for reaches zero.
@@ -438,7 +445,7 @@ fn syscall_sleep_handler(ctx: struct cpu_context*) -> struct cpu_context* {
     dprintk("[scheduler] sleep(), ctx->x0 = %llu, ctx->x1 = %llu\n", ctx->x[0], ctx->x[1]);
 
     let sleep_duration = seconds * 1000;
-    proc->state = PROC_BLOCKED;
+    proc->state = proc_state::BLOCKED;
     proc->sleep_until = timer_get_uptime() + sleep_duration;
     proc->ctx = ctx;
 
@@ -449,7 +456,7 @@ fn syscall_sleep_handler(ctx: struct cpu_context*) -> struct cpu_context* {
 }
 
 /**
- * Syscall handler for SYSCALL_MSLEEP. Sets current->sleep_for directly to
+ * Syscall handler for syscall::MSLEEP. Sets current->sleep_for directly to
  * ctx->x1 ms, moves current to the sleep queue, and calls scheduler_handler
  * to run the next task. The process is woken by _notify_sleepers inside
  * scheduler_handler once sleep_for reaches zero.
@@ -472,7 +479,7 @@ fn syscall_msleep_handler(ctx: struct cpu_context*) -> struct cpu_context* {
 
     dprintk("[scheduler] msleep(), ctx->x0 = %llu, ctx->x1 = %llu\n", ctx->x[0], ctx->x[1]);
 
-    proc->state = PROC_BLOCKED;
+    proc->state = proc_state::BLOCKED;
     proc->sleep_until = timer_get_uptime() + mseconds;
     proc->ctx = ctx;
 
@@ -483,7 +490,7 @@ fn syscall_msleep_handler(ctx: struct cpu_context*) -> struct cpu_context* {
 }
 
 /**
- * Handles SYSCALL_OPEN. Opens the path in x1 (with access mode in x2) in the
+ * Handles syscall::OPEN. Opens the path in x1 (with access mode in x2) in the
  * current process's fd table via process_open_file and returns the descriptor in
  * x0. No context switch.
  *
@@ -531,7 +538,7 @@ fn syscall_openat_handler(ctx: struct cpu_context*) -> struct cpu_context* {
 }
 
 /**
- * Handles SYSCALL_CLOSE. Closes the descriptor in x1 in the current process's fd
+ * Handles syscall::CLOSE. Closes the descriptor in x1 in the current process's fd
  * table via process_close_file and returns the result in x0. No context switch.
  *
  * @param ctx: saved context of the calling process
@@ -557,7 +564,7 @@ fn syscall_close_handler(ctx: struct cpu_context*) -> struct cpu_context* {
 }
 
 /**
- * Handles SYSCALL_READ. Reads count (x3) bytes from descriptor fd (x1) into the
+ * Handles syscall::READ. Reads count (x3) bytes from descriptor fd (x1) into the
  * buffer at x2 via process_read_file and returns the byte count in x0. No context
  * switch.
  *
@@ -586,7 +593,7 @@ fn syscall_read_handler(ctx: struct cpu_context*) -> struct cpu_context* {
 }
 
 /**
- * Handles SYSCALL_WRITE. Writes count (x3) bytes from the buffer at x2 to
+ * Handles syscall::WRITE. Writes count (x3) bytes from the buffer at x2 to
  * descriptor fd (x1) via process_write_file and returns the byte count in x0. No
  * context switch.
  *
@@ -615,7 +622,7 @@ fn syscall_write_handler(ctx: struct cpu_context*) -> struct cpu_context* {
 }
 
 /**
- * Handles SYSCALL_FSTAT. Fills the file_stat at x2 with metadata for descriptor
+ * Handles syscall::FSTAT. Fills the file_stat at x2 with metadata for descriptor
  * fd (x1) via process_file_stat and returns the result in x0. No context switch.
  *
  * @param ctx: saved context of the calling process
@@ -642,7 +649,7 @@ fn syscall_fstat_handler(ctx: struct cpu_context*) -> struct cpu_context* {
 }
 
 /**
- * Handles SYSCALL_STAT. Fills the file_stat at x2 with metadata for the file at
+ * Handles syscall::STAT. Fills the file_stat at x2 with metadata for the file at
  * the path in x1 (resolved relative to the process cwd) via process_stat and
  * returns the result in x0. Unlike fstat, no open descriptor is needed. No
  * context switch.
@@ -671,7 +678,7 @@ fn syscall_stat_handler(ctx: struct cpu_context*) -> struct cpu_context* {
 }
 
 /**
- * Handles SYSCALL_GETCWD. Writes the absolute path of the process's current
+ * Handles syscall::GETCWD. Writes the absolute path of the process's current
  * working directory into the buffer at x1 (capacity x2) via process_get_cwd and
  * returns the result in x0. No context switch.
  *
@@ -696,4 +703,32 @@ fn syscall_getcwd_handler(ctx: struct cpu_context*) -> struct cpu_context* {
     ctx->x[0] = process_get_cwd(proc, buf, size) as uint64;
 
     return ctx;
+}
+
+/**
+ * Handles syscall::EXEC. Replaces the calling process's image with the program at
+ * path (x1), passing argc (x2) and argv (x3) via process_exec, then resumes the
+ * process on its (possibly rebuilt) context. On success the old image is gone, so
+ * x0 carries the negative error code only on failure.
+ *
+ * @param ctx: saved context of the calling process
+ *
+ * @return the process's context to resume (proc->ctx), with x0 = a negative error
+ *         on failure
+ */
+fn syscall_exec_handler(ctx: struct cpu_context*) -> struct cpu_context* {
+    let proc = scheduler_get_current_process();
+    if (proc == null) {
+        dprintk("[scheduler] no current process!\n");
+        ctx->x[0] = -1 as uint64;
+        return ctx;
+    }
+
+    let path = ctx->x[1] as uint8*;
+    let argc = ctx->x[2] as int64;
+    let argv = ctx->x[3] as uint8**;
+
+    ctx->x[0] = process_exec(proc, path, argc, argv) as uint64;
+
+    return proc->ctx;    
 }

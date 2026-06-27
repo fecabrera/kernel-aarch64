@@ -29,23 +29,6 @@ enum io_error: int64 {
 }
 
 /**
- * An open file: a node bound to a read/write position and an access mode. This
- * is the open-file-description layer (Unix `struct file`) — it owns the cursor
- * `pos`, sits between a process's fd table and fs_read/fs_write, and is what a
- * file descriptor (the per-process integer index) ultimately refers to. Its
- * lifetime is managed by a refcounted pointer<file_descriptor> in the fd table.
- *
- * @field node:  the underlying VFS node
- * @field pos:   current byte offset, advanced by file_read/file_write
- * @field attrs: access mode (FS_FILE_ATTRS_READ/WRITE/EXEC bits)
- */
-struct file_descriptor {
-    fd_node: struct fs_node*;
-    fd_pos:  uint64;
-    fd_mode: uint32;
-}
-
-/**
  * Metadata returned by file_stat / the fstat syscall.
  *
  * @field st_size: file size in bytes
@@ -55,3 +38,30 @@ struct file_stat {
     st_size: uint64;
     st_mode: uint32;
 }
+
+/**
+ * The kind of filesystem object a directory entry refers to, reported in
+ * dirent.d_type by the getdents syscall.
+ */
+enum dent_type: uint16 {
+    DIRECTORY   = 0,
+    REGULAR     = 1,
+    BLK_DEVICE  = 2,
+    CHAR_DEVICE = 3,
+}
+
+/**
+ * A single directory entry returned by the getdents syscall. Entries are
+ * variable-length: d_size is the total byte size of this record (header +
+ * name), so the next entry begins d_size bytes after the start of this one.
+ *
+ * @field d_size: total size of this entry in bytes, for walking to the next one
+ * @field d_type: kind of object this entry names (see dent_type)
+ * @field d_name: null-terminated entry name
+ */
+struct dirent {
+    d_size: uint16;
+    d_type: dent_type;
+    d_name: uint8*;
+}
+

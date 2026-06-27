@@ -38,7 +38,7 @@ const RTC_INT_MATCH = (1 << 0); // Match interrupt
 /**
  * Enables the RTC by setting the EN bit in CR, reads the IRQ number from the
  * DTB, registers pl031_irq_handler with the GIC, and registers syscall_time_handler for
- * SYSCALL_TIME.
+ * syscall::TIME.
  */
 fn pl031_init() {
     PL031->cr = RTC_CR_EN;
@@ -105,7 +105,7 @@ fn pl031_irq_handler(irq: uint32, ctx: struct cpu_context*) -> struct cpu_contex
 }
 
 /**
- * Syscall handler for SYSCALL_TIME. Reads the current Unix timestamp from
+ * Syscall handler for syscall::TIME. Reads the current Unix timestamp from
  * the RTC data register (PL031->dr) and writes it into ctx->x0. Does not
  * perform a context switch.
  *

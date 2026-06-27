@@ -2,6 +2,23 @@ import "fs";
 import "system/fs";
 
 /**
+ * An open file: a node bound to a read/write position and an access mode. This
+ * is the open-file-description layer (Unix `struct file`) — it owns the cursor
+ * `pos`, sits between a process's fd table and fs_read/fs_write, and is what a
+ * file descriptor (the per-process integer index) ultimately refers to. Its
+ * lifetime is managed by a refcounted pointer<file_descriptor> in the fd table.
+ *
+ * @field node:  the underlying VFS node
+ * @field pos:   current byte offset, advanced by file_read/file_write
+ * @field attrs: access mode (FS_FILE_ATTRS_READ/WRITE/EXEC bits)
+ */
+struct file_descriptor {
+    fd_node: struct fs_node*;
+    fd_pos:  uint64;
+    fd_mode: uint32;
+}
+
+/**
  * Initializes fd as an open file on node with the given access mode, positioned
  * at offset 0.
  *

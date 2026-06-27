@@ -1,32 +1,35 @@
 import "system/fs";
+import "system/proc";
 
 const NUM_SYSCALLS = 256;
 
 enum syscall: uint64 {
-    EXIT    = 0,
-    YIELD   = 1,
-    GETPID  = 2,
-    WAITPID = 3,
-    FORK    = 4,
-    SLEEP   = 5,
-    MSLEEP  = 6,
-    TIME    = 7,
-    UPTIME  = 8,
-    OPEN    = 9,
-    OPENAT  = 10,
-    CLOSE   = 11,
-    READ    = 12,
-    WRITE   = 13,
-    FSTAT   = 14,
-    STAT    = 15,
-    GETCWD  = 16,
-    ACQMEM  = 17,
-    RSZMEM  = 18,
-    RELMEM  = 19,
+    EXIT     = 0,
+    YIELD    = 1,
+    GETPID   = 2,
+    WAITPID  = 3,
+    FORK     = 4,
+    SLEEP    = 5,
+    MSLEEP   = 6,
+    TIME     = 7,
+    UPTIME   = 8,
+    OPEN     = 9,
+    OPENAT   = 10,
+    CLOSE    = 11,
+    READ     = 12,
+    WRITE    = 13,
+    FSTAT    = 14,
+    STAT     = 15,
+    GETDENTS = 16,
+    GETCWD   = 17,
+    ACQMEM   = 18,
+    RSZMEM   = 19,
+    RELMEM   = 20,
+    EXEC     = 21,
 }
 
 /**
- * Voluntarily yields the CPU to the scheduler via SYSCALL_YIELD (svc #0).
+ * Voluntarily yields the CPU to the scheduler via syscall::YIELD (svc #0).
  * Traps into EL1, where syscall_yield_handler sets the return value to 0 in ctx->x0 and calls
  * scheduler_handler to pick the next runnable task. Execution resumes in the calling task when it
  * is next scheduled.
@@ -42,8 +45,8 @@ enum syscall: uint64 {
 }
 
 /**
- * Terminates the calling process via SYSCALL_EXIT (svc #0).
- * Traps into EL1, where syscall_exit_handler marks the process PROC_DEAD, destroys it, and calls
+ * Terminates the calling process via syscall::EXIT (svc #0).
+ * Traps into EL1, where syscall_exit_handler marks the process proc_state::DEAD, destroys it, and calls
  * scheduler_handler to run the next task. Does not return.
  *
  * @param status: exit status passed in x1 (logged by syscall_exit_handler).
@@ -57,14 +60,14 @@ enum syscall: uint64 {
 }
 
 /**
- * Returns the PID of the calling process via SYSCALL_GETPID (svc #0).
+ * Returns the PID of the calling process via syscall::GETPID (svc #0).
  * Traps into EL1, where syscall_getpid_handler writes current->pid into ctx->x0.
  * Execution resumes in the calling task without a context switch.
  *
  * @return PID of the current process, or -1 if no process is currently scheduled.
  */
-@inline fn getpid() -> int64 {
-    return @asm @clobbers("x0") (syscall::GETPID) -> int64 {
+@inline fn getpid() -> proc_pid {
+    return @asm @clobbers("x0") (syscall::GETPID) -> proc_pid {
         "mov x0, $0"
         "svc #0"
         "mov $out, x0"
@@ -72,7 +75,7 @@ enum syscall: uint64 {
 }
 
 /**
- * Blocks the calling process until the process with the given PID exits via SYSCALL_WAITPID (svc
+ * Blocks the calling process until the process with the given PID exits via syscall::WAITPID (svc
  * #0). Traps into EL1, where syscall_waitpid_handler moves the caller to the wait queue and performs a
  * context switch. Execution resumes when the target process calls exit.
  *
@@ -81,7 +84,7 @@ enum syscall: uint64 {
  * @return exit status of the terminated process, or -1 if no process is
  *         currently scheduled.
  */
-@inline fn waitpid(pid: int64) -> int64 {
+@inline fn waitpid(pid: proc_pid) -> int64 {
     return @asm @clobbers("x0", "x1", "memory") (syscall::WAITPID, pid) -> int64 {
         "mov x0, $0"
         "mov x1, $1"
@@ -91,14 +94,14 @@ enum syscall: uint64 {
 }
 
 /**
- * Forks the calling process via SYSCALL_FORK (svc #0). Traps into EL1, where syscall_fork_handler
+ * Forks the calling process via syscall::FORK (svc #0). Traps into EL1, where syscall_fork_handler
  * duplicates the current process (stack and context) and enqueues the child. The child resumes from
  * the same point with a return value of 0; the parent receives the child's PID.
  *
  * @return child PID in the parent, 0 in the child, or -1 on failure.
  */
-@inline fn fork() -> int64 {
-    return @asm @clobbers("x0", "memory") (syscall::FORK) -> int64 {
+@inline fn fork() -> proc_pid {
+    return @asm @clobbers("x0", "memory") (syscall::FORK) -> proc_pid {
         "mov x0, $0"
         "svc #0"
         "mov $out, x0"
@@ -106,7 +109,7 @@ enum syscall: uint64 {
 }
 
 /**
- * Blocks the calling process for the given number of seconds via SYSCALL_SLEEP (svc #0). Traps into
+ * Blocks the calling process for the given number of seconds via syscall::SLEEP (svc #0). Traps into
  * EL1, where syscall_sleep_handler sets process->sleep_for and moves the caller to the sleep queue. The
  * timer tick decrements sleep_for on each tick; process is enqueued when it reaches zero.
  *
@@ -124,7 +127,7 @@ enum syscall: uint64 {
 }
 
 /**
- * Blocks the calling process for the given number of milliseconds via SYSCALL_MSLEEP (svc #0).
+ * Blocks the calling process for the given number of milliseconds via syscall::MSLEEP (svc #0).
  * Traps into EL1, where syscall_msleep_handler sets process->sleep_for directly to the given value and
  * moves the caller to the sleep queue. The timer tick decrements sleep_for on each tick; process is
  * enqueued when it reaches zero.
@@ -143,7 +146,7 @@ enum syscall: uint64 {
 }
 
 /**
- * Returns the current Unix timestamp via SYSCALL_TIME (svc #0).
+ * Returns the current Unix timestamp via syscall::TIME (svc #0).
  * Traps into EL1, where syscall_time_handler reads the RTC and writes the value into ctx->x0.
  *
  * @return current Unix timestamp, or -1 on failure.
@@ -157,7 +160,7 @@ enum syscall: uint64 {
 }
 
 /**
- * Returns the system uptime in milliseconds via SYSCALL_UPTIME (svc #0).
+ * Returns the system uptime in milliseconds via syscall::UPTIME (svc #0).
  * Traps into EL1, where syscall_uptime_handler reads cntpct_el0 and computes elapsed milliseconds
  * since timer_init.
  *
@@ -172,7 +175,7 @@ enum syscall: uint64 {
 }
 
 /**
- * Opens path via SYSCALL_OPEN (svc #0). Traps into EL1, where syscall_open_handler
+ * Opens path via syscall::OPEN (svc #0). Traps into EL1, where syscall_open_handler
  * resolves the path relative to the process cwd and adds an entry to its fd table.
  *
  * @param path:  null-terminated path to open
@@ -203,7 +206,7 @@ enum syscall: uint64 {
 }
 
 /**
- * Closes file descriptor fd via SYSCALL_CLOSE (svc #0). Traps into EL1, where
+ * Closes file descriptor fd via syscall::CLOSE (svc #0). Traps into EL1, where
  * syscall_close_handler closes the corresponding fd-table entry.
  *
  * @param fd: file descriptor to close
@@ -220,7 +223,7 @@ enum syscall: uint64 {
 }
 
 /**
- * Reads up to count bytes from fd into buffer via SYSCALL_READ (svc #0). Traps
+ * Reads up to count bytes from fd into buffer via syscall::READ (svc #0). Traps
  * into EL1, where syscall_read_handler dispatches to the process fd table.
  *
  * @param fd:     file descriptor to read from
@@ -242,7 +245,7 @@ enum syscall: uint64 {
 }
 
 /**
- * Writes up to count bytes from buffer to fd via SYSCALL_WRITE (svc #0). Traps
+ * Writes up to count bytes from buffer to fd via syscall::WRITE (svc #0). Traps
  * into EL1, where syscall_write_handler dispatches to the process fd table.
  *
  * @param fd:     file descriptor to write to
@@ -264,7 +267,7 @@ enum syscall: uint64 {
 }
 
 /**
- * Retrieves metadata for fd into stat via SYSCALL_FSTAT (svc #0). Traps into EL1,
+ * Retrieves metadata for fd into stat via syscall::FSTAT (svc #0). Traps into EL1,
  * where syscall_fstat_handler fills the file_stat from the process fd table.
  *
  * @param fd:   file descriptor to stat
@@ -284,7 +287,7 @@ enum syscall: uint64 {
 }
 
 /**
- * Retrieves metadata for the file at path into stat via SYSCALL_STAT (svc #0).
+ * Retrieves metadata for the file at path into stat via syscall::STAT (svc #0).
  * Traps into EL1, where syscall_stat_handler resolves path relative to the
  * process cwd and fills the file_stat. Unlike fstat, no open descriptor is
  * required.
@@ -306,8 +309,32 @@ enum syscall: uint64 {
 }
 
 /**
+ * Reads directory entries from the open directory fd into buf via
+ * syscall::GETDENTS (svc #0). Fills buf with consecutive variable-length dirent
+ * records (walk them via d_size) up to count bytes.
+ *
+ * @param fd:    descriptor of an open directory
+ * @param buf:   output buffer for packed dirent records
+ * @param count: capacity of buf in bytes
+ *
+ * @return number of bytes written to buf, 0 at end of directory, or a negative
+ *         error code.
+ */
+@inline fn getdents(fd: int64, buf: uint8*, count: uint64) -> int64 {
+    return @asm @clobbers("x0", "x1", "x2", "x3", "memory")
+        (syscall::GETDENTS, fd, buf, count) -> int64 {
+        "mov x0, $0"
+        "mov x1, $1"
+        "mov x2, $2"
+        "mov x3, $3"
+        "svc #0"
+        "mov $out, x0"
+    };
+}
+
+/**
  * Writes the absolute path of the calling process's current working directory
- * into buf via SYSCALL_GETCWD (svc #0). Traps into EL1, where
+ * into buf via syscall::GETCWD (svc #0). Traps into EL1, where
  * syscall_getcwd_handler resolves the path from the process cwd.
  *
  * @param buf:  output buffer for the null-terminated path
@@ -355,5 +382,29 @@ enum syscall: uint64 {
         "mov x0, $0"
         "mov x1, $1"
         "svc #0"
+    };
+}
+
+/**
+ * Replaces the calling process's image with the program at path via
+ * syscall::EXEC (svc #0). Traps into EL1, where syscall_exec_handler loads the
+ * new program and resumes the process at its entry point (execve-style). On
+ * success the call does not return.
+ *
+ * @param path: null-terminated path to the executable
+ * @param argc: number of arguments to pass to the new program
+ * @param argv: null-terminated argument vector; argv[0] is the program name
+ *
+ * @return does not return on success; a negative error code on failure.
+ */
+@inline fn exec(path: uint8*, argc: int64, argv: uint8**) -> int64 {
+    return @asm @clobbers("x0", "x1", "x2", "x3", "memory")
+        (syscall::EXEC, path, argc, argv) -> int64 {
+        "mov x0, $0"
+        "mov x1, $1"
+        "mov x2, $2"
+        "mov x3, $3"
+        "svc #0"
+        "mov $out, x0"
     };
 }

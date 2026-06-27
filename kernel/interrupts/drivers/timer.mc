@@ -105,7 +105,7 @@ fn timer_irq_handler(irq: uint32, ctx: struct cpu_context*) -> struct cpu_contex
 }
 
 /**
- * Syscall handler for SYSCALL_UPTIME. Reads the current cntpct_el0 tick count,
+ * Syscall handler for syscall::UPTIME. Reads the current cntpct_el0 tick count,
  * computes elapsed milliseconds since timer_init, and returns the result in x0.
  *
  * @param ctx: saved register frame of the calling process

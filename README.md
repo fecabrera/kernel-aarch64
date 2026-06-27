@@ -233,8 +233,10 @@ linking kernel internals (heap, UART, `printk`) — see "ELF loader / user progr
 - `time()` returns the current Unix timestamp from the RTC.
 - `uptime()` returns system uptime in milliseconds, computed from `cntpct_el0` ticks since boot.
 - `open(path, attrs)` / `close(fd)` / `read(fd, buf, count)` / `write(fd, buf, count)` / `fstat(fd, stat)` operate on the calling process's per-process fd table (see "File descriptors" below).
+- `getdents(fd, buf, count)` reads packed variable-length `dirent` records from an open directory into `buf` (walk them via each record's `d_size`). *(handler not yet registered)*
 - `getcwd(buf, size)` writes the calling process's current working directory as an absolute path into `buf`, resolved by walking the `..` chain to the root (`fs_get_absolute_dir`).
-- `acqmem(size, align)` / `rszmem(ptr, size, align)` / `relmem(ptr)` (syscalls 17/18/19) are the user-side memory syscalls that back the user build of `libmc`'s `malloc`/`realloc`/`free`. Their handlers (registered by `register_mem_syscalls`) currently serve user allocations straight from the kernel heap (`kmalloc`/`krealloc`/`kfree`).
+- `acqmem(size, align)` / `rszmem(ptr, size, align)` / `relmem(ptr)` (syscalls 18/19/20) are the user-side memory syscalls that back the user build of `libmc`'s `malloc`/`realloc`/`free`. Their handlers (registered by `register_mem_syscalls`) currently serve user allocations straight from the kernel heap (`kmalloc`/`krealloc`/`kfree`).
+- `exec(path, argc, argv)` (syscall 21) is intended to replace the calling process's image with the program at `path` (execve-style). The wrapper and `syscall_exec_handler` exist, but `process_exec` is currently a stub that returns `-1`.
 
 ### **File descriptors**
 
@@ -286,7 +288,7 @@ src/                — entry points (assembly stubs + top-level mc)
 
 kernel/             — mc kernel modules (logic + @extern bindings to the C below)
   cpu.mc            — cpu_context, SPSR/CNTP_CTL defines; inline-@asm impls of wfe/wfi, halt/hang, irq_enable/disable, timer registers, set_vbar_el1, bswap; be*/le* helpers
-  syscall.mc        — svc #0 dispatch table (generic set): syscall_init/register/unregister_handler, syscall_handler, SYSCALL_* numbers
+  syscall.mc        — svc #0 dispatch table (generic set): syscall_init/register/unregister_handler, syscall_handler, syscall::* numbers
   dtb.mc            — @extern bindings to the C DTB parser: dtb_init/dump/find_prop, *_irq_number lookups, fdt_header/memreg/fdt_prop structs
   pointer.mc        — generic refcounted pointer<T>: create_pointer/pointer_acquire/pointer_release
   process.mc        — process struct (cwd + refcounted fd table), create/duplicate/set_entry/destroy_process, process_open/close/read/write_file, process_file_stat/stat/get_cwd; bottom-of-stack canary (process_check_stack)
@@ -318,7 +320,7 @@ kernel/             — mc kernel modules (logic + @extern bindings to the C bel
     elf64.mc        — ELF64 relocatable-object loader: header/section/symbol parsing (elf_read), section layout + symbol rebasing + per-symbol GOT + AArch64 relocations with UNDEF-symbol/unknown-type rejection into relerrs (elf64_load), elf64_locate_symbol, elf64_unload; elf64_dump helpers and the full e_ident/ehdr/phdr/shdr/sym/rela type definitions
 
 libmc/              — mcc standard library (generic, type-parametric)
-  memory.mc         — alloc<T>/alloc_aligned<T>/resize<T>/dealloc<T>, bytecopy/copy/set_bytes/set_items (copy_bytes/copy_items kept as deprecated shims)
+  memory.mc         — alloc<T>/alloc_aligned<T>/resize<T>/dealloc<T>, bytecopy/copy/set_bytes/set_items, bytezero<T>/zero<T> (copy_bytes/copy_items kept as deprecated shims)
   list.mc           — dynamic list<T> with list_it/list_next cursor (for-in)
   string.mc         — growable byte string (list<uint8> specialization, @inline wrappers)
   dict.mc           — string-keyed dict<V> (open addressing, dict_it/dict_next cursor)
@@ -330,8 +332,9 @@ libmc/              — mcc standard library (generic, type-parametric)
   iteration/        — pair
   libc/             — freestanding ctype, string, limits; stdio binds the stb_sprintf family (vsprintf/snprintf/vsprintfcb) and implements printf/vprintf/getchar/putchar over the read/write syscalls; stdlib provides the malloc/realloc/free interface that memory.mc builds on, switched via `@if (IS_KERNEL)` between the kernel heap (kmalloc/kfree) and the acqmem/rszmem/relmem memory syscalls
   system/           — user-facing syscall surface, linked into both the kernel and loaded user programs
-    syscall.mc      — svc #0 wrappers: yield/exit/getpid/waitpid/fork/sleep/msleep/time/uptime/open/openat/close/read/write/fstat/stat/getcwd/acqmem/rszmem/relmem, all via inline @asm
-    fs.mc           — shared open-file types: file_descriptor, file_stat, and the FS_FILE_ATTRS_*/FILE_IO_ERROR_* constants
+    syscall.mc      — svc #0 wrappers: yield/exit/getpid/waitpid/fork/sleep/msleep/time/uptime/open/openat/close/read/write/fstat/stat/getdents/getcwd/acqmem/rszmem/relmem/exec, all via inline @asm; the syscall enum numbering the kernel handlers dispatch on
+    fs.mc           — shared fs types: file_stat, the dirent/dent_type directory-entry types, io_error, and the FS_FILE_ATTRS_* constants
+    proc.mc         — proc_pid (pid_t) type shared across the kernel and the syscall ABI
 
 lib/                — C helpers bound from mc via @extern (FDT + UTF-16)
   include/
