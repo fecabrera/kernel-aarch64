@@ -1,5 +1,3 @@
-import "system/syscall";
-
 @if (IS_KERNEL) {
     import "mm";
 
@@ -29,6 +27,8 @@ import "system/syscall";
     }
 }
 @else {
+    import "system/syscall";
+    
     @inline
     fn malloc(size: uint64) -> uint8* {
         return acqmem(size, 0);

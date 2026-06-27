@@ -43,6 +43,7 @@ fn println(format: uint8*, ...) {
  *
  * @param c: byte to write
  */
+@inline
 fn writechar(c: uint8) {
     write(STDOUT_FILENO, &c, 1);
 }

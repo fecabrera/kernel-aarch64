@@ -8,6 +8,7 @@ import "libc/stdlib";
  *
  * @return pointer to the first element; the memory is uninitialized
  */
+@inline
 fn alloc<T>(n: uint64) -> T* {
     return malloc(n * sizeof(T)) as T*;
 }
@@ -18,6 +19,7 @@ fn alloc<T>(n: uint64) -> T* {
  *
  * @return pointer to the element; the memory is uninitialized
  */
+@inline
 fn new<T>() -> T* {
     return alloc<T>(1);
 }
@@ -32,6 +34,7 @@ fn new<T>() -> T* {
  *
  * @return pointer to the first element; the memory is uninitialized
  */
+@inline
 fn alloc_aligned<T>(n: uint64, align: uint64) -> T* {
     return malloc_aligned(n * sizeof(T), align) as T*;
 }
@@ -92,6 +95,7 @@ fn copy_bytes<T>(dst: T*, src: T*, n: uint64) {
  * @param dst: destination, with room for at least n elements
  * @param n:   number of elements to zero
  */
+@inline
 fn bytezero<T>(dst: T*, n: uint64) {
     set_bytes(dst, 0, n);
 }
@@ -104,6 +108,7 @@ fn bytezero<T>(dst: T*, n: uint64) {
  * @param dst: destination, with room for at least n elements
  * @param n:   number of elements to zero
  */
+@inline
 fn zero<T>(dst: T*, n: uint64) {
     set_items(dst, 0, n);
 }
@@ -115,6 +120,7 @@ fn zero<T>(dst: T*, n: uint64) {
  * @param src: source to read from
  * @param n:   number of elements to copy
  */
+@inline
 fn copy<T>(dst: T*, src: T*, n: uint64) -> uint64 {
     let i: uint64 = 0;
     while (i < n) {
