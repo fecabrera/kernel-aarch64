@@ -25,8 +25,8 @@ let available_commands: uint8*[][2] = [
 let dirs: uint8*[] = ["/bin"];
 
 @private
-fn command_help(argc: int64, argv: uint8**) -> int64 {
-    println("available commands:");
+fn console_help(argc: int64, argv: uint8**) -> int64 {
+    println("built-in commands:");
 
     let r = struct range { end = len(available_commands) };
     for i in &r {
@@ -38,7 +38,7 @@ fn command_help(argc: int64, argv: uint8**) -> int64 {
 }
 
 @private
-fn command_mount(argc: int64, argv: uint8**) -> int64 {
+fn console_mount(argc: int64, argv: uint8**) -> int64 {
     if (argc < 2) {
         println("usage: %s <device> [mountpoint]", argv[0]);
         return -1;
@@ -127,29 +127,6 @@ fn console_cd(argc: int64, argv: uint8**) -> int64 {
 }
 
 /**
- * Forks a child process to run a command handler. The child invokes fnc and
- * exits with its return value; the parent blocks via waitpid and logs
- * the child's exit status. On fork failure the command is not run.
- *
- * @param fnc:  command handler to run in the child
- * @param argc: number of arguments
- * @param argv: null-terminated argument strings; argv[0] is the command name
- */
-@private
-fn run_command(fnc: fn (int64, uint8**) -> int64, argc: int64, argv: uint8**) {
-    let pid: int64 = fork();
-    if (pid < 0) {
-        println("[console] fork() returned %d!", pid);
-    } else if (pid > 0) {
-        let status: int64 = waitpid(pid);
-        println("[console] process %d returned %d!", pid, status);
-    } else {
-        let status: int64 = fnc(argc, argv);
-        exit(status);
-    }
-}
-
-/**
  * Attempts to run argv[0] as a program found in directory `dir`. Opens `dir` and
  * uses statat to check the program exists there *before* forking, so a missing
  * program returns -2 (letting console_parse_command try the next search dir)
@@ -214,16 +191,17 @@ fn try_run(const dir: uint8*, argc: int64, argv: uint8**) -> int64 {
 fn console_parse_command(argc: int64, argv: uint8**) {
     if (argc == 0)
         return;
-    
-    if (strcmp(argv[0], "cd") == 0) {
+
+    case (0) {
+    when strcmp(argv[0], "cd"):
         console_cd(argc, argv);
-    } else if (strcmp(argv[0], "ls") == 0) {
+    when strcmp(argv[0], "ls"):
         console_ls(argc, argv);
-    } else if (strcmp(argv[0], "mount") == 0) {
-        run_command(command_mount, argc, argv);
-    } else if (strcmp(argv[0], "help") == 0) {
-        run_command(command_help, argc, argv);
-    } else {
+    when strcmp(argv[0], "mount"):
+        console_mount(argc, argv);
+    when strcmp(argv[0], "help"):
+        console_help(argc, argv);
+    else:
         let r = struct range { end = len(dirs) };
         for i in &r {
             if (try_run(dirs[i], argc, argv) == 0)

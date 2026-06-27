@@ -1,6 +1,6 @@
 import "std";
 
-fn main() -> int32 {
+fn main() -> int64 {
     println("hello world");
     return 0;
 }
