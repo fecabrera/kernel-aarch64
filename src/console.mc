@@ -28,7 +28,7 @@ let dirs: uint8*[] = ["/bin"];
 fn console_help(argc: int64, argv: uint8**) -> int64 {
     println("built-in commands:");
 
-    let r = struct range { end = len(available_commands) };
+    let r = struct range<int32> { end = len(available_commands) };
     for i in &r {
         let command = available_commands[i];
         println("    %-28s %s", command[0], command[1]);
@@ -202,7 +202,7 @@ fn console_parse_command(argc: int64, argv: uint8**) {
     when strcmp(argv[0], "help"):
         console_help(argc, argv);
     else:
-        let r = struct range { end = len(dirs) };
+        let r = struct range<int32> { end = len(dirs) };
         for i in &r {
             if (try_run(dirs[i], argc, argv) == 0)
                 return;
@@ -263,7 +263,7 @@ fn console() {
 
             if (_backslash) {
                 _backslash = false;
-                string_append(&vec, c);
+                string_push(&vec, c);
             } else if (_quotes) {
                 case (c) {
                 when '\\':
@@ -273,12 +273,12 @@ fn console() {
                     bytecopy(arg, vec.data, vec.length);
                     arg[vec.length] = '\0';
 
-                    list_append(&args, arg);
+                    list_push(&args, arg);
                     string_reset(&vec);
 
                     _quotes = false;
                 else:
-                    string_append(&vec, c);
+                    string_push(&vec, c);
                 }
             } else {
                 case (c) {
@@ -293,12 +293,12 @@ fn console() {
                             bytecopy(arg, vec.data, vec.length);
                             arg[vec.length] = '\0';
 
-                            list_append(&args, arg);
+                            list_push(&args, arg);
                             string_reset(&vec);
                         }
                     }
                     else {
-                        string_append(&vec, c);
+                        string_push(&vec, c);
                     }
                 }
             }

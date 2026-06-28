@@ -121,7 +121,7 @@ fn process_duplicate(dest: struct process*, src: struct process*) -> int32 {
     list_init(&dest->dtor_ptrs, dtor_ptrs->capacity);
 
     for dtor in dtor_ptrs {
-        list_append(&dest->dtor_ptrs, pointer_acquire(dtor));
+        list_push(&dest->dtor_ptrs, pointer_acquire(dtor));
     }
 
     return 0;
@@ -525,7 +525,7 @@ fn process_open_file(proc: struct process*, pathname: uint8*, attrs: uint32) -> 
     let fd = dtor_ptrs->length as int64;
 
     let dtor = create_pointer<struct file_descriptor>();
-    list_append(dtor_ptrs, dtor);
+    list_push(dtor_ptrs, dtor);
 
     file_init(dtor->value, node, attrs);
 
@@ -548,7 +548,7 @@ fn process_open_file_at(proc: struct process*, dirfd: int64, pathname: uint8*, a
     let new_fd = dtor_ptrs->length as int64;
 
     let new_dtor = create_pointer<struct file_descriptor>();
-    list_append(dtor_ptrs, new_dtor);
+    list_push(dtor_ptrs, new_dtor);
 
     file_init(new_dtor->value, node, attrs);
 
