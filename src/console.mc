@@ -263,7 +263,24 @@ fn console() {
 
             if (_backslash) {
                 _backslash = false;
-                string_push(&vec, c);
+                case (c) {
+                when 'a':
+                    string_push(&vec, '\a');
+                when 'b':
+                    string_push(&vec, '\b');
+                when 't':
+                    string_push(&vec, '\t');
+                when 'n':
+                    string_push(&vec, '\n');
+                when 'f':
+                    string_push(&vec, '\f');
+                when 'r':
+                    string_push(&vec, '\r');
+                when 'e':
+                    string_push(&vec, '\e');
+                else:
+                    string_push(&vec, c);
+                }
             } else if (_quotes) {
                 case (c) {
                 when '\\':
