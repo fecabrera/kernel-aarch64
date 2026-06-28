@@ -42,3 +42,5 @@ jobs:
             kernel.elf
             kernel.img
             init.img
+            init/bin/*
+            user/*.a
