@@ -10,7 +10,7 @@ import "range";
  *
  * @return CRC-32 of the buffer's contents
  */
-fn crc32(data: uint8*, length: uint64) -> uint32 {
+fn crc32(data: byte*, length: uint64) -> uint32 {
     let crc: uint32 = 4294967295;  // 0xffffffff
 
     let r = struct range { end = length };

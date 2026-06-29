@@ -234,7 +234,7 @@ enum syscall: uint64 {
  *
  * @return number of bytes read, or a negative error.
  */
-@inline fn read(fd: int64, buffer: uint8*, count: uint64) -> int64 {
+@inline fn read(fd: int64, buffer: byte*, count: uint64) -> int64 {
     return @asm @clobbers("x0", "x1", "x2", "x3", "memory")
         (syscall::READ, fd, buffer, count) -> int64 {
         "mov x0, $0"
@@ -256,7 +256,7 @@ enum syscall: uint64 {
  *
  * @return number of bytes written, or a negative error.
  */
-@inline fn write(fd: int64, buffer: uint8*, count: uint64) -> int64 {
+@inline fn write(fd: int64, buffer: byte*, count: uint64) -> int64 {
     return @asm @clobbers("x0", "x1", "x2", "x3", "memory")
         (syscall::WRITE, fd, buffer, count) -> int64 {
         "mov x0, $0"
@@ -346,7 +346,7 @@ enum syscall: uint64 {
  * @return number of bytes written to buf, 0 at end of directory, or a negative
  *         error code.
  */
-@inline fn getdents(fd: int64, buf: uint8*, count: uint64) -> int64 {
+@inline fn getdents(fd: int64, buf: byte*, count: uint64) -> int64 {
     return @asm @clobbers("x0", "x1", "x2", "x3", "memory")
         (syscall::GETDENTS, fd, buf, count) -> int64 {
         "mov x0, $0"
@@ -368,7 +368,7 @@ enum syscall: uint64 {
  *
  * @return the path length excluding the null terminator, or -1 on failure.
  */
-@inline fn getcwd(buf: uint8*, size: uint64) -> int64 {
+@inline fn getcwd(buf: byte*, size: uint64) -> int64 {
     return @asm @clobbers("x0", "x1", "x2", "memory")
         (syscall::GETCWD, buf, size) -> int64 {
         "mov x0, $0"
@@ -379,9 +379,9 @@ enum syscall: uint64 {
     };
 }
 
-@inline fn acqmem(size: uint64, align: uint64) -> uint8* {
+@inline fn acqmem(size: uint64, align: uint64) -> byte* {
     return @asm @clobbers("x0", "x1", "x2", "memory")
-        (syscall::ACQMEM, size, align) -> uint8* {
+        (syscall::ACQMEM, size, align) -> byte* {
         "mov x0, $0"
         "mov x1, $1"
         "mov x2, $2"
@@ -390,9 +390,9 @@ enum syscall: uint64 {
     };
 }
 
-@inline fn rszmem(ptr: uint8*, size: uint64, align: uint64) -> uint8* {
+@inline fn rszmem(ptr: byte*, size: uint64, align: uint64) -> byte* {
     return @asm @clobbers("x0", "x1", "x2", "memory")
-        (syscall::RSZMEM, ptr, size, align) -> uint8* {
+        (syscall::RSZMEM, ptr, size, align) -> byte* {
         "mov x0, $0"
         "mov x1, $1"
         "mov x2, $2"
@@ -402,7 +402,7 @@ enum syscall: uint64 {
     };
 }
 
-@inline fn relmem(ptr: uint8*) {
+@inline fn relmem(ptr: byte*) {
     @asm @clobbers("x0", "x1", "memory")
         (syscall::RELMEM, ptr) {
         "mov x0, $0"

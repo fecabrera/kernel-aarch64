@@ -7,7 +7,7 @@ import "iteration/pair";
 import "iteration/iterator";
 
 // Slot states
-enum dict_entry_state: uint8 {
+enum dict_entry_state: byte {
     EMPTY = 0,
     OCCUPIED = 1,
     TOMBSTONE = 2,

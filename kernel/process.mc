@@ -48,9 +48,9 @@ enum proc_state: int64 {
 struct process {
     pid: proc_pid;
     state: proc_state;
-    image: uint8*;
+    image: byte*;
     image_size: uint64;
-    stack: uint8*;
+    stack: byte*;
     stack_size: uint64;
     ctx: struct cpu_context*;
     wait_pid: proc_pid;
@@ -221,7 +221,7 @@ fn get_next_pid() -> proc_pid {
 fn process_exec_node(proc: struct process*, node: struct fs_node*, argc: int64, argv: char**) -> exec_err {
     // allocate buffer
     let size = node->file_size;
-    let buf: uint8* = alloc<uint8>(size);
+    let buf: byte* = alloc<byte>(size);
     if (buf == null)
         return exec_err::NOT_ENOUGH_MEMORY;
 
@@ -328,7 +328,7 @@ fn set_stack_canary(proc: struct process*) {
 @private
 fn create_image(proc: struct process*, size: uint64) -> int32 {
     proc->image_size = size;
-    proc->image = kalloc<uint8>(size);
+    proc->image = kalloc<byte>(size);
 
     if (proc->image == null)
         return -1;
@@ -407,7 +407,7 @@ fn setup_args(proc: struct process*, argc: int64, argv: char**) {
     for i in &r {
         let l = strlen(argv[i]) + 1;
         p = p - l;
-        bytecopy(p as uint8*, argv[i] as uint8*, l);
+        bytecopy(p as byte*, argv[i] as byte*, l);
         ptrs[i] = p;
     }
 
@@ -488,7 +488,7 @@ fn dup_image(dest: struct process*, src: struct process*) -> int32 {
     
     // allocate image
     dest->image_size = src->image_size;
-    dest->image = kalloc<uint8>(dest->image_size);
+    dest->image = kalloc<byte>(dest->image_size);
 
     if (dest->image == null)
         return -1;
@@ -591,7 +591,7 @@ fn process_close_file(proc: struct process*, fd: int64) -> int64 {
  * @return number of bytes read, -1 if fd is out of range, or a negative error
  *         from file_read
  */
-fn process_read_file(proc: struct process*, fd: int64, buffer: uint8*, count: uint64) -> int64 {
+fn process_read_file(proc: struct process*, fd: int64, buffer: byte*, count: uint64) -> int64 {
     dprintk("[process] read_file(%lld, %lld, %p, %lld)\n",
             proc->pid, fd, buffer, count);
 
@@ -615,7 +615,7 @@ fn process_read_file(proc: struct process*, fd: int64, buffer: uint8*, count: ui
  * @return number of bytes written, -1 if fd is out of range, or a negative error
  *         from file_write
  */
-fn process_write_file(proc: struct process*, fd: int64, buffer: uint8*, count: uint64) -> int64 {
+fn process_write_file(proc: struct process*, fd: int64, buffer: byte*, count: uint64) -> int64 {
     dprintk("[process] write_file(%lld, %lld, %p, %lld)\n",
             proc->pid, fd, buffer, count);
 
@@ -715,7 +715,7 @@ fn process_stat_at(proc: struct process*, dirfd: int64, path: char*, st: struct 
  * @return the path length excluding the null terminator, or -1 if it would not
  *         fit in size bytes
  */
-fn process_get_cwd(proc: struct process*, buf: uint8*, size: uint64) -> int64 {
+fn process_get_cwd(proc: struct process*, buf: byte*, size: uint64) -> int64 {
     dprintk("[process] get_cwd(%lld, %p, %llu)\n",
             proc->pid, buf, size);
 

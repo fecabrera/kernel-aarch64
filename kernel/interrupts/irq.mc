@@ -33,7 +33,7 @@ const IRQ_SPI_PL031_RTC_ALARM = 34;      // SPI: PL031 RTC alarm
 
 const NUM_IRQS = 256;
 
-@extern let vector_table: uint8*;
+@extern let vector_table: byte*;
 @static let _irq_table: struct set<uint32, fn (uint32, struct cpu_context*) -> struct cpu_context*>;
 
 /**

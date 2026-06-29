@@ -340,7 +340,7 @@ fn virtio_mmio_find_next_slot(device_id: uint32, start: int8) -> int8 {
  *         device error, or VIRTIO_MMIO_INVALID_DEVICE if the slot has no
  *         initialized device
  */
-fn virtio_mmio_read(slot: int8, sector_number: uint64, data: uint8*) -> int64 {
+fn virtio_mmio_read(slot: int8, sector_number: uint64, data: byte*) -> int64 {
     let device = &_devices[slot];
 
     if (device->device_id == VIRTIO_DEVICE_ID_INVALID) {
@@ -353,7 +353,7 @@ fn virtio_mmio_read(slot: int8, sector_number: uint64, data: uint8*) -> int64 {
     hdr.type = VIRTIO_BLK_T_IN;
     hdr.sector = sector_number;
 
-    let status: uint8 = 0xFF; // device writes 0 on success, 1 on error, 2 = unsupported
+    let status: byte = 0xFF; // device writes 0 on success, 1 on error, 2 = unsupported
 
     let q = &device->queue;
 

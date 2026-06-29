@@ -5,7 +5,7 @@ import "iteration/pair";
 import "iteration/iterator";
 
 // Slot states
-enum set_entry_state: uint8 {
+enum set_entry_state: byte {
     EMPTY = 0,
     OCCUPIED = 1,
     TOMBSTONE = 2,
@@ -21,7 +21,7 @@ enum set_entry_state: uint8 {
  * @field state: slot lifecycle — EMPTY (0), OCCUPIED (1), or TOMBSTONE (2)
  */
 struct set_entry<K, V> extends pair<K, V> {
-    state: uint8;
+    state: byte;
 }
 
 /**

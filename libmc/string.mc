@@ -11,8 +11,8 @@ const DEFAULT_STRING_CAPACITY = 10;
 /**
  * A growable, heap-backed byte string.
  *
- * `string` is a specialization of `list<uint8>` (same fields and layout), so a
- * `struct string*` upcasts to a `struct list<uint8>*` and every operation
+ * `string` is a specialization of `list<byte>` (same fields and layout), so a
+ * `struct string*` upcasts to a `struct list<byte>*` and every operation
  * forwards to the matching `list_*` function. Each `string_*` wrapper is
  * `@inline`, so the indirection costs nothing once optimized.
  */
@@ -66,7 +66,7 @@ fn string_from_array(self: struct string*, str: char*) {
  * Builds a string by copying a borrowed run of bytes: initializes self and
  * appends every byte of the slice, so the string owns a private copy. self must
  * be uninitialized (or already destroyed). A string literal borrows in directly
- * (`str as slice<uint8>`), which drops the literal's trailing NUL.
+ * (`str as slice<byte>`), which drops the literal's trailing NUL.
  *
  * @param self: uninitialized string to build into
  * @param str:  byte slice to copy from

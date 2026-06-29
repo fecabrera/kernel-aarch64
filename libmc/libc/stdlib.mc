@@ -2,27 +2,27 @@
     import "mm";
 
     @inline
-    fn malloc(size: uint64) -> uint8* {
+    fn malloc(size: uint64) -> byte* {
         return kmalloc(size);
     }
 
     @inline
-    fn malloc_aligned(size: uint64, align: uint64) -> uint8* {
+    fn malloc_aligned(size: uint64, align: uint64) -> byte* {
         return kmalloc_aligned(size, align);
     }
     
     @inline
-    fn realloc(ptr: uint8*, new_size: uint64) -> uint8* {
+    fn realloc(ptr: byte*, new_size: uint64) -> byte* {
         return krealloc(ptr, new_size);
     }
 
     @inline    
-    fn realloc_aligned(ptr: uint8*, new_size: uint64, align: uint64) -> uint8* {
+    fn realloc_aligned(ptr: byte*, new_size: uint64, align: uint64) -> byte* {
         return krealloc_aligned(ptr, new_size, align);
     }
     
     @inline
-    fn free(ptr: uint8*) {
+    fn free(ptr: byte*) {
         kfree(ptr);
     }
 }
@@ -30,27 +30,27 @@
     import "system/syscall";
     
     @inline
-    fn malloc(size: uint64) -> uint8* {
+    fn malloc(size: uint64) -> byte* {
         return acqmem(size, 0);
     }
 
     @inline
-    fn malloc_aligned(size: uint64, align: uint64) -> uint8* {
+    fn malloc_aligned(size: uint64, align: uint64) -> byte* {
         return acqmem(size, align);
     }
 
     @inline
-    fn realloc(ptr: uint8*, new_size: uint64) -> uint8* {
+    fn realloc(ptr: byte*, new_size: uint64) -> byte* {
         return rszmem(ptr, new_size, 0);
     }
 
     @inline
-    fn realloc_align(ptr: uint8*, new_size: uint64, align: uint64) -> uint8* {
+    fn realloc_align(ptr: byte*, new_size: uint64, align: uint64) -> byte* {
         return rszmem(ptr, new_size, align);
     }
 
     @inline
-    fn free(ptr: uint8*) {
+    fn free(ptr: byte*) {
         relmem(ptr);
     }
 }

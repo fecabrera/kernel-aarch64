@@ -70,7 +70,7 @@ fn pool_destroy(self: struct pool*) {
     self->last_free_entry = null;
 }
 
-fn pool_alloc(self: struct pool*, count: uint64) -> uint8* {
+fn pool_alloc(self: struct pool*, count: uint64) -> byte* {
     let current = self->first_free_entry;
     until (current == null) {
         if (current->count >= count) {
@@ -124,7 +124,7 @@ fn pool_alloc(self: struct pool*, count: uint64) -> uint8* {
             pool_dump(self);
             
             // return ptr;
-            return current as uint8*;
+            return current as byte*;
         }
 
         current = current->next;
@@ -183,7 +183,7 @@ fn pool_try_merge(self: struct pool*, left: struct pool_entry*, right: struct po
  *
  * @return 0 on success, -1 if ptr is null
  */
-fn pool_free(self: struct pool*, ptr: uint8*, count: uint64) -> int32 {
+fn pool_free(self: struct pool*, ptr: byte*, count: uint64) -> int32 {
     if (ptr == null) {
         dprintk("[pool] free: null pointer!\n");
         return -1;

@@ -100,7 +100,7 @@
  *
  * @return Negative if lhs < rhs, zero if equal or count is zero, positive if lhs > rhs.
  */
-@extern fn memcmp(lhs: uint8*, rhs: uint8*, count: uint64) -> int32;
+@extern fn memcmp(lhs: byte*, rhs: byte*, count: uint64) -> int32;
 
 /**
  * Fills the first count bytes of the object pointed to by dest with the value ch.
@@ -111,7 +111,7 @@
  *
  * @return dest
  */
-@extern fn memset(dest: uint8*, value: int32, count: uint64) -> uint8*;
+@extern fn memset(dest: byte*, value: int32, count: uint64) -> byte*;
 
 /**
  * Copies count bytes from src to dest. The objects must not overlap.
@@ -122,7 +122,7 @@
  *
  * @return dest
  */
-@extern fn memcpy(dest: uint8*, src: uint8*, count: uint64) -> uint8*;
+@extern fn memcpy(dest: byte*, src: byte*, count: uint64) -> byte*;
 
 /**
  * Copies count bytes from src to dest. The objects may overlap.
@@ -133,4 +133,4 @@
  *
  * @return dest
  */
-@extern fn memmove(dest: uint8*, src: uint8*, count: uint64) -> uint8*;
+@extern fn memmove(dest: byte*, src: byte*, count: uint64) -> byte*;

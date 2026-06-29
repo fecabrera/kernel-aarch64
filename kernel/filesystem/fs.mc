@@ -31,7 +31,7 @@ struct fs_node {
     name: char*;
     file_size: uint64;
     attrs: uint32;
-    info: uint8*;
+    info: byte*;
     mount: struct fs_mount*;
     next: struct fs_node*;
     child: struct fs_node*;
@@ -52,10 +52,10 @@ struct fs_node {
 struct fs_mount {
     mountpoint: char*;
     device: char*;
-    info: uint8*;
+    info: byte*;
     root: struct fs_node*;
-    read: fn (struct fs_node*, uint8*, uint64, uint64) -> int64;
-    write: fn (struct fs_node*, uint8*, uint64, uint64) -> int64;
+    read: fn (struct fs_node*, byte*, uint64, uint64) -> int64;
+    write: fn (struct fs_node*, byte*, uint64, uint64) -> int64;
 }
 
 /**
@@ -120,7 +120,7 @@ fn fs_remove_child(node: struct fs_node*, name: char*) -> int32 {
  *
  * @return pointer to the new node, or null if alloc failed
  */
-fn fs_create_node(name: char*, file_size: uint64, attrs: uint32, info: uint8*,
+fn fs_create_node(name: char*, file_size: uint64, attrs: uint32, info: byte*,
                   mount: struct fs_mount*, next: struct fs_node*, child: struct fs_node*) -> struct fs_node * {
     let node: struct fs_node* = knew<struct fs_node>();
 
@@ -171,7 +171,7 @@ fn fs_destroy_node(node: struct fs_node*) {
  *
  * @return pointer to the new file node, or null if alloc failed
  */
-fn fs_create_file(name: char*, file_size: uint64, attrs: uint32, data: uint8*,
+fn fs_create_file(name: char*, file_size: uint64, attrs: uint32, data: byte*,
                   mount: struct fs_mount*) -> struct fs_node * {
     let _attrs = (attrs & node_attrs::PERMISSIONS_MASK) | node_attrs::FILE;
     return fs_create_node(name, file_size, _attrs, data, mount, null, null);
@@ -189,7 +189,7 @@ fn fs_create_file(name: char*, file_size: uint64, attrs: uint32, data: uint8*,
  *
  * @return pointer to the new folder node, or null if alloc failed
  */
-fn fs_create_folder(name: char*, attrs: uint32, data: uint8*, mount: struct fs_mount*) -> struct fs_node * {
+fn fs_create_folder(name: char*, attrs: uint32, data: byte*, mount: struct fs_mount*) -> struct fs_node * {
     let _attrs = (attrs & node_attrs::PERMISSIONS_MASK) | node_attrs::DIR;
 
     let folder = fs_create_node(name, 0, _attrs, data, mount, null, null);
@@ -273,7 +273,7 @@ fn fs_create_parent_ref(parent: struct fs_node*, folder: struct fs_node*) -> str
  * @return pointer to the new file node, or null if node is not a folder
  */
 fn fs_add_file_to_folder(parent: struct fs_node*, name: char*, file_size: uint64,
-                         attrs: uint32, data: uint8*, mount: struct fs_mount*) -> struct fs_node* {
+                         attrs: uint32, data: byte*, mount: struct fs_mount*) -> struct fs_node* {
     if ((parent->attrs & node_attrs::TYPE_MASK) != node_attrs::DIR) {
         dprintk("[filesystem] Node is not a folder!\n");
         return null;
@@ -298,7 +298,7 @@ fn fs_add_file_to_folder(parent: struct fs_node*, name: char*, file_size: uint64
  *
  * @return pointer to the new folder node, or null if node is not a folder
  */
-fn fs_add_subfolder(parent: struct fs_node *, name: char*, attrs: uint32, data: uint8*,
+fn fs_add_subfolder(parent: struct fs_node *, name: char*, attrs: uint32, data: byte*,
                     mount: struct fs_mount*) -> struct fs_node * {
     if ((parent->attrs & node_attrs::TYPE_MASK) != node_attrs::DIR) {
         dprintk("[filesystem] node is not a folder!\n");
@@ -415,7 +415,7 @@ fn fs_dump_node(node: struct fs_node*, prefix: char*) {
  *         FS_IO_ERROR_MOUNTPOINT_NOT_FOUND if the node has no mount,
  *         FS_IO_ERROR_HANDLER_NOT_PROVIDED if the mount has no read handler
  */
-fn fs_read(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint64) -> fs_error {
+fn fs_read(node: struct fs_node*, buffer: byte*, count: uint64, offset: uint64) -> fs_error {
     dprintk("[fs] buffer=0x%p, count=%llu, offset=%llu\n");
 
     if (node == null) {
@@ -444,7 +444,7 @@ fn fs_read(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint64)
         return fs_error::NOT_PERMITTED;
     }
 
-    return mp->read(node, buffer as uint8*, count, offset);
+    return mp->read(node, buffer as byte*, count, offset);
 }
 
 /**
@@ -460,7 +460,7 @@ fn fs_read(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint64)
  *         FS_IO_ERROR_MOUNTPOINT_NOT_FOUND if the node has no mount,
  *         FS_IO_ERROR_HANDLER_NOT_PROVIDED if the mount has no write handler
  */
-fn fs_write(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint64) -> int64 {
+fn fs_write(node: struct fs_node*, buffer: byte*, count: uint64, offset: uint64) -> int64 {
     if (node == null) {
         dprintk("[fs] node is null!\n");
         return fs_error::NOT_FOUND;
@@ -504,7 +504,7 @@ fn fs_write(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint64
  * @return the path length excluding the null terminator, or -1 if the path
  *         would not fit in size bytes
  */
-fn fs_get_absolute_dir(node: struct fs_node*, buf: uint8*, size: uint64) -> int64 {
+fn fs_get_absolute_dir(node: struct fs_node*, buf: byte*, size: uint64) -> int64 {
     let s: struct stack<struct fs_node*>;
     stack_init(&s, 10);
     defer stack_destroy(&s);
@@ -534,7 +534,7 @@ fn fs_get_absolute_dir(node: struct fs_node*, buf: uint8*, size: uint64) -> int6
         if (length + count > size)
             return -1; // won't copy otherwise it'd overflow
         
-        bytecopy(&buf[length], current->name as uint8*, count);
+        bytecopy(&buf[length], current->name as byte*, count);
         length = length + count;
 
         buf[length] = '/';

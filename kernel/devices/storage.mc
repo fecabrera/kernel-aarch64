@@ -44,7 +44,7 @@ fn storage_init() {
  *
  * @return count on success, negative error code from virtio_mmio_read on failure
  */
-fn storage_read(buffer: uint8*, count: uint64, offset: uint64, slot: uint64) -> int64 {
+fn storage_read(buffer: byte*, count: uint64, offset: uint64, slot: uint64) -> int64 {
     dprintk("[/dev/sd%d] buf=0x%p, count=%llu, offset=%llu\n", slot, buffer, count, offset);
 
     let first_sector: uint64 = offset / VIRTIO_MMIO_BLK_SECTOR_SIZE;
@@ -55,7 +55,7 @@ fn storage_read(buffer: uint8*, count: uint64, offset: uint64, slot: uint64) -> 
             slot, first_sector, last_sector, sectors_to_read);
 
     // allocate temporary buffer
-    let tmp: uint8* = kalloc<uint8>(sectors_to_read * VIRTIO_MMIO_BLK_SECTOR_SIZE);
+    let tmp: byte* = kalloc<byte>(sectors_to_read * VIRTIO_MMIO_BLK_SECTOR_SIZE);
     defer kdealloc(tmp);
 
     // read boot sectors
@@ -68,7 +68,7 @@ fn storage_read(buffer: uint8*, count: uint64, offset: uint64, slot: uint64) -> 
         let buf_offset: uint64 = i * VIRTIO_MMIO_BLK_SECTOR_SIZE;
 
         // read sector
-        let data = (tmp as uint64 + buf_offset) as uint8*;
+        let data = (tmp as uint64 + buf_offset) as byte*;
         let n = virtio_mmio_read(slot as int8, sector, data);
         if (n < 0) {
             // pass error n to caller
@@ -77,7 +77,7 @@ fn storage_read(buffer: uint8*, count: uint64, offset: uint64, slot: uint64) -> 
     }
 
     // copy data requested to temporary buffer
-    bytecopy(buffer, (tmp as uint64 + (offset % VIRTIO_MMIO_BLK_SECTOR_SIZE)) as uint8*, count);
+    bytecopy(buffer, (tmp as uint64 + (offset % VIRTIO_MMIO_BLK_SECTOR_SIZE)) as byte*, count);
 
     // return bytes delivered to the caller, not raw sectors read
     return count as int64;
@@ -93,7 +93,7 @@ fn storage_read(buffer: uint8*, count: uint64, offset: uint64, slot: uint64) -> 
  *
  * @return 0 on success
  */
-fn storage_write(buffer: uint8*, count: uint64, offset: uint64, slot: uint64) -> int64 {
+fn storage_write(buffer: byte*, count: uint64, offset: uint64, slot: uint64) -> int64 {
     let first_sector: uint64 = offset / VIRTIO_MMIO_BLK_SECTOR_SIZE;
     let last_sector: uint64 = (offset + count - 1) / VIRTIO_MMIO_BLK_SECTOR_SIZE;
     let sectors_to_read: uint64 = last_sector - first_sector + 1;

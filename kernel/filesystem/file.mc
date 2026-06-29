@@ -43,7 +43,7 @@ fn file_init(fd: struct file_descriptor*, node: struct fs_node*, mode: uint32) {
  * @return number of bytes read on success, FILE_IO_ERROR_NOT_PERMITTED if the
  *         file is not readable, or a negative error on fs_read failure
  */
-fn file_read(fd: struct file_descriptor*, buffer: uint8*, count: uint64) -> int64 {
+fn file_read(fd: struct file_descriptor*, buffer: byte*, count: uint64) -> int64 {
     if((fd->fd_mode & open_mode::READ) == 0)
         return io_error::NOT_PERMITTED;
 
@@ -67,7 +67,7 @@ fn file_read(fd: struct file_descriptor*, buffer: uint8*, count: uint64) -> int6
  * @return number of bytes written on success, FILE_IO_ERROR_NOT_PERMITTED if the
  *         file is not writable, or a negative error on fs_write failure
  */
-fn file_write(fd: struct file_descriptor*, buffer: uint8*, count: uint64) -> int64 {
+fn file_write(fd: struct file_descriptor*, buffer: byte*, count: uint64) -> int64 {
     if((fd->fd_mode & open_mode::WRITE) == 0)
         return io_error::NOT_PERMITTED;
 

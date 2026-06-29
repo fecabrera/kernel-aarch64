@@ -200,7 +200,7 @@ linking kernel internals (heap, UART, `printk`) — see "ELF loader / user progr
 ### **I/O module registry**
 
 - Named registry of `io_module` structs backed by a `hashmap64`; `io_init()` must be called before any registration. Creates the `/dev` VFS folder and registers it as a mountpoint with `io_read`/`io_write` as handlers, so `vfs_read("/dev/<name>", ...)` dispatches through the I/O registry.
-- Each module carries a `uint64_t drv_info` driver-private value and `read`/`write` function pointers (`io_handler_t`: `int (*)(uint8_t *buf, size_t count, size_t offset, uint64_t drv_info)`).
+- Each module carries a `uint64_t drv_info` driver-private value and `read`/`write` function pointers (`io_handler_t`: `int (*)(byte *buf, size_t count, size_t offset, uint64_t drv_info)`).
 - `io_register_module(name, drv_info, read, write)` allocates and inserts a module and creates a `/dev/<name>` file node in the VFS tree; returns -1 if already registered. `drv_info` is forwarded to the handler on every call.
 - `io_unregister_module(name)` removes and frees the module and unlinks the `/dev/<name>` VFS node; returns -1 if not found or the node cannot be removed.
 - `io_read(node, buf, n)` / `io_write(node, buf, n)` are `vfs_handler_t` callbacks; they look up the module by `node->name` and dispatch to its handler.
@@ -324,7 +324,7 @@ kernel/             — mc kernel modules (logic + @extern bindings to the C bel
 libmc/              — mcc standard library (generic, type-parametric)
   memory.mc         — alloc<T>/new<T>/alloc_aligned<T>/resize<T>/dealloc<T> (new<T>() is shorthand for alloc<T>(1)), bytecopy/copy/set_bytes/set_items, bytezero<T>/zero<T> (copy_bytes/copy_items kept as deprecated shims)
   list.mc           — dynamic list<T> with list_it/list_next cursor (for-in)
-  string.mc         — growable byte string (list<uint8> specialization, @inline wrappers)
+  string.mc         — growable byte string (list<char> specialization, @inline wrappers)
   dict.mc           — string-keyed dict<V> (open addressing, dict_it/dict_next cursor)
   set.mc, queue.mc, stack.mc — generic containers (set_entry extends pair; set_it/set_next cursor)
   hash.mc           — hash<T> dispatch (splitmix64 for values, fnv1a for pointers)

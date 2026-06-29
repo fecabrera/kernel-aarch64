@@ -47,7 +47,7 @@ fn getchar() -> int32 {
  * @return c on success, or EOF on write failure
  */
 fn putchar(c: int32) -> int32 {
-    if(write(STDOUT_FILENO, &c as uint8*, 1) < 0) {
+    if(write(STDOUT_FILENO, &c as byte*, 1) < 0) {
         return EOF;
     }
     return c;
@@ -84,7 +84,7 @@ fn vprintf(format: char*, args: va_list) -> int32 {
     let ctx: struct printf_ctx;
     ctx.fd = STDOUT_FILENO;
     ctx.length = 0;
-    vsprintfcb(vprintf_cb, &ctx as uint8*, ctx.tmp, format, args);
+    vsprintfcb(vprintf_cb, &ctx as byte*, ctx.tmp, format, args);
     return ctx.length;
 }
 
@@ -101,7 +101,7 @@ fn vprintf(format: char*, args: va_list) -> int32 {
  * @return ctx->tmp, the scratch buffer for stb's next chunk
  */
 @private
-fn vprintf_cb(buf: char*, c: uint8*, count: int32) -> char* {
+fn vprintf_cb(buf: char*, c: byte*, count: int32) -> char* {
     let ctx = c as struct printf_ctx*;
     write(ctx->fd, buf, count as uint64);
     ctx->length = ctx->length + count;
@@ -188,5 +188,5 @@ fn vprintf_cb(buf: char*, c: uint8*, count: int32) -> char* {
  *
  * @return total number of characters formatted
  */
-@extern fn vsprintfcb(callback: fn (char*, uint8*, int32) -> char*, user: uint8*,
+@extern fn vsprintfcb(callback: fn (char*, byte*, int32) -> char*, user: byte*,
                       str: char*, format: char*, args: va_list) -> int32;

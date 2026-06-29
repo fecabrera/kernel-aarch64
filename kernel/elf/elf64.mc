@@ -8,24 +8,24 @@ import "range";
 
 const EI_MAGIC: uint32 = 0x7F454C46; // [0x7F, 'E', 'F', 'I']
 
-enum elf_ei_class: uint8 {
+enum elf_ei_class: byte {
     ELFCLASSNONE = 0x00,
     ELFCLASS32 = 0x01,
     ELFCLASS64 = 0x02,
 }
 
-enum elf_ei_data: uint8 {
+enum elf_ei_data: byte {
     ELFDATANONE = 0x00,
     ELFDATA2LSB = 0x01,
     ELFDATA2MSB = 0x02,
 }
 
-enum elf_ei_version: uint8 {
+enum elf_ei_version: byte {
     NONE = 0x00,
     CURRENT = 0x01,
 }
 
-enum elf_ei_osabi: uint8 {
+enum elf_ei_osabi: byte {
     SYSV = 0x00,
     HPUX = 0x01,
     NETBSD = 0x02,
@@ -55,9 +55,9 @@ struct e_ident {
     ei_mag:        uint32;
     ei_class:      elf_ei_class;
     ei_data:       elf_ei_data;
-    ei_version:    uint8;
+    ei_version:    byte;
     ei_osabi:      elf_ei_osabi;
-    ei_abiversion: uint8;
+    ei_abiversion: byte;
 }
 
 // ELF64_EHDR
@@ -387,7 +387,7 @@ enum elf64_shn: uint16 {
     XINDEX = 0xFFFF,
 }
 
-enum elf64_stv: uint8 {
+enum elf64_stv: byte {
     DEFAULT   = 0x00,
     INTERNAL  = 0x01,
     HIDDEN    = 0x02,
@@ -396,7 +396,7 @@ enum elf64_stv: uint8 {
 
 struct elf64_sym {
     st_name:  uint32;
-    st_info:  uint8;
+    st_info:  byte;
     st_other: elf64_stv;
     st_shndx: uint16;
     st_value: uint64;
@@ -404,7 +404,7 @@ struct elf64_sym {
 }
 
 struct elf64_file {
-    buf:       uint8*;
+    buf:       byte*;
     ei:        struct e_ident*;
     ehdr:      struct elf64_ehdr*;
     phdr:      struct elf64_phdr*;
@@ -413,8 +413,8 @@ struct elf64_file {
     shnum:     uint16;
     symtab:    struct elf64_sym*;
     stnum:     uint64;
-    strtab:    uint8*;
-    shstrtab:  uint8*;
+    strtab:    byte*;
+    shstrtab:  byte*;
     relocated: bool;
     relerrs:   uint16;
     memsz:     uint64;
@@ -444,28 +444,28 @@ struct elf64_rela {
 }
 
 @private
-fn elf64_shdr_get_data(buf: uint8*, shdr: struct elf64_shdr*) -> uint8* {
+fn elf64_shdr_get_data(buf: byte*, shdr: struct elf64_shdr*) -> byte* {
     return &buf[shdr->sh_offset];
 }
 
 @private
-fn elf64_get_shstrtab(buf: uint8*, shdr: struct elf64_shdr*, i: uint16) -> uint8* {
+fn elf64_get_shstrtab(buf: byte*, shdr: struct elf64_shdr*, i: uint16) -> byte* {
     return elf64_shdr_get_data(buf, &shdr[i]);
 }
 
 @private
-fn elf64_get_section_name(shdr: struct elf64_shdr*, shstrtab: uint8*) -> char* {
+fn elf64_get_section_name(shdr: struct elf64_shdr*, shstrtab: byte*) -> char* {
     if (shstrtab == null) return null;
     return &shstrtab[shdr->sh_name] as char*;
 }
 
 @private
-fn elf64_get_symbol_name(sym: struct elf64_sym*, strtab: uint8*) -> char* {
+fn elf64_get_symbol_name(sym: struct elf64_sym*, strtab: byte*) -> char* {
     if (strtab == null) return null;
     return &strtab[sym->st_name] as char*;
 }
 
-fn is_elf(buf: uint8*) -> bool {
+fn is_elf(buf: byte*) -> bool {
     return *(buf as uint32*) == be32(EI_MAGIC);
 }
 
@@ -473,7 +473,7 @@ fn get_elf_type(file: struct elf64_file*) -> elf64_et {
     return file->ehdr->e_type;
 }
 
-fn elf_read(buf: uint8*, size: uint64, file: struct elf64_file*) -> int32 {
+fn elf_read(buf: byte*, size: uint64, file: struct elf64_file*) -> int32 {
     file->buf = buf;
     file->memsz = 0;
     file->relocated = false;
@@ -564,7 +564,7 @@ fn elf64_unload(file: struct elf64_file*) {
     kdealloc(file->got);
 }
 
-fn elf64_locate_symbol(file: struct elf64_file*, const sym_name: char*) -> uint8* {
+fn elf64_locate_symbol(file: struct elf64_file*, const sym_name: char*) -> byte* {
     let r = struct range { start = 1, end = file->stnum };
     for i in &r {
         let sym = &file->symtab[i];
@@ -572,7 +572,7 @@ fn elf64_locate_symbol(file: struct elf64_file*, const sym_name: char*) -> uint8
 
         if (name != null and strcmp(name, sym_name) == 0) {
             dprintk("[elf] found symbol \"%s\" at 0x%p\n", sym_name, sym->st_value);
-            return sym->st_value as uint8*;
+            return sym->st_value as byte*;
         }
     }
     return null;
@@ -616,7 +616,7 @@ fn elf64_calculate_and_pad(file: struct elf64_file*) -> int32 {
 }
 
 @private
-fn elf64_try_rebase_symbol(sym: struct elf64_sym*, base_addr: uint64, strtab: uint8*,
+fn elf64_try_rebase_symbol(sym: struct elf64_sym*, base_addr: uint64, strtab: byte*,
                            shdr: struct elf64_shdr*) -> bool {
     let name = elf64_get_symbol_name(sym, strtab);
 
@@ -644,10 +644,10 @@ fn elf64_try_rebase_symbol(sym: struct elf64_sym*, base_addr: uint64, strtab: ui
 }
 
 @private
-fn elf64_try_relocate_section(shdr: struct elf64_shdr*, buf: uint8*, base_addr: uint64) -> bool {
+fn elf64_try_relocate_section(shdr: struct elf64_shdr*, buf: byte*, base_addr: uint64) -> bool {
     if ((shdr->sh_flags & elf64_shf::ALLOC) == 0) return false;
 
-    let dst = base_addr as uint8*;
+    let dst = base_addr as byte*;
     if (shdr->sh_type == elf64_sht::NOBITS) {
         set_bytes(&dst[shdr->sh_addr], 0, shdr->sh_size);
     } else {
@@ -696,7 +696,7 @@ fn elf64_patch_adrp(P: uint64, imm: uint64) {
  */
 @private
 fn elf64_apply_one_relocation(rela: struct elf64_rela*, symtab: struct elf64_sym*,
-                              strtab: uint8*, got: uint64*, site_base: uint64) -> bool {
+                              strtab: byte*, got: uint64*, site_base: uint64) -> bool {
     let type = (rela->r_info & 0xFFFFFFFF) as uint32;
     let sym_idx = rela->r_info >> 32;
     let sym = &symtab[sym_idx];
@@ -845,7 +845,7 @@ fn elf64_dump_phdr_entry(phdr: struct elf64_phdr*) {
 }
 
 @private
-fn elf64_dump_shdr(shdr: struct elf64_shdr*, shnum: uint16, shstrtab: uint8*) {
+fn elf64_dump_shdr(shdr: struct elf64_shdr*, shnum: uint16, shstrtab: byte*) {
     dprintk("section headers:\n");
     dprintk("%-30s %-8s %-8s %-16s %-16s %-4s %-8s %-8s %-5s %-4s\n",
             "name", "type", "flags", "addr", "offset", "size",
@@ -859,7 +859,7 @@ fn elf64_dump_shdr(shdr: struct elf64_shdr*, shnum: uint16, shstrtab: uint8*) {
 }
 
 @private
-fn elf64_dump_shdr_entry(shdr: struct elf64_shdr*, shstrtab: uint8*) {
+fn elf64_dump_shdr_entry(shdr: struct elf64_shdr*, shstrtab: byte*) {
     let name = elf64_get_section_name(shdr, shstrtab);
     dprintk("%-30s %08X %08X %p %p %4llu %08X %08X %5llu %4llu\n",
             name == null ? "" : name, shdr->sh_type, shdr->sh_flags,
@@ -868,7 +868,7 @@ fn elf64_dump_shdr_entry(shdr: struct elf64_shdr*, shstrtab: uint8*) {
 }
 
 @private
-fn elf64_dump_symtab(symtab: struct elf64_sym*, symtab_num: uint64, strtab: uint8*) {
+fn elf64_dump_symtab(symtab: struct elf64_sym*, symtab_num: uint64, strtab: byte*) {
     dprintk("%-30s %-2s %-2s %-4s %-16s %-16s\n",
             "name", "i", "o", "idx", "value", "size");
 
@@ -880,7 +880,7 @@ fn elf64_dump_symtab(symtab: struct elf64_sym*, symtab_num: uint64, strtab: uint
 }
 
 @private
-fn elf64_dump_symtab_entry(sym: struct elf64_sym*, strtab: uint8*) {
+fn elf64_dump_symtab_entry(sym: struct elf64_sym*, strtab: byte*) {
     let name = elf64_get_symbol_name(sym, strtab);
     dprintk("%-30s %02X %02X %04X %016X %016X\n",
             name == null ? "" : name, sym->st_info, sym->st_other,

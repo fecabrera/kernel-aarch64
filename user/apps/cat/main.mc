@@ -24,7 +24,7 @@ fn main(argc: int64, argv: char**) -> int64 {
         return -3;
     }
     
-    let buffer: uint8* = alloc<uint8>(st.st_size + 1);
+    let buffer: byte* = alloc<byte>(st.st_size + 1);
     defer dealloc(buffer);
 
     let r_status = read(fd, buffer, st.st_size);

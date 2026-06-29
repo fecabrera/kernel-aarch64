@@ -75,13 +75,13 @@ struct fat32_ext_bs {
     root_cluster: uint32;     // cluster number of the root directory (usually 2)
     fat_info: uint16;         // sector number of the FSInfo structure
     backup_bs_sector: uint16; // sector number of the backup boot sector (usually 6)
-    reserved_0: uint8[12];
-    drive_number: uint8;      // BIOS drive number (0x00 = floppy, 0x80 = hard disk)
-    reserved_1: uint8;
-    boot_signature: uint8;    // extended boot signature (0x29 = volume_id/label/type fields present)
+    reserved_0: byte[12];
+    drive_number: byte;      // BIOS drive number (0x00 = floppy, 0x80 = hard disk)
+    reserved_1: byte;
+    boot_signature: byte;    // extended boot signature (0x29 = volume_id/label/type fields present)
     volume_id: uint32;        // volume serial number
-    volume_label: uint8[11];  // volume label, padded with spaces (not null-terminated)
-    fat_type_label: uint8[8]; // always "FAT32   " (informational only, not for type detection)
+    volume_label: byte[11];  // volume label, padded with spaces (not null-terminated)
+    fat_type_label: byte[8]; // always "FAT32   " (informational only, not for type detection)
 }
 
 /**
@@ -92,21 +92,21 @@ struct fat32_ext_bs {
  */
 @packed
 struct mbr_boot_sector {
-    mbr_jump_boot: uint8[3];      // x86 jump instruction to bootstrap code
-    oem_name: uint8[8];           // OEM name string, NOT null-terminated (e.g. "mkfs.fat")
+    mbr_jump_boot: byte[3];      // x86 jump instruction to bootstrap code
+    oem_name: byte[8];           // OEM name string, NOT null-terminated (e.g. "mkfs.fat")
     n_bytes_per_sector: uint16;   // bytes per sector (typically 512)
-    n_sectors_per_cluster: uint8; // sectors per allocation cluster (power of 2)
+    n_sectors_per_cluster: byte; // sectors per allocation cluster (power of 2)
     n_reserved_sectors: uint16;   // reserved sectors before first FAT (includes this sector)
-    n_fat: uint8;                 // number of FAT copies (usually 2)
+    n_fat: byte;                 // number of FAT copies (usually 2)
     n_root_dir_entries: uint16;   // root directory entries (0 for FAT32)
     total_sectors_16: uint16;     // total sectors if < 65536, else 0 (use total_sectors_32)
-    media_dtor_type: uint8;       // media descriptor byte (see MBR_MEDIA_DESCRIPTOR_*)
+    media_dtor_type: byte;       // media descriptor byte (see MBR_MEDIA_DESCRIPTOR_*)
     table_size_16: uint16;        // sectors per FAT (FAT12/16 only; 0 for FAT32)
     n_sectors_per_track: uint16;  // sectors per track (CHS geometry)
     n_heads: uint16;              // number of heads (CHS geometry)
     n_hidden_sectors: uint32;     // hidden sectors preceding this partition
     total_sectors_32: uint32;     // total sectors if >= 65536 (FAT32 always uses this)
-    boot_code: uint8[474];        // bootstrap code + EBR (for FAT32, EBR starts at offset 36)
+    boot_code: byte[474];        // bootstrap code + EBR (for FAT32, EBR starts at offset 36)
     mbr_signature_word: uint16;   // boot sector signature (must be 0xAA55)
 }
 
@@ -117,10 +117,10 @@ struct mbr_boot_sector {
  */
 @packed
 struct fat32_dir_entry {
-    name: uint8[11];       // short name: 8 chars name + 3 chars extension, space-padded
-    attributes: uint8;     // FAT32_ATTR_* flags
-    reserved: uint8;       // reserved for Windows NT
-    create_time_cs: uint8; // creation time, 10ms units (0–199)
+    name: byte[11];       // short name: 8 chars name + 3 chars extension, space-padded
+    attributes: byte;     // FAT32_ATTR_* flags
+    reserved: byte;       // reserved for Windows NT
+    create_time_cs: byte; // creation time, 10ms units (0–199)
     create_time: uint16;   // creation time: bits[15:11]=hour, [10:5]=minute, [4:0]=second/2
     create_date: uint16;   // creation date: bits[15:9]=year-1980, [8:5]=month, [4:0]=day
     access_date: uint16;   // last access date (same format as create_date)
@@ -138,11 +138,11 @@ struct fat32_dir_entry {
  */
 @packed
 struct fat32_lfn_entry {
-    order: uint8;      // sequence number (1-based); OR'd with FAT32_LFN_LAST_ENTRY if last
+    order: byte;      // sequence number (1-based); OR'd with FAT32_LFN_LAST_ENTRY if last
     name1: uint16[5];  // UTF-16LE name characters 1–5
-    attributes: uint8; // always FAT32_ATTR_LFN (0x0F)
-    type: uint8;       // always 0
-    checksum: uint8;   // checksum of the 8.3 short name
+    attributes: byte; // always FAT32_ATTR_LFN (0x0F)
+    type: byte;       // always 0
+    checksum: byte;   // checksum of the 8.3 short name
     name2: uint16[6];  // UTF-16LE name characters 6–11
     cluster: uint16;   // always 0x0000
     name3: uint16[2];  // UTF-16LE name characters 12–13
@@ -151,14 +151,14 @@ struct fat32_lfn_entry {
 struct fat32_bs_info {
     // fields from MBR boot sector
     volume_label: char[12]; // volume label from EBR, null-terminated
-    n_fat: uint8;
-    n_sectors_per_cluster: uint8;
+    n_fat: byte;
+    n_sectors_per_cluster: byte;
     n_reserved_sectors: uint16;
     n_bytes_per_sector: uint16;
     total_sectors_16: uint16;
     total_sectors_32: uint32;
     // fields from FAT32 extended boot record
-    drive_number: uint8;
+    drive_number: byte;
     root_cluster: uint32;
     table_size_32: uint32;
     // derived fields
@@ -189,7 +189,7 @@ struct fat32_entry_reference {
  *
  * @return non-zero if the buffer looks like a valid FAT32 boot sector, zero otherwise
  */
-fn fat32_is_boot_sector(buf: uint8*) -> bool {
+fn fat32_is_boot_sector(buf: byte*) -> bool {
     let bs = buf as struct mbr_boot_sector*;
 
     // check boot sector signature
@@ -217,7 +217,7 @@ fn fat32_is_boot_sector(buf: uint8*) -> bool {
  * @param buff:    512-byte buffer containing the boot sector read from disk
  * @param bs_info: output struct populated with parsed and derived fields
  */
-fn fat32_parse_boot_sector(buff: uint8*, bs_info: struct fat32_bs_info*) {
+fn fat32_parse_boot_sector(buff: byte*, bs_info: struct fat32_bs_info*) {
     let bs = buff as struct mbr_boot_sector*;
     let ext_br = bs->boot_code as struct fat32_ext_bs*;
 
@@ -227,8 +227,8 @@ fn fat32_parse_boot_sector(buff: uint8*, bs_info: struct fat32_bs_info*) {
     
     // ARM doesn't like unaligned memory access, so we need to memcpy the fields into local
     // variables before using them
-    let n_fat: uint8;
-    let n_sectors_per_cluster: uint8;
+    let n_fat: byte;
+    let n_sectors_per_cluster: byte;
     let n_reserved_sectors: uint16;
     let n_bytes_per_sector: uint16;
     let total_sectors_16: uint16;
@@ -241,7 +241,7 @@ fn fat32_parse_boot_sector(buff: uint8*, bs_info: struct fat32_bs_info*) {
     bytecopy(&total_sectors_32, &bs->total_sectors_32, 1);
 
     // extended boot record fields
-    let drive_number: uint8; 
+    let drive_number: byte; 
     let root_cluster: uint32;
     let table_size_32: uint32;
     bytecopy(&drive_number, &ext_br->drive_number, 1);
@@ -283,7 +283,7 @@ fn fat32_read_cluster(pathname: char*, bs_info: struct fat32_bs_info*, cluster: 
     let n_entries_per_sector: uint16 = bs_info->n_bytes_per_sector / 32;
 
     // allocate buffer
-    let buf: uint8* = kalloc<uint8>(bs_info->n_bytes_per_sector as uint64);
+    let buf: byte* = kalloc<byte>(bs_info->n_bytes_per_sector as uint64);
     defer kdealloc(buf);
 
     let status = vfs_read(pathname, buf, bs_info->n_bytes_per_sector as uint64,
@@ -317,7 +317,7 @@ fn fat32_read_cluster(pathname: char*, bs_info: struct fat32_bs_info*, cluster: 
         let _offset = offset;
 
         // parse lfn entries
-        let attributes: uint8;
+        let attributes: byte;
         let n_lfn_entries: uint32 = 0;
         while (true) {
             bytecopy(&attributes, &dir_entry->attributes, 1);
@@ -538,7 +538,7 @@ fn fat32_build_cluster_chains(bs_info: struct fat32_bs_info*, cluster_chains: st
  */
 fn fat32_mount(device_path: char*, mountpoint: char*) -> int64 {
     let status: int32;
-    let bs: uint8[512];
+    let bs: byte[512];
 
     // read mbr
     if (vfs_read(device_path, bs, 512, 0) < 0) {
@@ -617,7 +617,7 @@ fn fat32_mount(device_path: char*, mountpoint: char*) -> int64 {
     dprintk("[fat32] reading FAT table...\n");
 
     let fat_table_size = bs_info->table_size_32 * bs_info->n_bytes_per_sector;
-    let fat_table = kalloc<uint8>(fat_table_size as uint64);
+    let fat_table = kalloc<byte>(fat_table_size as uint64);
     status = read_fat_table(device_path, bs_info, fat_table);
     if (status < 0) {
         dprintk("[fat32] read_fat_table() returned %d!\n", status);
@@ -647,7 +647,7 @@ fn fat32_mount(device_path: char*, mountpoint: char*) -> int64 {
 }
 
 @private
-fn read_fat_table(pathname: char*, bs_info: struct fat32_bs_info*, fat_table: uint8*) -> int32 {
+fn read_fat_table(pathname: char*, bs_info: struct fat32_bs_info*, fat_table: byte*) -> int32 {
     let fat_table_addr: uint64 = bs_info->first_fat_sector as uint64 * bs_info->n_bytes_per_sector;
     dprintk("[fat32] will read %d sectors\n", bs_info->table_size_32);
 
@@ -694,7 +694,7 @@ fn fat32_unmount(device_path: char*) -> int64 {
  *
  * @return number of bytes read on success, negative on error
  */
-fn fat32_read(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint64) -> int64 {
+fn fat32_read(node: struct fs_node*, buffer: byte*, count: uint64, offset: uint64) -> int64 {
     let entry_ref = node->info as struct fat32_entry_reference*;
     let fs_mp = node->mount;
     let bs_info = fs_mp->info as struct fat32_bs_info*;
@@ -710,11 +710,11 @@ fn fat32_read(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint
     let dir_entry_size: uint32 = sizeof(struct fat32_dir_entry) as uint32;
     let dir_entry_offset: uint32 = dir_entry_sector * bs_info->n_bytes_per_sector +
                                 (entry_ref->offset + entry_ref->n_lfn_entries) * dir_entry_size;
-    let dir_entry = kalloc<uint8>(dir_entry_size as uint64) as struct fat32_dir_entry*;
+    let dir_entry = kalloc<byte>(dir_entry_size as uint64) as struct fat32_dir_entry*;
     defer kdealloc(dir_entry);
 
     dprintk("[fat32] count=%d, offset=%p\n", dir_entry_size, dir_entry_offset);
-    let status = vfs_read(fs_mp->device, dir_entry as uint8*, dir_entry_size as uint64, dir_entry_offset as uint64);
+    let status = vfs_read(fs_mp->device, dir_entry as byte*, dir_entry_size as uint64, dir_entry_offset as uint64);
     if (status < 0) {
         dprintk("[fat32] vfs_read() returned %d!\n", status);
         return status;
@@ -758,7 +758,7 @@ fn fat32_read(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint
     }
 
     // read contents
-    let tmp: uint8* = kalloc<uint8>(n_data_sectors_to_read * bs_info->n_bytes_per_sector);
+    let tmp: byte* = kalloc<byte>(n_data_sectors_to_read * bs_info->n_bytes_per_sector);
     defer kdealloc(tmp);
 
     let sectors = struct range { end = n_data_sectors_to_read };
@@ -796,7 +796,7 @@ fn fat32_read(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint
  *
  * @return number of bytes written on success, negative on error
  */
-fn fat32_write(node: struct fs_node*, buffer: uint8*, count: uint64, offset: uint64) -> int64 {
+fn fat32_write(node: struct fs_node*, buffer: byte*, count: uint64, offset: uint64) -> int64 {
     let entry_ref = node->info as struct fat32_entry_reference*;
     let fs_mp = node->mount;
     let bs_info = fs_mp->info as struct fat32_bs_info*;

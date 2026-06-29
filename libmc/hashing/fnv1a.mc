@@ -1,6 +1,6 @@
 /**
  * FNV-1a content hash. Reads the pointee as a zero-terminated buffer of T
- * elements (e.g. a NUL-terminated uint8* string), folding each element into
+ * elements (e.g. a NUL-terminated byte* string), folding each element into
  * the hash; the terminator itself is not hashed.
  *
  * @param key: zero-terminated buffer to hash

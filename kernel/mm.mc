@@ -14,10 +14,10 @@ const DEFAULT_STACK_SIZE = STACK_POOL_BLK_SIZE * DEFAULT_STACK_BLOCK_COUNT;
 
 @static let mem: struct memreg;
 
-@static let kheap_ptr: uint8[KERNEL_HEAP_SIZE];
+@static let kheap_ptr: byte[KERNEL_HEAP_SIZE];
 @static let kheap: struct heap;
 
-@static let stack_pool_ptr: uint8[STACK_POOL_SIZE];
+@static let stack_pool_ptr: byte[STACK_POOL_SIZE];
 @static let stack_pool: struct pool;
 
 /**
@@ -60,7 +60,7 @@ fn register_mem_syscalls() {
  * @return pointer to the allocated region, or null if the pool is exhausted
  */
 @inline
-fn stack_alloc(count: uint64) -> uint8* {
+fn stack_alloc(count: uint64) -> byte* {
     return pool_alloc(&stack_pool, count);
 }
 
@@ -71,7 +71,7 @@ fn stack_alloc(count: uint64) -> uint8* {
  * @param count: number of blocks the allocation spanned
  */
 @inline
-fn stack_free(ptr: uint8*, count: uint64) {
+fn stack_free(ptr: byte*, count: uint64) {
     pool_free(&stack_pool, ptr, count);
 }
 
@@ -83,7 +83,7 @@ fn stack_free(ptr: uint8*, count: uint64) {
  * @return pointer to the allocated memory, or null if size is 0 or the heap is exhausted
  */
 @inline
-fn kmalloc(size: uint64) -> uint8* {
+fn kmalloc(size: uint64) -> byte* {
     return heap_acquire(&kheap, size);
 }
 
@@ -98,7 +98,7 @@ fn kmalloc(size: uint64) -> uint8* {
  * @return aligned pointer to the allocated memory, or null on failure
  */
 @inline
-fn kmalloc_aligned(size: uint64, align: uint64) -> uint8* {
+fn kmalloc_aligned(size: uint64, align: uint64) -> byte* {
     // Round size up to the next multiple of align. The returned pointer is
     // always (block_header base + HEADER_SIZE); since HEADER_SIZE is a
     // multiple of 8 and every block base is 8-byte aligned, any align that
@@ -119,7 +119,7 @@ fn kmalloc_aligned(size: uint64, align: uint64) -> uint8* {
  * @return pointer to the (possibly relocated) memory, or null on failure
  */
 @inline
-fn krealloc(ptr: uint8*, new_size: uint64) -> uint8* {
+fn krealloc(ptr: byte*, new_size: uint64) -> byte* {
     return heap_resize(&kheap, ptr, new_size);
 }
 
@@ -134,7 +134,7 @@ fn krealloc(ptr: uint8*, new_size: uint64) -> uint8* {
  * @return pointer to the (possibly relocated) memory, or null on failure
  */
 @inline
-fn krealloc_aligned(ptr: uint8*, new_size: uint64, align: uint64) -> uint8* {
+fn krealloc_aligned(ptr: byte*, new_size: uint64, align: uint64) -> byte* {
     let aligned_size = (new_size + align - 1) & ~(align - 1);
     return heap_resize(&kheap, ptr, aligned_size);
 }
@@ -148,7 +148,7 @@ fn krealloc_aligned(ptr: uint8*, new_size: uint64, align: uint64) -> uint8* {
  *         free)
  */
 @inline
-fn kfree(ptr: uint8*) -> int32 {
+fn kfree(ptr: byte*) -> int32 {
     return heap_release(&kheap, ptr);
 }
 
@@ -240,7 +240,7 @@ fn syscall_acqmem_handler(ctx: struct cpu_context*) -> struct cpu_context* {
  * @return ctx with x0 set to the resized pointer (or null on failure)
  */
 fn syscall_rszmem_handler(ctx: struct cpu_context*) -> struct cpu_context* {
-    let ptr = ctx->x[1] as uint8*;
+    let ptr = ctx->x[1] as byte*;
     let new_size = ctx->x[2] as uint64;
     let align = ctx->x[3] as uint64;
 
@@ -259,7 +259,7 @@ fn syscall_rszmem_handler(ctx: struct cpu_context*) -> struct cpu_context* {
  * @return ctx unchanged
  */
 fn syscall_relmem_handler(ctx: struct cpu_context*) -> struct cpu_context* {
-    let ptr = ctx->x[1] as uint8*;
+    let ptr = ctx->x[1] as byte*;
 
     kfree(ptr);
 

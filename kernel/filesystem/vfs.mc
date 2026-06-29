@@ -46,9 +46,9 @@ fn vfs_root() -> struct fs_node* {
  * @return pointer to the new fs_mount on success, null if the mountpoint is not found or not a
  *         folder
  */
-fn vfs_create_mountpoint(mountpoint: char*, device: char*, info: uint8*,
-                         read: fn (struct fs_node*, uint8*, uint64, uint64) -> int64,
-                         write: fn (struct fs_node*, uint8*, uint64, uint64) -> int64) -> struct fs_mount* {
+fn vfs_create_mountpoint(mountpoint: char*, device: char*, info: byte*,
+                         read: fn (struct fs_node*, byte*, uint64, uint64) -> int64,
+                         write: fn (struct fs_node*, byte*, uint64, uint64) -> int64) -> struct fs_mount* {
     let mp_node = vfs_get_node_for_path(mountpoint, null);
     if (mp_node == null) {
         dprintk("[vfs] mountpoint \"%s\" not found!\n", mountpoint);
@@ -227,7 +227,7 @@ fn vfs_get_file_size(pathname: char*) -> uint64 {
  * @return return value of mount->read on success; FS_IO_ERROR_FILE_NOT_FOUND,
  *         FS_IO_ERROR_MOUNTPOINT_NOT_FOUND, or FS_IO_ERROR_HANDLER_NOT_PROVIDED on failure
  */
-fn vfs_read(pathname: char*, buffer: uint8*, count: uint64, offset: uint64) -> int64 {
+fn vfs_read(pathname: char*, buffer: byte*, count: uint64, offset: uint64) -> int64 {
     dprintk("[vfs] read(): file=\"%s\", buff=%p, count=%d, offset=%d\n",
             pathname, buffer, count, offset);
 
@@ -248,7 +248,7 @@ fn vfs_read(pathname: char*, buffer: uint8*, count: uint64, offset: uint64) -> i
  * @return return value of mount->write on success; FS_IO_ERROR_FILE_NOT_FOUND,
  *         FS_IO_ERROR_MOUNTPOINT_NOT_FOUND, or FS_IO_ERROR_HANDLER_NOT_PROVIDED on failure
  */
-fn vfs_write(pathname: char*, buffer: uint8*, count: uint64, offset: uint64) -> int64 {
+fn vfs_write(pathname: char*, buffer: byte*, count: uint64, offset: uint64) -> int64 {
     dprintk("[vfs] write(): file=\"%s\", buff=%p, count=%d, offset=%d\n",
             pathname, buffer, count, offset);
 

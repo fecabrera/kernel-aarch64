@@ -6,9 +6,9 @@ import "filesystem/fs";
 import "filesystem/vfs";
 
 struct io_module {
-    attrs: uint8;
-    read: fn (uint8*, uint64, uint64, uint64) -> int64;
-    write: fn (uint8*, uint64, uint64, uint64) -> int64;
+    attrs: byte;
+    read: fn (byte*, uint64, uint64, uint64) -> int64;
+    write: fn (byte*, uint64, uint64, uint64) -> int64;
     drv_info: uint64;
 }
 
@@ -68,8 +68,8 @@ fn io_get_module(name: char*) -> struct io_module* {
  * @return 0 on success, -1 if a module with that name is already registered
  */
 fn io_register_module(name: char*, attrs: uint32, drv_info: uint64,
-                      read: fn (uint8*, uint64, uint64, uint64) -> int64,
-                      write: fn (uint8*, uint64, uint64, uint64) -> int64) -> int32 {
+                      read: fn (byte*, uint64, uint64, uint64) -> int64,
+                      write: fn (byte*, uint64, uint64, uint64) -> int64) -> int32 {
     if (io_get_module(name) != null) {
         dprintk("[io] there's already a \"%s\" module!\n", name);
         return -1;
@@ -127,7 +127,7 @@ fn io_unregister_module(name: char*) -> int32 {
  *
  * @return return value of module->read, or -1 if the module is not found
  */
-fn io_read(node: struct fs_node*, buff: uint8*, count: uint64, offset: uint64) -> int64 {
+fn io_read(node: struct fs_node*, buff: byte*, count: uint64, offset: uint64) -> int64 {
     dprintk("[io] read(): mod=\"%s\", buff=%p, count=%d, offset=%d\n",
             node->name, buff, count, offset);
 
@@ -151,7 +151,7 @@ fn io_read(node: struct fs_node*, buff: uint8*, count: uint64, offset: uint64) -
  *
  * @return return value of module->write, or -1 if the module is not found
  */
-fn io_write(node: struct fs_node*, buff: uint8*, count: uint64, offset: uint64) -> int64 {
+fn io_write(node: struct fs_node*, buff: byte*, count: uint64, offset: uint64) -> int64 {
     dprintk("[io] write(): mod=\"%s\", buff=%p, count=%d, offset=%d\n",
             node->name, buff, count, offset);
 

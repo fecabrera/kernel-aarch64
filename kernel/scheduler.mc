@@ -9,7 +9,7 @@ import "filesystem/file";
 import "interrupts/drivers/timer";
 
 @static let idle_ctx: struct cpu_context* = null;
-@static let idle_stack: uint8[DEFAULT_STACK_SIZE];
+@static let idle_stack: byte[DEFAULT_STACK_SIZE];
 
 @static let current: struct process* = null;
 
@@ -41,7 +41,7 @@ import "interrupts/drivers/timer";
  */
 fn scheduler_init() {
     idle_ctx = &idle_stack[DEFAULT_STACK_SIZE - 272] as struct cpu_context*;
-    set_bytes(idle_ctx as uint8*, 0, 272);
+    set_bytes(idle_ctx as byte*, 0, 272);
 
     queue_init(&ready_queue, 10);
     set_init(&waitpid_queue, 10);
@@ -589,7 +589,7 @@ fn syscall_read_handler(ctx: struct cpu_context*) -> struct cpu_context* {
             ctx->x[0], ctx->x[1], ctx->x[2], ctx->x[3]);
 
     let fd = ctx->x[1] as int64;
-    let buffer = ctx->x[2] as uint8*;
+    let buffer = ctx->x[2] as byte*;
     let count = ctx->x[3] as uint64;
 
     ctx->x[0] = process_read_file(proc, fd, buffer, count) as uint64;
@@ -618,7 +618,7 @@ fn syscall_write_handler(ctx: struct cpu_context*) -> struct cpu_context* {
             ctx->x[0], ctx->x[1], ctx->x[2], ctx->x[3]);
 
     let fd = ctx->x[1] as int64;
-    let buffer = ctx->x[2] as uint8*;
+    let buffer = ctx->x[2] as byte*;
     let count = ctx->x[3] as uint64;
 
     ctx->x[0] = process_write_file(proc, fd, buffer, count) as uint64;
@@ -728,7 +728,7 @@ fn syscall_getcwd_handler(ctx: struct cpu_context*) -> struct cpu_context* {
         return ctx;
     }
 
-    let buf = ctx->x[1] as uint8*;
+    let buf = ctx->x[1] as byte*;
     let size = ctx->x[2] as uint64;
 
     dprintk("[scheduler] getcwd(), ctx->x0 = %llu, ctx->x1 = %llu, ctx->x2 = %llu\n",

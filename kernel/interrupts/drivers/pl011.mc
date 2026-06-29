@@ -158,10 +158,10 @@ fn pl011_init() {
  *
  * @return 0 if a byte was read, non-zero (PL011_FR_RXFE set) if the RX FIFO is empty
  */
-fn pl011_getc(c: uint8*) -> uint32 {
+fn pl011_getc(c: byte*) -> uint32 {
     let value = PL011->fr & PL011_FR_RXFE;
     if (value == 0)
-        *c = (PL011->dr & PL011_DR_DATA_MASK) as uint8; // mask value
+        *c = (PL011->dr & PL011_DR_DATA_MASK) as byte; // mask value
     return value;
 }
 
@@ -170,7 +170,7 @@ fn pl011_getc(c: uint8*) -> uint32 {
  *
  * @param c: character to transmit
  */
-fn pl011_putc(c: uint8) {
+fn pl011_putc(c: byte) {
     while(PL011->fr & PL011_FR_TXFF)
         wfi(); // Wait if TX FIFO full
     
@@ -208,7 +208,7 @@ fn pl011_vprintf(format: char*, args: va_list) {
     ctx.length = 0;
     // stb formats into ctx.tmp (the STB_SPRINTF_MIN scratch buffer) and hands
     // &ctx back to pl011_printf_cb as `user`, which flushes each chunk to the UART.
-    vsprintfcb(pl011_printf_cb, &ctx as uint8*, ctx.tmp, format, args);
+    vsprintfcb(pl011_printf_cb, &ctx as byte*, ctx.tmp, format, args);
 }
 
 /**
@@ -224,11 +224,11 @@ fn pl011_vprintf(format: char*, args: va_list) {
  * @return ctx->tmp, the scratch buffer for stb's next chunk
  */
 @private
-fn pl011_printf_cb(buf: char*, user: uint8*, count: int32) -> char* {
+fn pl011_printf_cb(buf: char*, user: byte*, count: int32) -> char* {
     let ctx = user as struct pl011_printf_ctx*;
     let r = struct range { end = count };
     for i in &r {
-        pl011_putc(buf[i] as uint8);
+        pl011_putc(buf[i] as byte);
     }
     ctx->length = ctx->length + count;
     return ctx->tmp;

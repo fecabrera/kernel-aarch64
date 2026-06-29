@@ -21,7 +21,7 @@ fn rotl32(x: uint32, r: uint32) -> uint32 {
  * @return p[0..3] assembled least-significant byte first
  */
 @static
-fn load_le(p: uint8*) -> uint32 {
+fn load_le(p: byte*) -> uint32 {
     return p[0] as uint32
          | (p[1] as uint32 << 8)
          | (p[2] as uint32 << 16)
@@ -38,7 +38,7 @@ fn load_le(p: uint8*) -> uint32 {
  *
  * @return 32-bit hash of the buffer's contents
  */
-fn murmur3(key: uint8*, length: uint64, seed: uint32) -> uint32 {
+fn murmur3(key: byte*, length: uint64, seed: uint32) -> uint32 {
     let h: uint32 = seed;
     let nblocks = length / 4;
 
