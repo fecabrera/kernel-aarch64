@@ -5,6 +5,7 @@ CC="aarch64-elf-gcc"
 MCFLAGS="--target aarch64-unknown-none-elf \
 		 --nostdlib --freestanding \
          --general-regs-only \
+         --strict-align \
 		 -O3"
 CFLAGS="-ffreestanding -nostdlib -nostdinc \
         -mgeneral-regs-only \
