@@ -9,7 +9,7 @@
  *
  * @return dst
  */
-@extern fn utf16lencpy(dst: uint8*, src: uint16*, n: uint64) -> uint8*;
+@extern fn utf16lencpy(dst: char*, src: uint16*, n: uint64) -> char*;
 
 /**
  * Copies up to n big-endian UTF-16 code units from src into dst as ASCII
@@ -22,4 +22,4 @@
  *
  * @return dst
  */
-@extern fn utf16bencpy(dst: uint8*, src: uint16*, n: uint64) -> uint8*;
+@extern fn utf16bencpy(dst: char*, src: uint16*, n: uint64) -> char*;

@@ -65,7 +65,7 @@
  *
  * @return str
  */
-@extern fn itoa(value: int64, str: uint8*, base: int32) -> uint8*;
+@extern fn itoa(value: int64, str: char*, base: int32) -> char*;
 
 /**
  * Converts an unsigned integer to a null-terminated string in the given base, using lowercase
@@ -78,7 +78,7 @@
  *
  * @return str
  */
-@extern fn utoa(value: uint64, str: uint8*, base: int32) -> uint8*;
+@extern fn utoa(value: uint64, str: char*, base: int32) -> char*;
 
 /**
  * Converts the initial decimal digits of str to an integer, skipping leading whitespace and
@@ -88,7 +88,7 @@
  *
  * @return parsed value; 0 if no digits are found
  */
-@extern fn atoi(str: uint8*) -> int32;
+@extern fn atoi(str: char*) -> int32;
 
 /**
  * Same as atoi but returns long.
@@ -97,7 +97,7 @@
  *
  * @return parsed value; 0 if no digits are found
  */
-@extern fn atol(str: uint8*) -> int64;
+@extern fn atol(str: char*) -> int64;
 
 /**
  * Same as atoi but returns long long.
@@ -106,4 +106,4 @@
  *
  * @return parsed value; 0 if no digits are found
  */
-@extern fn atoll(str: uint8*) -> int64;
+@extern fn atoll(str: char*) -> int64;

@@ -1,6 +1,6 @@
 import "std";
 
 fn main() -> int64 {
-    println("hello world");
+    writeln("hello world" as slice<char>);
     return 0;
 }

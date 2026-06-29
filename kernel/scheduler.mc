@@ -511,7 +511,7 @@ fn syscall_open_handler(ctx: struct cpu_context*) -> struct cpu_context* {
         return ctx;
     }
 
-    let path = ctx->x[1] as uint8*;
+    let path = ctx->x[1] as char*;
     let attrs = ctx->x[2] as uint32;
 
     dprintk("[scheduler] open(), ctx->x0 = %llu, ctx->x1 = 0x%p, ctx->x2 = %llu\n",
@@ -531,7 +531,7 @@ fn syscall_openat_handler(ctx: struct cpu_context*) -> struct cpu_context* {
     }
 
     let dirfd = ctx->x[1] as int64;
-    let path = ctx->x[2] as uint8*;
+    let path = ctx->x[2] as char*;
     let attrs = ctx->x[3] as uint32;
 
     dprintk("[scheduler] openat(), ctx->x0 = %llu, ctx->x1 = %llu, ctx->x2 = 0x%p, ctx->x3 = %llu\n",
@@ -671,7 +671,7 @@ fn syscall_stat_handler(ctx: struct cpu_context*) -> struct cpu_context* {
         return ctx;
     }
 
-    let path = ctx->x[1] as uint8*;
+    let path = ctx->x[1] as char*;
     let st = ctx->x[2] as struct file_stat*;
 
     dprintk("[scheduler] stat(), ctx->x0 = %llu, ctx->x1 = %p, ctx->x2 = %llu\n",
@@ -700,7 +700,7 @@ fn syscall_statat_handler(ctx: struct cpu_context*) -> struct cpu_context* {
     }
 
     let dirfd = ctx->x[1] as int64;
-    let path = ctx->x[2] as uint8*;
+    let path = ctx->x[2] as char*;
     let st = ctx->x[3] as struct file_stat*;
 
     dprintk("[scheduler] statat(), ctx->x0 = %llu, ctx->x1 = %llu, ctx->x2 = %p, ctx->x3 = %lld\n",
@@ -758,9 +758,9 @@ fn syscall_exec_handler(ctx: struct cpu_context*) -> struct cpu_context* {
         return ctx;
     }
 
-    let path = ctx->x[1] as uint8*;
+    let path = ctx->x[1] as char*;
     let argc = ctx->x[2] as int64;
-    let argv = ctx->x[3] as uint8**;
+    let argv = ctx->x[3] as char**;
     
     dprintk("[scheduler] exec(), ctx->x0 = %lld, ctx->x1 = %p, ctx->x2 = %lld, ctx->x3 = %p\n",
             ctx->x[0], ctx->x[1], ctx->x[2], ctx->x[3]);
@@ -795,9 +795,9 @@ fn syscall_execat_handler(ctx: struct cpu_context*) -> struct cpu_context* {
     }
 
     let dirfd = ctx->x[1] as int64;
-    let path = ctx->x[2] as uint8*;
+    let path = ctx->x[2] as char*;
     let argc = ctx->x[3] as int64;
-    let argv = ctx->x[4] as uint8**;
+    let argv = ctx->x[4] as char**;
 
     dprintk("[scheduler] execat(), dirfd = %lld, path = %p, argc = %lld, argv = %p\n",
             ctx->x[1], ctx->x[2], ctx->x[3], ctx->x[4]);

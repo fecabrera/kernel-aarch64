@@ -3,7 +3,7 @@ import "system/syscall";
 import "libc/stdlib";
 
 @private
-fn main(argc: int64, argv: uint8**) -> int64 {
+fn main(argc: int64, argv: char**) -> int64 {
     if (argc < 2) {
         println("usage: %s <seconds>", argv[0]);
         return -1;

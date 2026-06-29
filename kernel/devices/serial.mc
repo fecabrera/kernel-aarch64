@@ -9,7 +9,7 @@ import "interrupts/drivers/pl011";
  * Must be called after io_init().
  */
 fn serial_init() {
-    let mod_name: uint8* = "serial";
+    let mod_name: char* = "serial";
     dprintk("[serial] adding \"/dev/%s\"\n", mod_name);
 
     let attrs: uint32 = node_attrs::READ | node_attrs::WRITE;

@@ -218,7 +218,7 @@ fn get_next_pid() -> proc_pid {
  *         PARSING_ERROR, CANNOT_REPLACE_IMAGE, RELOCATION_ERROR, ENTRY_NOT_FOUND)
  */
 @private
-fn process_exec_node(proc: struct process*, node: struct fs_node*, argc: int64, argv: uint8**) -> exec_err {
+fn process_exec_node(proc: struct process*, node: struct fs_node*, argc: int64, argv: char**) -> exec_err {
     // allocate buffer
     let size = node->file_size;
     let buf: uint8* = alloc<uint8>(size);
@@ -397,7 +397,7 @@ fn init_ctx(proc: struct process*) {
  * @param argv: source argument vector (read before the stack is overwritten)
  */
 @private
-fn setup_args(proc: struct process*, argc: int64, argv: uint8**) {
+fn setup_args(proc: struct process*, argc: int64, argv: char**) {
     let ptrs: uint64[MAX_ARGS];
 
     let p: uint64 = (proc->stack as uint64) + proc->stack_size;
@@ -407,7 +407,7 @@ fn setup_args(proc: struct process*, argc: int64, argv: uint8**) {
     for i in &r {
         let l = strlen(argv[i]) + 1;
         p = p - l;
-        bytecopy(p as uint8*, argv[i], l);
+        bytecopy(p as uint8*, argv[i] as uint8*, l);
         ptrs[i] = p;
     }
 
@@ -513,7 +513,7 @@ fn dup_image(dest: struct process*, src: struct process*) -> int32 {
  *         FILE_IO_ERROR_NOT_FOUND if the path does not resolve, or
  *         FILE_IO_ERROR_NOT_A_FILE if it names a folder
  */
-fn process_open_file(proc: struct process*, pathname: uint8*, attrs: uint32) -> int64 {
+fn process_open_file(proc: struct process*, pathname: char*, attrs: uint32) -> int64 {
     dprintk("[process] open_file(%lld, \"%s\", %04X)\n", proc->pid, pathname, attrs);
 
     let root = pathname[0] == '/' ? vfs_root() : proc->cwd;
@@ -532,7 +532,7 @@ fn process_open_file(proc: struct process*, pathname: uint8*, attrs: uint32) -> 
     return fd;
 }
 
-fn process_open_file_at(proc: struct process*, dirfd: int64, pathname: uint8*, attrs: uint32) -> int64 {
+fn process_open_file_at(proc: struct process*, dirfd: int64, pathname: char*, attrs: uint32) -> int64 {
     dprintk("[process] open_file_at(%lld, %lld, \"%s\", %04X)\n",
             proc->pid, dirfd, pathname, attrs);
 
@@ -661,7 +661,7 @@ fn process_file_stat(proc: struct process*, fd: int64, st: struct file_stat*) ->
  *
  * @return 0 on success, FILE_IO_ERROR_NOT_FOUND if the path does not resolve
  */
-fn process_stat(proc: struct process*, path: uint8*, st: struct file_stat*) -> int64 {
+fn process_stat(proc: struct process*, path: char*, st: struct file_stat*) -> int64 {
     dprintk("[process] stat(%lld, %s, %p)\n",
             proc->pid, path, st);
 
@@ -686,7 +686,7 @@ fn process_stat(proc: struct process*, path: uint8*, st: struct file_stat*) -> i
  * @return 0 on success, INVALID_DESCRIPTOR if dirfd is not open, NOT_FOUND if the
  *         path does not resolve
  */
-fn process_stat_at(proc: struct process*, dirfd: int64, path: uint8*, st: struct file_stat*) -> int64 {
+fn process_stat_at(proc: struct process*, dirfd: int64, path: char*, st: struct file_stat*) -> int64 {
     dprintk("[process] statat(%lld, %lld, %s, %p)\n",
             proc->pid, dirfd, path, st);
 
@@ -737,8 +737,8 @@ fn process_get_cwd(proc: struct process*, buf: uint8*, size: uint64) -> int64 {
  * @return does not return on success; an exec_err on failure (FILE_NOT_FOUND if
  *         the path does not resolve, otherwise as process_exec_node)
  */
-fn process_exec(proc: struct process*, path: uint8*, argc: int64,
-                argv: uint8**) -> exec_err {
+fn process_exec(proc: struct process*, path: char*, argc: int64,
+                argv: char**) -> exec_err {
     let root = path[0] == '/' ? vfs_root() : proc->cwd;
     let node = vfs_get_node_for_path(path, root);
     if (node == null) {
@@ -763,8 +763,8 @@ fn process_exec(proc: struct process*, path: uint8*, argc: int64,
  * @return does not return on success; FILE_NOT_FOUND if dirfd is invalid or the
  *         path does not resolve, otherwise as process_exec_node
  */
-fn process_exec_at(proc: struct process*, dirfd: int64, path: uint8*,
-                   argc: int64, argv: uint8**) -> exec_err {
+fn process_exec_at(proc: struct process*, dirfd: int64, path: char*,
+                   argc: int64, argv: char**) -> exec_err {
     let dtor_ptrs = &proc->dtor_ptrs;
     let dtor: struct pointer<struct file_descriptor>*;
     if (!list_get(dtor_ptrs, dirfd as uint64, &dtor)) {

@@ -7,7 +7,7 @@ import "interrupts/drivers/pl011";
  * @param format: printf-style format string
  * @param ...:    variadic arguments matching the format specifiers
  */
-fn printk(format: uint8*, ...) {
+fn printk(format: char*, ...) {
     let args: va_list;
     va_start(args, format);
     pl011_vprintf(format, args);
@@ -21,7 +21,7 @@ fn printk(format: uint8*, ...) {
  * @param format: printf-style format string
  * @param ...:    variadic arguments matching the format specifiers
  */
-fn dprintk(format: uint8*, ...) {
+fn dprintk(format: char*, ...) {
     @if (DEBUG) {
         let args: va_list;
         va_start(args, format);

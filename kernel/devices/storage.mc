@@ -6,7 +6,7 @@ import "libc/stdio";
 import "interrupts/drivers/virtio_mmio";
 
 @static
-let _next: uint8 = 'a';
+let _next: char = 'a';
 
 /**
  * Scans all virtio MMIO slots for block devices and registers each one as an I/O module named
@@ -20,7 +20,7 @@ fn storage_init() {
         if (slot == -1)
             break;
 
-        let mod_name: uint8[4];
+        let mod_name: char[4];
         set_bytes(mod_name, 0, 4);
         sprintf(mod_name, "sd%c", _next);
         _next = _next + 1;

@@ -47,7 +47,7 @@ fn io_init() {
  *         under that name
  */
 @private
-fn io_get_module(name: uint8*) -> struct io_module* {
+fn io_get_module(name: char*) -> struct io_module* {
     let mod: struct io_module*;
     if (!dict_get(&_devices, name, &mod))
         return null;
@@ -67,7 +67,7 @@ fn io_get_module(name: uint8*) -> struct io_module* {
  *
  * @return 0 on success, -1 if a module with that name is already registered
  */
-fn io_register_module(name: uint8*, attrs: uint32, drv_info: uint64,
+fn io_register_module(name: char*, attrs: uint32, drv_info: uint64,
                       read: fn (uint8*, uint64, uint64, uint64) -> int64,
                       write: fn (uint8*, uint64, uint64, uint64) -> int64) -> int32 {
     if (io_get_module(name) != null) {
@@ -98,7 +98,7 @@ fn io_register_module(name: uint8*, attrs: uint32, drv_info: uint64,
  *
  * @return 0 on success, -1 if the module is not found or the VFS node cannot be removed
  */
-fn io_unregister_module(name: uint8*) -> int32 {
+fn io_unregister_module(name: char*) -> int32 {
     let mod = io_get_module(name);
     if (mod == null) {
         dprintk("[io] module \"%s\" not found!\n", name);

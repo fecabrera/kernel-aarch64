@@ -107,7 +107,7 @@ const PL011_DR_DATA_MASK = 0xFF;
  */
 struct pl011_printf_ctx {
     length: int32;             // running count of characters emitted
-    tmp: uint8[STB_SPRINTF_MIN]; // scratch buffer stb formats into
+    tmp: char[STB_SPRINTF_MIN]; // scratch buffer stb formats into
 }
 
 @static let PL011 = UART0_BASE as struct pl011_regs*;
@@ -186,7 +186,7 @@ fn pl011_putc(c: uint8) {
  * @param format: printf-style format string
  * @param ...: variadic arguments matching the format specifiers
  */
-fn pl011_printf(format: uint8*, ...) {
+fn pl011_printf(format: char*, ...) {
     let args: va_list;
     va_start(args, format);
     pl011_vprintf(format, args);
@@ -203,7 +203,7 @@ fn pl011_printf(format: uint8*, ...) {
  * @param format: printf-style format string
  * @param args:   variadic argument list (must be initialized by the caller)
  */
-fn pl011_vprintf(format: uint8*, args: va_list) {
+fn pl011_vprintf(format: char*, args: va_list) {
     let ctx: struct pl011_printf_ctx;
     ctx.length = 0;
     // stb formats into ctx.tmp (the STB_SPRINTF_MIN scratch buffer) and hands
@@ -224,11 +224,11 @@ fn pl011_vprintf(format: uint8*, args: va_list) {
  * @return ctx->tmp, the scratch buffer for stb's next chunk
  */
 @private
-fn pl011_printf_cb(buf: uint8*, user: uint8*, count: int32) -> uint8* {
+fn pl011_printf_cb(buf: char*, user: uint8*, count: int32) -> char* {
     let ctx = user as struct pl011_printf_ctx*;
     let r = struct range { end = count };
     for i in &r {
-        pl011_putc(buf[i]);
+        pl011_putc(buf[i] as uint8);
     }
     ctx->length = ctx->length + count;
     return ctx->tmp;

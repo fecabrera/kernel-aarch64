@@ -150,7 +150,7 @@ struct fat32_lfn_entry {
 
 struct fat32_bs_info {
     // fields from MBR boot sector
-    volume_label: uint8[12]; // volume label from EBR, null-terminated
+    volume_label: char[12]; // volume label from EBR, null-terminated
     n_fat: uint8;
     n_sectors_per_cluster: uint8;
     n_reserved_sectors: uint16;
@@ -223,7 +223,7 @@ fn fat32_parse_boot_sector(buff: uint8*, bs_info: struct fat32_bs_info*) {
 
     // extract volume label from EBR, which is more likely to be human-friendly than the OEM name in
     // the MBR boot sector. Also trim trailing spaces.
-    strntrimend(bs_info->volume_label, ext_br->volume_label as uint8*, 11);
+    strntrimend(bs_info->volume_label, ext_br->volume_label as char*, 11);
     
     // ARM doesn't like unaligned memory access, so we need to memcpy the fields into local
     // variables before using them
@@ -273,7 +273,7 @@ fn fat32_parse_boot_sector(buff: uint8*, bs_info: struct fat32_bs_info*) {
 }
 
 @private
-fn fat32_read_cluster(pathname: uint8*, bs_info: struct fat32_bs_info*, cluster: uint32,
+fn fat32_read_cluster(pathname: char*, bs_info: struct fat32_bs_info*, cluster: uint32,
                       parent_node: struct fs_node*, parent_nodes: struct set<uint32, struct fs_node*>*,
                       mount: struct fs_mount*) -> int32 {
     let sector_offset: uint32 = cluster - bs_info->root_cluster;
@@ -336,15 +336,15 @@ fn fat32_read_cluster(pathname: uint8*, bs_info: struct fat32_bs_info*, cluster:
 
         bytecopy(&attributes, &dir_entry->attributes, 1);
 
-        let dir_name: uint8[12];
+        let dir_name: char[12];
         set_bytes(dir_name, 0, 12);
         
         let r = struct range<uint16> { end = 11 };
         for i in &r {
-            dir_name[i] = tolower(dir_entry->name[i] as int32) as uint8;
+            dir_name[i] = tolower(dir_entry->name[i] as int32) as char;
         }
 
-        let lfn_dir_name = kalloc<uint8>(n_lfn_entries as uint64 * 13 + 1);
+        let lfn_dir_name = kalloc<char>(n_lfn_entries as uint64 * 13 + 1);
         defer kdealloc(lfn_dir_name);
         set_bytes(lfn_dir_name, 0, n_lfn_entries as uint64 * 13 + 1);
 
@@ -374,13 +374,13 @@ fn fat32_read_cluster(pathname: uint8*, bs_info: struct fat32_bs_info*, cluster:
             emit (_cluster_hi << 16) | _cluster_lo;
         };
 
-        let name: uint8*;
+        let name: char*;
         if (n_lfn_entries) {
             let l = strlen(lfn_dir_name);
-            name = kalloc<uint8>(l + 1);
+            name = kalloc<char>(l + 1);
             strncpy(name, lfn_dir_name, l + 1);
         } else {
-            name = kalloc<uint8>(13);
+            name = kalloc<char>(13);
             let name_l = strntrimend(name, dir_name, 8);
             if (strntrimend(&name[name_l + 1], &dir_name[8], 3) > 0)
                 name[name_l] = '.';
@@ -431,7 +431,7 @@ fn fat32_read_cluster(pathname: uint8*, bs_info: struct fat32_bs_info*, cluster:
 }
 
 @private
-fn fat32_build_fs_tree(pathname: uint8*, bs_info: struct fat32_bs_info*,
+fn fat32_build_fs_tree(pathname: char*, bs_info: struct fat32_bs_info*,
                        root_node: struct fs_node*, mount: struct fs_mount*) -> int32 {
     // build queue with all the clusters that start a chain
     let cluster_chains: queue<uint32>;
@@ -536,7 +536,7 @@ fn fat32_build_cluster_chains(bs_info: struct fat32_bs_info*, cluster_chains: st
  *         vfs_get_node_for_path returned null); -4 mountpoint is not a folder;
  *         -5 vfs_create_mountpoint failed; -6 FAT table read error; -7 fs tree build error
  */
-fn fat32_mount(device_path: uint8*, mountpoint: uint8*) -> int64 {
+fn fat32_mount(device_path: char*, mountpoint: char*) -> int64 {
     let status: int32;
     let bs: uint8[512];
 
@@ -565,7 +565,7 @@ fn fat32_mount(device_path: uint8*, mountpoint: uint8*) -> int64 {
             bs_info->total_clusters);
     
     let root: struct fs_node*;
-    let _mountpoint: uint8[50];
+    let _mountpoint: char[50];
     if (mountpoint == null) {
         // create folder
         root = vfs_create_dir("/volumes", bs_info->volume_label, 0, null);
@@ -647,7 +647,7 @@ fn fat32_mount(device_path: uint8*, mountpoint: uint8*) -> int64 {
 }
 
 @private
-fn read_fat_table(pathname: uint8*, bs_info: struct fat32_bs_info*, fat_table: uint8*) -> int32 {
+fn read_fat_table(pathname: char*, bs_info: struct fat32_bs_info*, fat_table: uint8*) -> int32 {
     let fat_table_addr: uint64 = bs_info->first_fat_sector as uint64 * bs_info->n_bytes_per_sector;
     dprintk("[fat32] will read %d sectors\n", bs_info->table_size_32);
 
@@ -673,7 +673,7 @@ fn read_fat_table(pathname: uint8*, bs_info: struct fat32_bs_info*, fat_table: u
  *
  * @return 0 on success, -1 on error
  */
-fn fat32_unmount(device_path: uint8*) -> int64 {
+fn fat32_unmount(device_path: char*) -> int64 {
     // steps:
     //   1. get fs_mount
     //   2. get bs_info

@@ -14,7 +14,7 @@ import "libc/stdlib";
 import "system/syscall";
 
 @static
-let available_commands: uint8*[][2] = [
+let available_commands: char*[][2] = [
     ["ls [path]", "list a folder's entries"],
     ["cd <path>", "change the working directory"],
     ["mount <device> [mountpoint]", "mount a FAT32 block device"],
@@ -22,10 +22,10 @@ let available_commands: uint8*[][2] = [
 ];
 
 @static
-let dirs: uint8*[] = ["/bin"];
+let dirs: char*[] = ["/bin"];
 
 @private
-fn console_help(argc: int64, argv: uint8**) -> int64 {
+fn console_help(argc: int64, argv: char**) -> int64 {
     println("built-in commands:");
 
     let r = struct range<int32> { end = len(available_commands) };
@@ -38,13 +38,13 @@ fn console_help(argc: int64, argv: uint8**) -> int64 {
 }
 
 @private
-fn console_mount(argc: int64, argv: uint8**) -> int64 {
+fn console_mount(argc: int64, argv: char**) -> int64 {
     if (argc < 2) {
         println("usage: %s <device> [mountpoint]", argv[0]);
         return -1;
     }
 
-    let mountpoint: uint8* = argc > 2 ? argv[2] : null;
+    let mountpoint: char* = argc > 2 ? argv[2] : null;
 
     let status = fat32_mount(argv[1], mountpoint);
     if (status < 0) {
@@ -57,8 +57,8 @@ fn console_mount(argc: int64, argv: uint8**) -> int64 {
 }
 
 @private
-fn console_ls(argc: int64, argv: uint8**) -> int64 {
-    let filename: uint8* = argc > 1 ? argv[1] : "/";
+fn console_ls(argc: int64, argv: char**) -> int64 {
+    let filename: char* = argc > 1 ? argv[1] : "/";
     
     let proc = scheduler_get_current_process();
     
@@ -101,7 +101,7 @@ fn console_ls(argc: int64, argv: uint8**) -> int64 {
  *         is not a folder
  */
 @private
-fn console_cd(argc: int64, argv: uint8**) -> int64 {
+fn console_cd(argc: int64, argv: char**) -> int64 {
     if (argc < 2) {
         println("usage: %s <path>", argv[0]);
         return -1;
@@ -143,7 +143,7 @@ fn console_cd(argc: int64, argv: uint8**) -> int64 {
  *         fork failed
  */
 @private
-fn try_run(const dir: uint8*, argc: int64, argv: uint8**) -> int64 {
+fn try_run(const dir: char*, argc: int64, argv: char**) -> int64 {
     // open dir
     let dirfd = open(dir, open_mode::DIR);
     if (dirfd < 0) {
@@ -188,7 +188,7 @@ fn try_run(const dir: uint8*, argc: int64, argv: uint8**) -> int64 {
  * @param argv: null-terminated argument strings; argv[0] is the command name
  */
 @private
-fn console_parse_command(argc: int64, argv: uint8**) {
+fn console_parse_command(argc: int64, argv: char**) {
     if (argc == 0)
         return;
 
@@ -226,14 +226,14 @@ fn console() {
     while (true) {
         let i: uint64;
 
-        let path: uint8* = alloc<uint8*>(1024);
+        let path: char* = alloc<char>(1024);
         defer dealloc(path);
         
         getcwd(path, 1024);
 
         print("%s# ", path);
 
-        let buffer: uint8* = alloc<uint8*>(1024);
+        let buffer: char* = alloc<char>(1024);
         defer dealloc(buffer);
 
         set_bytes(buffer, 0, 1024);
@@ -243,7 +243,7 @@ fn console() {
         let _quotes = false;
         let _backslash = false;
 
-        let args: struct list<uint8*>;
+        let args: struct list<char*>;
         list_init(&args, 10);
         defer {
             for arg in &args {
@@ -258,8 +258,8 @@ fn console() {
 
         let r = struct range { end = n + 1 };
         for i in &r {
-            let c: uint8 = buffer[i];
-            let arg: uint8*;
+            let c: char = buffer[i];
+            let arg: char*;
 
             if (_backslash) {
                 _backslash = false;
@@ -286,7 +286,7 @@ fn console() {
                 when '\\':
                     _backslash = true;
                 when '\"':
-                    arg = alloc<uint8*>(vec.length + 1);
+                    arg = alloc<char>(vec.length + 1);
                     bytecopy(arg, vec.data, vec.length);
                     arg[vec.length] = '\0';
 
@@ -306,7 +306,7 @@ fn console() {
                 else:
                     if (isspace(c as int32) or c == '\0') {
                         if (vec.length > 0) {
-                            arg = alloc<uint8*>(vec.length + 1);
+                            arg = alloc<char>(vec.length + 1);
                             bytecopy(arg, vec.data, vec.length);
                             arg[vec.length] = '\0';
 

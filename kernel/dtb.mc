@@ -34,7 +34,7 @@ struct memreg {
 
 // Result of a property lookup
 struct fdt_prop {
-    data: uint8*;
+    data: char*;
     length: uint32;
 }
 
@@ -62,7 +62,7 @@ struct fdt_prop {
  *
  * @return 0 if the property was found, -1 otherwise.
  */
-@extern fn dtb_find_prop(node_path: uint8*, prop_name: uint8*, out: struct fdt_prop*) -> int32;
+@extern fn dtb_find_prop(node_path: char*, prop_name: char*, out: struct fdt_prop*) -> int32;
 
 /**
  * Reads the base address and size of the main RAM region from the DTB memory@40000000 node's reg
@@ -83,7 +83,7 @@ struct fdt_prop {
  *
  * @return Absolute GIC IRQ ID.
  */
-@extern fn dtb_get_irq_number(prop: struct fdt_prop *, index: uint32) -> uint32;
+@extern fn dtb_get_irq_number(prop: struct fdt_prop*, index: uint32) -> uint32;
 
 /**
  * Returns the number of interrupt entries in an "interrupts" property.

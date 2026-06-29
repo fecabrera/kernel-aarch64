@@ -454,15 +454,15 @@ fn elf64_get_shstrtab(buf: uint8*, shdr: struct elf64_shdr*, i: uint16) -> uint8
 }
 
 @private
-fn elf64_get_section_name(shdr: struct elf64_shdr*, shstrtab: uint8*) -> uint8* {
+fn elf64_get_section_name(shdr: struct elf64_shdr*, shstrtab: uint8*) -> char* {
     if (shstrtab == null) return null;
-    return &shstrtab[shdr->sh_name];
+    return &shstrtab[shdr->sh_name] as char*;
 }
 
 @private
-fn elf64_get_symbol_name(sym: struct elf64_sym*, strtab: uint8*) -> uint8* {
+fn elf64_get_symbol_name(sym: struct elf64_sym*, strtab: uint8*) -> char* {
     if (strtab == null) return null;
-    return &strtab[sym->st_name];
+    return &strtab[sym->st_name] as char*;
 }
 
 fn is_elf(buf: uint8*) -> bool {
@@ -564,7 +564,7 @@ fn elf64_unload(file: struct elf64_file*) {
     kdealloc(file->got);
 }
 
-fn elf64_locate_symbol(file: struct elf64_file*, const sym_name: uint8*) -> uint8* {
+fn elf64_locate_symbol(file: struct elf64_file*, const sym_name: char*) -> uint8* {
     let r = struct range { start = 1, end = file->stnum };
     for i in &r {
         let sym = &file->symtab[i];

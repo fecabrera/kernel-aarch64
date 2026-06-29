@@ -12,7 +12,7 @@
  *
  * @return dest
  */
-@extern fn strcpy(dest: uint8*, src: uint8*) -> uint8*;
+@extern fn strcpy(dest: char*, src: char*) -> char*;
 
 /**
  * Copies at most count characters from src into dest. If src is shorter than count,
@@ -24,7 +24,7 @@
  *
  * @return dest
  */
-@extern fn strncpy(dest: uint8*, src: uint8*, count: uint64) -> uint8*;
+@extern fn strncpy(dest: char*, src: char*, count: uint64) -> char*;
 
 /**
  * Copies src into dest, stripping trailing whitespace and non-printable
@@ -38,7 +38,7 @@
  * @return number of characters written to dest, not including the null terminator;
  *         0 if src contains only whitespace or non-printable characters
  */
-@extern fn strntrimend(dest: uint8*, src: uint8*, count: uint64) -> uint64;
+@extern fn strntrimend(dest: char*, src: char*, count: uint64) -> uint64;
 
 /***************************************
  * String examination
@@ -51,7 +51,7 @@
  *
  * @return Number of characters in str.
  */
-@extern fn strlen(str: uint8*) -> uint64;
+@extern fn strlen(str: char*) -> uint64;
 
 /**
  * Returns the length of str, but reads at most count bytes. Unlike strlen, will not read past count
@@ -62,7 +62,7 @@
  *
  * @return number of characters before the null terminator, or count if none found
  */
-@extern fn strnlen(str: uint8*, count: uint64) -> uint64;
+@extern fn strnlen(str: char*, count: uint64) -> uint64;
 
 /**
  * Compares two null-terminated strings lexicographically.
@@ -72,7 +72,7 @@
  *
  * @return Negative if lhs < rhs, zero if equal, positive if lhs > rhs.
  */
-@extern fn strcmp(lhs: uint8*, rhs: uint8*) -> int32;
+@extern fn strcmp(lhs: char*, rhs: char*) -> int32;
 
 /**
  * Compares at most count characters of two null-terminated strings lexicographically.
@@ -83,7 +83,7 @@
  *
  * @return Negative if lhs < rhs, zero if equal or count is zero, positive if lhs > rhs.
  */
-@extern fn strncmp(lhs: uint8*, rhs: uint8*, count: uint64) -> int32;
+@extern fn strncmp(lhs: char*, rhs: char*, count: uint64) -> int32;
 
 /***************************************
  * Character array manipulation

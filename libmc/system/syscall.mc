@@ -423,7 +423,7 @@ enum syscall: uint64 {
  *
  * @return does not return on success; an exec_err on failure.
  */
-@inline fn exec(path: uint8*, argc: int64, argv: uint8**) -> exec_err {
+@inline fn exec(path: uint8*, argc: int64, argv: char**) -> exec_err {
     return @asm @clobbers("x0", "x1", "x2", "x3", "memory")
         (syscall::EXEC, path, argc, argv) -> exec_err {
         "mov x0, $0"
@@ -448,7 +448,7 @@ enum syscall: uint64 {
  *
  * @return does not return on success; an exec_err on failure.
  */
-@inline fn execat(dirfd: int64, path: uint8*, argc: int64, argv: uint8**) -> exec_err {
+@inline fn execat(dirfd: int64, path: uint8*, argc: int64, argv: char**) -> exec_err {
     return @asm @clobbers("x0", "x1", "x2", "x3", "x4", "memory")
         (syscall::EXECAT, dirfd, path, argc, argv) -> exec_err {
         "mov x0, $0"

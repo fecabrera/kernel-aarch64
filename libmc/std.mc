@@ -15,7 +15,7 @@ import "string";
  * @param format: printf-style format string (stb_sprintf grammar; floats disabled)
  * @param ...:    variadic arguments matching the format specifiers
  */
-fn print(format: uint8*, ...) {
+fn print(format: char*, ...) {
     let args: va_list;
     va_start(args, format);
     vprintf(format, args);
@@ -30,7 +30,7 @@ fn print(format: uint8*, ...) {
  * @param format: printf-style format string (stb_sprintf grammar; floats disabled)
  * @param ...:    variadic arguments matching the format specifiers
  */
-fn println(format: uint8*, ...) {
+fn println(format: char*, ...) {
     let args: va_list;
     va_start(args, format);
     vprintf(format, args);
@@ -44,7 +44,7 @@ fn println(format: uint8*, ...) {
  * @param c: byte to write
  */
 @inline
-fn writechar(c: uint8) {
+fn writechar(c: char) {
     write(STDOUT_FILENO, &c, 1);
 }
 
@@ -54,7 +54,7 @@ fn writechar(c: uint8) {
  * @param str: string to write
  */
 @inline
-fn writestr(const str: slice<uint8>) {
+fn writestr(const str: slice<const char>) {
     write(STDOUT_FILENO, str.ptr, str.length);
 }
 
@@ -64,7 +64,7 @@ fn writestr(const str: slice<uint8>) {
  * @param str: string to write
  */
 @inline
-fn writeln(const str: slice<uint8>) {
+fn writeln(const str: slice<const char>) {
     writestr(str);
     writechar('\n');
 }
@@ -76,12 +76,12 @@ fn writeln(const str: slice<uint8>) {
  *
  * @return the next non-escape byte read
  */
-fn readchar() -> uint8 {
+fn readchar() -> char {
     let _escape = false;
     let _arrow = false;
 
     while (true) {
-        let c: uint8;
+        let c: char;
         read(STDIN_FILENO, &c, 1);
 
         if (_escape) {
@@ -121,11 +121,11 @@ fn readchar() -> uint8 {
  *
  * @return number of characters in the line, excluding the null terminator
  */
-fn readline(buffer: uint8*) -> uint64 {
+fn readline(buffer: char*) -> uint64 {
     let count: uint64 = 0;
 
     while (true) {
-        let c: uint8 = readchar();
+        let c: char = readchar();
 
         case (c) {
         when '\r': // ASCII_CR

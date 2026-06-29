@@ -3,7 +3,7 @@ import "system/fs";
 import "system/syscall";
 
 @private
-fn main(argc: int64, argv: uint8**) -> int64 {
+fn main(argc: int64, argv: char**) -> int64 {
     if (argc < 2) {
         println("usage: %s <path>", argv[0]);
         return -1;

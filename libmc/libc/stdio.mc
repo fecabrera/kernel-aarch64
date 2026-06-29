@@ -27,7 +27,7 @@ const EOF = -1;
 struct printf_ctx {
     fd: int64;                    // destination file descriptor
     length: int32;               // running count of characters written
-    tmp: uint8[STB_SPRINTF_MIN];  // scratch buffer stb formats into
+    tmp: char[STB_SPRINTF_MIN];  // scratch buffer stb formats into
 }
 
 /**
@@ -62,7 +62,7 @@ fn putchar(c: int32) -> int32 {
  *
  * @return number of characters written
  */
-fn printf(format: uint8*, ...) -> int32 {
+fn printf(format: char*, ...) -> int32 {
     let args: va_list;
     va_start(args, format);
     let n = vprintf(format, args);
@@ -80,7 +80,7 @@ fn printf(format: uint8*, ...) -> int32 {
  *
  * @return number of characters written
  */
-fn vprintf(format: uint8*, args: va_list) -> int32 {
+fn vprintf(format: char*, args: va_list) -> int32 {
     let ctx: struct printf_ctx;
     ctx.fd = STDOUT_FILENO;
     ctx.length = 0;
@@ -101,7 +101,7 @@ fn vprintf(format: uint8*, args: va_list) -> int32 {
  * @return ctx->tmp, the scratch buffer for stb's next chunk
  */
 @private
-fn vprintf_cb(buf: uint8*, c: uint8*, count: int32) -> uint8* {
+fn vprintf_cb(buf: char*, c: uint8*, count: int32) -> char* {
     let ctx = c as struct printf_ctx*;
     write(ctx->fd, buf, count as uint64);
     ctx->length = ctx->length + count;
@@ -122,7 +122,7 @@ fn vprintf_cb(buf: uint8*, c: uint8*, count: int32) -> uint8* {
  *
  * @return number of characters written, not including the null terminator
  */
-@extern fn vsprintf(str: uint8*, format: uint8*, args: va_list) -> int32;
+@extern fn vsprintf(str: char*, format: char*, args: va_list) -> int32;
 
 /**
  * Like vsprintf, but writes at most count bytes to str (including the null
@@ -136,7 +136,7 @@ fn vprintf_cb(buf: uint8*, c: uint8*, count: int32) -> uint8* {
  * @return number of characters that would have been written had count been
  *         unlimited, not including the null terminator
  */
-@extern fn vsnprintf(str: uint8*, count: int32, format: uint8*, args: va_list) -> int32;
+@extern fn vsnprintf(str: char*, count: int32, format: char*, args: va_list) -> int32;
 
 /**
  * Formats into str using a printf-style format. Accepts the full stb_sprintf
@@ -151,7 +151,7 @@ fn vprintf_cb(buf: uint8*, c: uint8*, count: int32) -> uint8* {
  *
  * @return number of characters written, not including the null terminator
  */
-@extern fn sprintf(str: uint8*, format: uint8*, ...) -> int32;
+@extern fn sprintf(str: char*, format: char*, ...) -> int32;
 
 /**
  * Like sprintf, but writes at most count bytes to str (including the null
@@ -165,7 +165,7 @@ fn vprintf_cb(buf: uint8*, c: uint8*, count: int32) -> uint8* {
  * @return number of characters that would have been written had count been
  *         unlimited, not including the null terminator
  */
-@extern fn snprintf(str: uint8*, count: int32, format: uint8*, ...) -> int32;
+@extern fn snprintf(str: char*, count: int32, format: char*, ...) -> int32;
 
 /**
  * Streaming formatter: formats according to format/args and, every time its
@@ -188,5 +188,5 @@ fn vprintf_cb(buf: uint8*, c: uint8*, count: int32) -> uint8* {
  *
  * @return total number of characters formatted
  */
-@extern fn vsprintfcb(callback: fn (uint8*, uint8*, int32) -> uint8*, user: uint8*,
-                      str: uint8*, format: uint8*, args: va_list) -> int32;
+@extern fn vsprintfcb(callback: fn (char*, uint8*, int32) -> char*, user: uint8*,
+                      str: char*, format: char*, args: va_list) -> int32;
