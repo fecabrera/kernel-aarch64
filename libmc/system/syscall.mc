@@ -185,7 +185,7 @@ enum syscall: uint64 {
  *
  * @return the new file descriptor, or -1 on failure.
  */
-@inline fn open(path: uint8*, attrs: uint32) -> int64 {
+@inline fn open(path: char*, attrs: uint32) -> int64 {
     return @asm @clobbers("x0", "x1", "x2", "memory") (syscall::OPEN, path, attrs) -> int64 {
         "mov x0, $0"
         "mov x1, $1"
@@ -195,7 +195,7 @@ enum syscall: uint64 {
     };
 }
 
-@inline fn openat(dirfd: int64, path: uint8*, attrs: uint32) -> int64 {
+@inline fn openat(dirfd: int64, path: char*, attrs: uint32) -> int64 {
     return @asm @clobbers("x0", "x1", "x2", "x3", "memory")
         (syscall::OPENAT, dirfd, path, attrs) -> int64 {
         "mov x0, $0"
@@ -299,7 +299,7 @@ enum syscall: uint64 {
  *
  * @return 0 on success, or a negative error.
  */
-@inline fn stat(path: uint8*, stat: struct file_stat*) -> int64 {
+@inline fn stat(path: char*, stat: struct file_stat*) -> int64 {
     return @asm @clobbers("x0", "x1", "x2", "memory")
         (syscall::STAT, path, stat) -> int64 {
         "mov x0, $0"
@@ -322,7 +322,7 @@ enum syscall: uint64 {
  *
  * @return 0 on success, or a negative error.
  */
-@inline fn statat(dirfd: int64, path: uint8*, stat: struct file_stat*) -> int64 {
+@inline fn statat(dirfd: int64, path: char*, stat: struct file_stat*) -> int64 {
     return @asm @clobbers("x0", "x1", "x2", "x3", "memory")
         (syscall::STATAT, dirfd, path, stat) -> int64 {
         "mov x0, $0"
@@ -423,7 +423,7 @@ enum syscall: uint64 {
  *
  * @return does not return on success; an exec_err on failure.
  */
-@inline fn exec(path: uint8*, argc: int64, argv: char**) -> exec_err {
+@inline fn exec(path: char*, argc: int64, argv: char**) -> exec_err {
     return @asm @clobbers("x0", "x1", "x2", "x3", "memory")
         (syscall::EXEC, path, argc, argv) -> exec_err {
         "mov x0, $0"
@@ -448,7 +448,7 @@ enum syscall: uint64 {
  *
  * @return does not return on success; an exec_err on failure.
  */
-@inline fn execat(dirfd: int64, path: uint8*, argc: int64, argv: char**) -> exec_err {
+@inline fn execat(dirfd: int64, path: char*, argc: int64, argv: char**) -> exec_err {
     return @asm @clobbers("x0", "x1", "x2", "x3", "x4", "memory")
         (syscall::EXECAT, dirfd, path, argc, argv) -> exec_err {
         "mov x0, $0"
