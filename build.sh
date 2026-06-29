@@ -1,6 +1,6 @@
 #!/bin/bash
 MCCPATH=${MCCPATH:-~/Documents/lang}
-MCC="python -m mcc"
+MCC=${MCC:-"python -m mcc"}
 CC="aarch64-elf-gcc"
 MCFLAGS="--target aarch64-unknown-none-elf \
 		 --nostdlib --freestanding \
@@ -9,6 +9,7 @@ MCFLAGS="--target aarch64-unknown-none-elf \
 		 -O3"
 CFLAGS="-ffreestanding -nostdlib -nostdinc \
         -mgeneral-regs-only \
+        -mstrict-align \
         -O3 -Wall -Wextra \
         -mcpu=cortex-a710 \
         -Ilib/include \
