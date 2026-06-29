@@ -52,7 +52,7 @@ fn string_duplicate(dst: struct string*, src: struct string*) {
  * @param str:  source byte array to copy from
  * @param n:    number of bytes to copy from str
  */
-fn string_from_array(self: struct string*, str: char*) {
+fn string_from_array(self: struct string*, const str: char*) {
     string_init(self);
 
     let i: uint64 = 0;
@@ -72,7 +72,7 @@ fn string_from_array(self: struct string*, str: char*) {
  * @param str:  byte slice to copy from
  */
 @inline
-fn string_from_slice(self: struct string*, const str: slice<char>) {
+fn string_from_slice(self: struct string*, const str: slice<const char>) {
     list_from_slice(self, str);
 }
 
@@ -132,7 +132,7 @@ fn string_set(self: struct string*, index: uint64, value: char) -> bool {
  * @param value: byte to push
  */
 @inline
-fn string_push(self: struct string*, value: char) {
+fn string_push(self: struct string*, const value: char) {
     list_push(self, value);
 }
 
@@ -182,6 +182,7 @@ fn string_eq(self: struct string*, str: struct string*) -> bool {
  *
  * @return an iterator positioned at the first byte
  */
+@inline
 fn string_it(self: struct string*) -> struct iterator<struct string> {
     return list_it(self);
 }
@@ -195,6 +196,7 @@ fn string_it(self: struct string*) -> struct iterator<struct string> {
  *
  * @return true if a byte was produced, false once iteration is complete
  */
+@inline
 fn string_next(it: struct iterator<struct string>*, out: char*) -> bool {
     return list_next(it, out);
 }

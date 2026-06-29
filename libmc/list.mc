@@ -5,9 +5,7 @@ import "iteration/iterator";
 /**
  * A growable, heap-backed list of T.
  */
-struct list<T> {
-    data: T*;
-    length: uint64;
+struct list<T> extends slice<T> {
     capacity: uint64;
 }
 
@@ -65,7 +63,7 @@ fn list_from_array<T>(self: struct list<T>*, arr: T*, n: uint64) {
  * @param self: uninitialized list to build into
  * @param arr:  slice to copy from
  */
-fn list_from_slice<T>(self: struct list<T>*, const arr: slice<T>) {
+fn list_from_slice<T>(self: struct list<T>*, const arr: slice<const T>) {
     list_init(self, arr.length);
 
     for el in arr {
@@ -136,7 +134,7 @@ fn list_set<T>(self: struct list<T>*, index: uint64, value: T) -> bool {
  * @param self:  list to append to
  * @param value: value to append
  */
-fn list_push<T>(self: struct list<T>*, value: T) {
+fn list_push<T>(self: struct list<T>*, value: const T) {
     if (self->length == self->capacity)
         list_grow<T>(self);
 

@@ -6,13 +6,13 @@ import "system/fs";
 fn main(argc: int64, argv: char**) -> int64 {
     if (argc < 2) {
         println("usage: %s <path>", argv[0]);
-        return -1;
+        return 1;
     }
 
     let fd = open(argv[1], open_mode::READ);
     if (fd < 0) {
         println("open() returned %lld!", fd);
-        return -2;
+        return 2;
     }
     
     defer close(fd);
@@ -21,7 +21,7 @@ fn main(argc: int64, argv: char**) -> int64 {
     let st_status = fstat(fd, &st);
     if (st_status < 0) {
         println("fstat() returned %lld!", st_status);
-        return -3;
+        return 3;
     }
     
     let buffer: byte* = alloc<byte>(st.st_size + 1);
@@ -30,7 +30,7 @@ fn main(argc: int64, argv: char**) -> int64 {
     let r_status = read(fd, buffer, st.st_size);
     if (r_status < 0) {
         println("read() returned %lld!", r_status);
-        return -4;
+        return 4;
     }
 
     buffer[st.st_size] = '\0';

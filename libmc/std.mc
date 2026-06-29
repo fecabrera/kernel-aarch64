@@ -55,7 +55,7 @@ fn writechar(c: char) {
  */
 @inline
 fn writestr(const str: slice<const char>) {
-    write(STDOUT_FILENO, str.ptr, str.length);
+    write(STDOUT_FILENO, str.data, str.length);
 }
 
 /**
