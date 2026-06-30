@@ -2,6 +2,7 @@ import "debug";
 import "dtb";
 import "heap";
 import "pool";
+import "align";
 
 const KERNEL_HEAP_SIZE = 16 * (1 << 20); // 16 MiB heap
 const KERNEL_MIN_BLK_SIZE = 16;
@@ -105,8 +106,7 @@ fn kmalloc_aligned(size: uint64, align: uint64) -> byte* {
     // is itself a multiple of 8 (8, 16, 64, 4096, ...) is guaranteed safe
     // with no gap or stored-offset needed. The result can be passed directly
     // to kfree.
-    let aligned_size = (size + align - 1) & ~(align - 1);
-    return kmalloc(aligned_size);
+    return kmalloc(aligned(size, align));
 }
 
 /**
