@@ -1,5 +1,5 @@
 import "debug";
-import "cpu";
+import "endian";
 import "mm";
 import "memory";
 import "range";

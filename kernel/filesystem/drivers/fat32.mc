@@ -1,7 +1,7 @@
 import "debug";
 import "memory";
 import "range";
-import "cpu";
+import "endian";
 import "utf16";
 import "libc/string";
 import "libc/ctype";

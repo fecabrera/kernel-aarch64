@@ -19,8 +19,8 @@ CFLAGS="-ffreestanding -nostdlib -nostdinc \
 LD="aarch64-elf-ld"
 AR="aarch64-elf-ar"
 
-USER_FLAGS="-I libmc -I libcrt"
-KERNEL_FLAGS="-I kernel -I libmc -D IS_KERNEL"
+USER_FLAGS="-I libmc -I libcrt -I utils"
+KERNEL_FLAGS="-I kernel -I libmc -I utils -D IS_KERNEL"
 
 run_echo() {
     echo "$@"
@@ -55,10 +55,11 @@ user_app_compile() {
     done
 
     # link
-	run_echo $LD -e entry -r ${1}/*.o user/libmc.a user/libc.a user/libcrt.a -o init/bin/$(basename -- "$1")
+	run_echo $LD -e entry -r ${1}/*.o user/utils/*.o user/libmc.a user/libc.a user/libcrt.a -o init/bin/$(basename -- "$1")
 }
 
 # user lib dirs
+mkdir -p user/utils
 mkdir -p user/libcrt
 mkdir -p user/libc
 mkdir -p user/libmc
@@ -70,6 +71,9 @@ mkdir -p user/libmc/system
 # user bin dir
 mkdir -p init/bin
 
+# utils
+for file in utils/*.mc; do user_lib_compile $file; done
+
 # lib
 for file in lib/src/*.c; do c_compile $file; done
 
@@ -80,6 +84,9 @@ for file in libc/src/*.c; do c_compile $file; done
 for file in kernel/*.mc; do kernel_compile $file; done
 for file in kernel/**/*.mc; do kernel_compile $file; done
 for file in kernel/**/**/*.mc; do kernel_compile $file; done
+
+# kernel-side utils
+for file in utils/*.mc; do kernel_compile $file; done
 
 # kernel-side libmc
 for file in libmc/*.mc; do kernel_compile $file; done
@@ -109,7 +116,7 @@ for file in src/*.S; do asm_compile $file; done
 for file in src/*.mc; do kernel_compile $file; done
 
 # link kernel
-run_echo $LD -T linker.ld -o kernel.elf src/*.o lib/src/*.o libc/src/*.o kernel/*.o kernel/**/*.o kernel/**/**/*.o libmc/*.o libmc/**/*.o
+run_echo $LD -T linker.ld -o kernel.elf src/*.o utils/*.o lib/src/*.o libc/src/*.o kernel/*.o kernel/**/*.o kernel/**/**/*.o libmc/*.o libmc/**/*.o
 
 # init.img
 dd if=/dev/zero of=init.img bs=1M count=100
