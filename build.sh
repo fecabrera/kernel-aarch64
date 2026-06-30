@@ -1,12 +1,13 @@
 #!/bin/bash
-MCCPATH=${MCCPATH:-~/Documents/lang}
-MCC=${MCC:-"python -m mcc"}
+MCC=${MCC:-"mcc"}
 CC="aarch64-elf-gcc"
+
 MCFLAGS="--target aarch64-unknown-none-elf \
 		 --nostdlib --freestanding \
          --general-regs-only \
          --strict-align \
 		 -O3"
+
 CFLAGS="-ffreestanding -nostdlib -nostdinc \
         -mgeneral-regs-only \
         -mstrict-align \
@@ -14,8 +15,10 @@ CFLAGS="-ffreestanding -nostdlib -nostdinc \
         -mcpu=cortex-a710 \
         -Ilib/include \
         -Ilibc/include"
+
 LD="aarch64-elf-ld"
 AR="aarch64-elf-ar"
+
 USER_FLAGS="-I libmc -I libcrt"
 KERNEL_FLAGS="-I kernel -I libmc -D IS_KERNEL"
 
@@ -26,7 +29,7 @@ run_echo() {
 
 kernel_compile() {
     # create object files
-    PYTHONPATH=$MCCPATH run_echo $MCC $MCFLAGS $KERNEL_FLAGS $1 -o "${1%.mc}.o"
+    run_echo $MCC $MCFLAGS $KERNEL_FLAGS $1 -o "${1%.mc}.o"
 }
 
 asm_compile() {
@@ -39,15 +42,17 @@ c_compile() {
 
 user_lib_compile() {
     # create object files
-    PYTHONPATH=$MCCPATH run_echo $MCC $MCFLAGS $USER_FLAGS $1 -o "user/${1%.mc}.o"
+    run_echo $MCC $MCFLAGS $USER_FLAGS $1 -o "user/${1%.mc}.o"
     
     # create interfaces
-    PYTHONPATH=$MCCPATH run_echo $MCC $MCFLAGS $USER_FLAGS --emit-interface $1 -o "user/${1%.mc}.mci"
+    run_echo $MCC $MCFLAGS $USER_FLAGS --emit-interface $1 -o "user/${1%.mc}.mci"
 }
 
 user_app_compile() {
     # create object files
-    PYTHONPATH=$MCCPATH run_echo $MCC $MCFLAGS -I user/libmc $1/*.mc
+    for f in $1/*.mc; do
+        run_echo $MCC $MCFLAGS $USER_FLAGS $f
+    done
 
     # link
 	run_echo $LD -e entry -r ${1}/*.o user/libmc.a user/libc.a user/libcrt.a -o init/bin/$(basename -- "$1")

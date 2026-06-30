@@ -23,16 +23,14 @@ jobs:
 
       - name: Get mcc compiler
         run: |
-          git clone https://github.com/fecabrera/mcc.git
-          cd mcc
-          pip install pipenv
-          pipenv install --dev --deploy --system
-          cd ..
+          brew trust fecabrera/mcc
+          brew tap fecabrera/mcc
+          brew install mcc
 
       - name: Build
         run: |
           chmod a+x ./build.sh
-          MCCPATH=mcc ./build.sh
+          ./build.sh
 
       - name: Upload kernel binaries
         uses: actions/upload-artifact@v4
