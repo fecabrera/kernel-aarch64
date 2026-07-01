@@ -63,6 +63,8 @@ fn scheduler_init() {
     syscall_register_handler(syscall::STAT, syscall_stat_handler);
     syscall_register_handler(syscall::STATAT, syscall_statat_handler);
     syscall_register_handler(syscall::GETCWD, syscall_getcwd_handler);
+    syscall_register_handler(syscall::CHDIR, syscall_chdir_handler);
+    syscall_register_handler(syscall::FCHDIR, syscall_fchdir_handler);
     syscall_register_handler(syscall::EXEC, syscall_exec_handler);
     syscall_register_handler(syscall::EXECAT, syscall_execat_handler);
 }
@@ -735,6 +737,61 @@ fn syscall_getcwd_handler(ctx: struct cpu_context*) -> struct cpu_context* {
             ctx->x[0], ctx->x[1], ctx->x[2]);
 
     ctx->x[0] = process_get_cwd(proc, buf, size) as uint64;
+
+    return ctx;
+}
+
+/**
+ * Handles syscall::CHDIR. Changes the process's current working directory to the
+ * path at x1 via process_set_cwd and returns the result in x0. No context switch.
+ *
+ * @param ctx: saved context of the calling process
+ *
+ * @return ctx with x0 set to 0 on success, or a negative io_error (-1 if there
+ *         is no current process)
+ */
+fn syscall_chdir_handler(ctx: struct cpu_context*) -> struct cpu_context* {
+    let proc = scheduler_get_current_process();
+    if (proc == null) {
+        dprintk("[scheduler] no current process!\n");
+        ctx->x[0] = -1 as uint64;
+        return ctx;
+    }
+
+    let path = ctx->x[1] as char*;
+
+    dprintk("[scheduler] chdir(), ctx->x0 = %llu, ctx->x1 = 0x%p\n",
+            ctx->x[0], ctx->x[1]);
+    
+    ctx->x[0] = process_set_cwd(proc, path) as uint64;
+
+    return ctx;
+}
+
+/**
+ * Handles syscall::FCHDIR. Changes the process's current working directory to the
+ * directory behind the open descriptor at x1 via process_set_cwd_at and returns
+ * the result in x0. No context switch.
+ *
+ * @param ctx: saved context of the calling process
+ *
+ * @return ctx with x0 set to 0 on success, or a negative io_error (-1 if there
+ *         is no current process)
+ */
+fn syscall_fchdir_handler(ctx: struct cpu_context*) -> struct cpu_context* {
+    let proc = scheduler_get_current_process();
+    if (proc == null) {
+        dprintk("[scheduler] no current process!\n");
+        ctx->x[0] = -1 as uint64;
+        return ctx;
+    }
+
+    let fd = ctx->x[1] as int64;
+
+    dprintk("[scheduler] fchdir(), ctx->x0 = %llu, ctx->x1 = %lld\n",
+            ctx->x[0], ctx->x[1]);
+
+    ctx->x[0] = process_set_cwd_at(proc, fd) as uint64;
 
     return ctx;
 }

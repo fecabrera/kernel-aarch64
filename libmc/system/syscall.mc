@@ -23,11 +23,13 @@ enum syscall: uint64 {
     STATAT   = 16,
     GETDENTS = 17,
     GETCWD   = 18,
-    ACQMEM   = 19,
-    RSZMEM   = 20,
-    RELMEM   = 21,
-    EXEC     = 22,
-    EXECAT   = 23,
+    CHDIR    = 19,
+    FCHDIR   = 20,
+    ACQMEM   = 21,
+    RSZMEM   = 22,
+    RELMEM   = 23,
+    EXEC     = 24,
+    EXECAT   = 25,
 }
 
 /**
@@ -386,6 +388,44 @@ enum syscall: uint64 {
         "mov x0, $0"
         "mov x1, $1"
         "mov x2, $2"
+        "svc #0"
+        "mov $out, x0"
+    };
+}
+
+/**
+ * Changes the calling process's current working directory to path via
+ * syscall::CHDIR (svc #0). Traps into EL1, where syscall_chdir_handler resolves
+ * the path (relative to the cwd unless absolute) and updates the process cwd.
+ *
+ * @param path: null-terminated path to the target directory
+ *
+ * @return 0 on success, or a negative error.
+ */
+@inline fn chdir(path: char*) -> int64 {
+    return @asm @clobbers("x0", "x1", "memory")
+        (syscall::CHDIR, path) -> int64 {
+        "mov x0, $0"
+        "mov x1, $1"
+        "svc #0"
+        "mov $out, x0"
+    };
+}
+
+/**
+ * Like chdir, but sets the current working directory to the directory behind the
+ * open descriptor fd via syscall::FCHDIR (svc #0) instead of resolving a path.
+ * Traps into EL1, where syscall_fchdir_handler updates the process cwd.
+ *
+ * @param fd: descriptor of an open directory to make the new cwd
+ *
+ * @return 0 on success, or a negative error.
+ */
+@inline fn fchdir(fd: int64) -> int64 {
+    return @asm @clobbers("x0", "x1", "memory")
+        (syscall::FCHDIR, fd) -> int64 {
+        "mov x0, $0"
+        "mov x1, $1"
         "svc #0"
         "mov $out, x0"
     };

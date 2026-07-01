@@ -769,6 +769,72 @@ fn process_get_cwd(proc: struct process*, buf: byte*, size: uint64) -> int64 {
 }
 
 /**
+ * Changes the process's current working directory to the folder at path
+ * (resolved relative to the VFS root if absolute, else proc's cwd).
+ *
+ * @param proc: process whose cwd is changed
+ * @param path: path of the target directory
+ *
+ * @return 0 on success, io_error::NOT_FOUND if the path does not resolve, or
+ *         io_error::NOT_A_DIR if it names something other than a folder
+ */
+fn process_set_cwd(proc: struct process*, path: char*) -> int64 {
+    dprintk("[process] set_cwd(%lld, %s)\n",
+            proc->pid, path);
+
+    let root = path[0] == '/' ? vfs_root() : proc->cwd;
+    let node = vfs_get_node_for_path(path, root);
+    return process_set_cwd_node(proc, node);
+}
+
+/**
+ * Like process_set_cwd, but sets the cwd to the directory node behind an
+ * already-open descriptor (fd) in proc's fd table rather than resolving a path.
+ *
+ * @param proc: process whose cwd is changed
+ * @param fd:   descriptor of an open directory to make the new cwd
+ *
+ * @return 0 on success, io_error::INVALID_DESCRIPTOR if fd is not open,
+ *         io_error::NOT_FOUND if it has no node, or io_error::NOT_A_DIR if it
+ *         does not name a folder
+ */
+fn process_set_cwd_at(proc: struct process*, fd: int64) -> int64 {
+    dprintk("[process] set_cwd_at(%lld, %lld)\n",
+            proc->pid, fd);
+    
+    let dtor_ptrs = &proc->dtor_ptrs;
+    let dtor: struct pointer<struct file_descriptor>*;
+    if (!list_get(dtor_ptrs, fd as uint64, &dtor)) {
+        dprintk("[process] invalid fd!\n");
+        return io_error::INVALID_DESCRIPTOR;
+    }
+
+    return process_set_cwd_node(proc, dtor->value->fd_node);
+}
+
+/**
+ * Shared back end of process_set_cwd and process_set_cwd_at: validates that node
+ * is a directory, then makes it the process's current working directory.
+ *
+ * @param proc: process whose cwd is set
+ * @param node: resolved directory node, or null if the path/fd did not resolve
+ *
+ * @return 0 on success, io_error::NOT_FOUND if node is null, or
+ *         io_error::NOT_A_DIR if node is not a directory
+ */
+@private
+fn process_set_cwd_node(proc: struct process*, node: fs_node*) -> int64 {
+    if (node == null)
+        return io_error::NOT_FOUND;
+
+    if (fs_node_get_type(node) != node_attrs::DIR)
+        return io_error::NOT_A_DIR;
+
+    proc->cwd = node;
+    return 0;
+}
+
+/**
  * Replaces the process's image with the program at `path` (resolved relative to
  * the VFS root if absolute, else proc's cwd), passing it argc/argv. execve-style:
  * on success the old image and stack contents are abandoned and the next

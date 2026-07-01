@@ -24,6 +24,15 @@ let available_commands: char*[][2] = [
 @static
 let dirs: char*[] = ["/bin"];
 
+/**
+ * Prints the built-in command list (from the available_commands table) to the
+ * console.
+ *
+ * @param argc: number of arguments (unused)
+ * @param argv: argument vector (unused)
+ *
+ * @return 0
+ */
 @private
 fn console_help(argc: int64, argv: char**) -> int64 {
     println("built-in commands:");
@@ -37,11 +46,21 @@ fn console_help(argc: int64, argv: char**) -> int64 {
     return 0;
 }
 
+/**
+ * Mounts the FAT32 block device named by argv[1] via fat32_mount. An optional
+ * argv[2] overrides the mountpoint; when omitted it defaults to the device's
+ * label (as chosen by fat32_mount).
+ *
+ * @param argc: number of arguments
+ * @param argv: argv[1] is the block device path; argv[2] is the optional mountpoint
+ *
+ * @return 0 on success, 1 if no device was given, 2 if fat32_mount fails
+ */
 @private
 fn console_mount(argc: int64, argv: char**) -> int64 {
     if (argc < 2) {
         println("usage: %s <device> [mountpoint]", argv[0]);
-        return -1;
+        return 1;
     }
 
     let mountpoint: char* = argc > 2 ? argv[2] : null;
@@ -49,13 +68,24 @@ fn console_mount(argc: int64, argv: char**) -> int64 {
     let status = fat32_mount(argv[1], mountpoint);
     if (status < 0) {
         println("fat32_mount() returned %d!", status);
-        return -2;
+        return 2;
     }
 
     println("block device \"%s\" mounted!", argv[1]);
     return 0;
 }
 
+/**
+ * Lists the entries of the folder at argv[1] (defaulting to "/" when no path is
+ * given), resolved absolutely from the VFS root or relative to the process cwd.
+ * Prints each child's name, skipping entries flagged node_attrs::HIDDEN (e.g.
+ * "." and "..").
+ *
+ * @param argc: number of arguments
+ * @param argv: argv[1] is the optional folder path
+ *
+ * @return 0 on success, 1 if the path is not found or is not a folder
+ */
 @private
 fn console_ls(argc: int64, argv: char**) -> int64 {
     let filename: char* = argc > 1 ? argv[1] : "/";
@@ -87,18 +117,17 @@ fn console_ls(argc: int64, argv: char**) -> int64 {
 }
 
 /**
- * Changes the calling process's current working directory to argv[1], resolved
- * via vfs_get_node_for_path (absolute from the VFS root, else relative to the
- * cwd; LINK nodes such as "." / ".." are followed by the resolver). Unlike the
- * other built-ins, cd is dispatched directly (not via console_run_command) so the
- * cwd update lands in the console process itself rather than a short-lived forked
- * child. The target must resolve to a folder.
+ * Changes the calling process's current working directory to argv[1] via the
+ * chdir syscall (which resolves the path absolutely from the VFS root or relative
+ * to the cwd, and requires it to name a folder). Like the other built-ins, cd
+ * runs directly in the console process rather than a forked child, so the cwd
+ * update lands in the shell itself.
  *
  * @param argc: number of arguments
  * @param argv: argv[0] is the command name; argv[1] is the destination path
  *
- * @return 0 on success, -1 if no path was given, -2 if the path is not found or
- *         is not a folder
+ * @return 0 on success, -1 if no path was given, 1 if chdir fails (path not found
+ *         or not a folder)
  */
 @private
 fn console_cd(argc: int64, argv: char**) -> int64 {
@@ -107,22 +136,12 @@ fn console_cd(argc: int64, argv: char**) -> int64 {
         return -1;
     }
 
-    let proc = scheduler_get_current_process();
-    
-    let path = argv[1];
-    let root = path[0] == '/' ? vfs_root() : proc->cwd;
-    let node = vfs_get_node_for_path(path, root);
-    if (node == null) {
-        println("\"%s\" not found!", path);
-        return -2;
+    let status = chdir(argv[1]);
+    if (status < 0) {
+        println("chdir() returned %lld", status);
+        return 1;
     }
 
-    if (fs_node_get_type(node) != node_attrs::DIR) {
-        println("\"%s\" is not a folder!", path);
-        return -2;
-    }
-
-    proc->cwd = node;
     return 0;
 }
 
@@ -175,14 +194,13 @@ fn try_run(const dir: char*, argc: int64, argv: char**) -> int64 {
 }
 
 /**
- * Dispatches a parsed command. Built-ins run in the console process (cd, which
- * mutates the console's own cwd) or a forked child (ls, mount, help):
- * ls [path] (list a folder's entries), cd <path> (change the working
- * directory), mount <device> [mountpoint] (fat32_mount; mountpoint defaults to
- * /volumes/<label>), help (list commands). Anything else is treated as an
- * external program: each entry in `dirs` is searched for an ELF object named
- * argv[0] (via try_run), which is fork+execat'd into its own process. Unknown
- * commands print a "not found!" message; empty input is ignored.
+ * Dispatches a parsed command. Built-ins all run directly in the console process:
+ * ls [path] (list a folder's entries), cd <path> (change the working directory),
+ * mount <device> [mountpoint] (fat32_mount; mountpoint defaults to the device
+ * label), help (list commands). Anything else is treated as an external program:
+ * each entry in `dirs` is searched for an ELF object named argv[0] (via try_run),
+ * which is fork+execat'd into its own process. Unknown commands print a
+ * "not found!" message; empty input is ignored.
  *
  * @param argc: number of arguments
  * @param argv: null-terminated argument strings; argv[0] is the command name
@@ -213,14 +231,13 @@ fn console_parse_command(argc: int64, argv: char**) {
 }
 
 /**
- * Runs an interactive console loop on pathname. Prompts with the current working directory's name
- * (or "/" at the root) followed by " > ", tokenizes each line into argc/argv (whitespace-delimited;
- * double-quoted strings are treated as single tokens; backslash escapes any character, including \"
- * inside quotes), and dispatches to console_parse_command. Lines
- * with an unterminated quote or trailing backslash are rejected with an error and not dispatched.
+ * Runs the interactive console loop. Prompts with the absolute path of the
+ * current working directory (via getcwd) followed by "# ", reads a line, and
+ * tokenizes it into argc/argv (whitespace-delimited; double-quoted strings are
+ * treated as single tokens; backslash escapes any character, including \" inside
+ * quotes) before dispatching to console_parse_command. Lines with an unterminated
+ * quote or trailing backslash are rejected with an error and not dispatched.
  * Does not return.
- *
- * @param pathname: VFS path of the device to use for I/O (e.g. "/dev/serial")
  */
 fn console() {
     while (true) {
