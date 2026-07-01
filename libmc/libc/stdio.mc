@@ -1,6 +1,10 @@
 import "std";
 import "system/syscall";
 
+@if (IS_KERNEL) {
+    import "interrupts/drivers/pl011";
+}
+
 // Bindings to the bundled stb_sprintf (src/lib/stb_sprintf.h). The build defines
 // STB_SPRINTF_NOFLOAT, so the float conversions (%f/%e/%g/%a) are disabled; all
 // integer/string/pointer conversions and the full flag/width/precision/length
@@ -81,11 +85,15 @@ fn printf(format: char*, ...) -> int32 {
  * @return number of characters written
  */
 fn vprintf(format: char*, args: va_list) -> int32 {
-    let ctx: struct printf_ctx;
-    ctx.fd = STDOUT_FILENO;
-    ctx.length = 0;
-    vsprintfcb(vprintf_cb, &ctx as byte*, ctx.tmp, format, args);
-    return ctx.length;
+    @if (IS_KERNEL) {
+        return pl011_vprintf(format, args);
+    } @else {
+        let ctx: struct printf_ctx;
+        ctx.fd = STDOUT_FILENO;
+        ctx.length = 0;
+        vsprintfcb(vprintf_cb, &ctx as byte*, ctx.tmp, format, args);
+        return ctx.length;
+    }
 }
 
 /**

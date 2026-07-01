@@ -202,13 +202,16 @@ fn pl011_printf(format: char*, ...) {
  *
  * @param format: printf-style format string
  * @param args:   variadic argument list (must be initialized by the caller)
+ *
+ * @return number of characters written
  */
-fn pl011_vprintf(format: char*, args: va_list) {
+fn pl011_vprintf(format: char*, args: va_list) -> int32 {
     let ctx: struct pl011_printf_ctx;
     ctx.length = 0;
     // stb formats into ctx.tmp (the STB_SPRINTF_MIN scratch buffer) and hands
     // &ctx back to pl011_printf_cb as `user`, which flushes each chunk to the UART.
     vsprintfcb(pl011_printf_cb, &ctx as byte*, ctx.tmp, format, args);
+    return ctx.length;
 }
 
 /**
