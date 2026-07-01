@@ -1,19 +1,9 @@
+import "std";
 import "libc/string";
 import "memory";
 import "string";
 import "endian";
 import "align";
-
-@if (IS_KERNEL) {
-    import "debug";
-    
-    const fdt_print = printk;
-}
-@else {
-    import "libc/stdio";
-
-    const fdt_print = printf;
-}
 
 // value expected in fdt_header::magic, identifying a flattened device tree blob
 const FDT_MAGIC: uint32 = 0xD00DFEED;
@@ -72,7 +62,7 @@ struct fdt_prop {
     token:              fdt_token;  // FDT_PROP
     length:             uint32;     // length of the value in bytes
     nameoff:            uint32;     // offset of the property name in the strings block
-    value:              char[];     // property value bytes
+    value:              byte[];     // property value bytes
 }
 
 /**
@@ -172,22 +162,22 @@ fn fdt_file_dump_data(self: fdt_file*) -> fdt_status {
     until (token == null) {
         case (be32(*token)) {
         when fdt_token::FDT_BEGIN_NODE:
-            fdt_print("fdt_begin_node: %s\n", fdt_get_node_name(token as fdt_node*));
+            println("fdt_begin_node: %s", fdt_get_node_name(token as fdt_node*));
             token = fdt_parse_begin_node(token);
         when fdt_token::FDT_END_NODE:
-            fdt_print("fdt_end_node\n");
+            println("fdt_end_node");
             token = fdt_parse_end_node(token);
         when fdt_token::FDT_PROP:
-            fdt_print("  fdt_prop: %s\n", fdt_get_prop_name(token as fdt_prop*, self->dt_strings));
+            println("  fdt_prop: %s", fdt_get_prop_name(token as fdt_prop*, self->dt_strings));
             token = fdt_parse_prop(token);
         when fdt_token::FDT_END:
-            fdt_print("fdt_end\n");
+            println("fdt_end");
             break;
         when fdt_token::FDT_NOP:
-            fdt_print("fdt_nop\n");
+            println("fdt_nop");
             token = fdt_parse_nop(token);
         else:
-            fdt_print("unknown token: 0x%08X\n", be32(*token));
+            println("unknown token: 0x%08X", be32(*token));
             return fdt_status::FDT_UNKNOWN_TOKEN;
         }
     }
@@ -397,8 +387,11 @@ fn fdt_tree_node_find_prop(node: fdt_tree_node*, name: char*, dt_strings: char*)
  * @param level: the current nesting depth, used for indentation
  */
 fn fdt_dump_tree_node(node: fdt_tree_node*, dt_strings: char*, level: int32) {
+    let r = struct range { end = level };
+    
     let name = fdt_get_node_name(node->dt_node);
-    fdt_print("%s {\n", name[0] ? name : "/");
+    for i in &r { print("\t"); }
+    println("%s {", name[0] ? name : "/");
     
     let prop = node->props;
     until (prop == null) {
@@ -408,11 +401,13 @@ fn fdt_dump_tree_node(node: fdt_tree_node*, dt_strings: char*, level: int32) {
 
     let child = node->children;
     until (child == null) {
+        println("");
         fdt_dump_tree_node(child, dt_strings, level + 1);
         child = child->next;
     }
-    
-    fdt_print("}\n");
+
+    for i in &r { print("\t"); }
+    println("}");
 }
 
 /**
@@ -423,7 +418,21 @@ fn fdt_dump_tree_node(node: fdt_tree_node*, dt_strings: char*, level: int32) {
  * @param level: the current nesting depth, used for indentation
  */
 fn fdt_dump_tree_prop(prop: fdt_tree_prop*, dt_strings: char*, level: int32) {
-    fdt_print("%s: \n", fdt_get_prop_name(prop->dt_prop, dt_strings));
+    let r = struct range { end = level };
+    for i in &r { print("\t"); }
+    print("%s", fdt_get_prop_name(prop->dt_prop, dt_strings));
+
+    if (be32(prop->dt_prop->length) > 0) {
+        print(" = <");
+
+        let values = struct range { end = be32(prop->dt_prop->length) };
+        for i in &values {
+            print("%s%02X", i ? " " : "", prop->dt_prop->value[i]);
+        }
+
+        print(">");
+    }
+    println(";");
 }
 
 /**
