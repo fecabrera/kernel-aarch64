@@ -1,3 +1,14 @@
+/**
+ * Access modes requested when opening a node, passed as a bitmask to the open
+ * syscall. NONE opens with no particular intent; the remaining flags may be
+ * OR'd together.
+ *
+ * @field NONE:  no access flags
+ * @field DIR:   open the node as a directory
+ * @field READ:  request read access
+ * @field WRITE: request write access
+ * @field EXEC:  request execute access
+ */
 enum open_mode: uint32 {
     NONE  = 0,
     DIR   = (1 << 0),
@@ -6,9 +17,25 @@ enum open_mode: uint32 {
     EXEC  = (1 << 3),
 }
 
+/**
+ * Attributes describing a filesystem node, stored per-node and reported through
+ * stat. The low bits encode the node type, higher bits encode flags and access
+ * permissions. Use the *_MASK values to isolate each group of bits.
+ *
+ * @field DIR:              node is a directory (type bit clear)
+ * @field FILE:             node is a regular file (type bit set)
+ * @field LINK:             node is a symbolic link
+ * @field HIDDEN:           node is hidden
+ * @field READ:             node is readable
+ * @field WRITE:            node is writable
+ * @field EXECUTE:          node is executable
+ * @field TYPE_MASK:        mask selecting the type bits
+ * @field FLAG_MASK:        mask selecting the flag bits (LINK, HIDDEN)
+ * @field PERMISSIONS_MASK: mask selecting the permission bits (READ, WRITE, EXECUTE)
+ */
 enum node_attrs: uint32 {
-    DIR              = (0 << 0),
-    FILE             = (1 << 0),
+    DIR              = 0,
+    FILE             = 1,
     // RESERVED         = (1 << 1),
     LINK             = (1 << 2),
     HIDDEN           = (1 << 3),
@@ -16,10 +43,20 @@ enum node_attrs: uint32 {
     WRITE            = (1 << 5),
     EXECUTE          = (1 << 6),
     TYPE_MASK        = (node_attrs::FILE),
-    PERMISSIONS_MASK = (node_attrs::READ | node_attrs::WRITE | node_attrs::EXECUTE),
     FLAG_MASK        = (node_attrs::LINK | node_attrs::HIDDEN),
+    PERMISSIONS_MASK = (node_attrs::READ | node_attrs::WRITE | node_attrs::EXECUTE),
 }
 
+/**
+ * Negative error codes returned by filesystem operations. A non-negative return
+ * value indicates success; a negative value matches one of these variants.
+ *
+ * @field INVALID_DESCRIPTOR: the given file descriptor is not valid
+ * @field NOT_FOUND:          the requested node does not exist
+ * @field NOT_A_FILE:         the target is not a regular file
+ * @field NOT_A_DIR:          the target is not a directory
+ * @field NOT_PERMITTED:      the operation is not permitted for this node
+ */
 enum io_error: int64 {
     INVALID_DESCRIPTOR = -1,
     NOT_FOUND          = -2,
@@ -64,4 +101,3 @@ struct dirent {
     d_type: dent_type;
     d_name: byte[];
 }
-

@@ -5,6 +5,17 @@ import "stack";
 import "libc/stdio";
 import "libc/string";
 
+/**
+ * Negative error codes returned by the fs_* layer. A non-negative return value
+ * indicates success; a negative value matches one of these variants.
+ *
+ * @field NOT_FOUND:            the target node does not exist (e.g. null node)
+ * @field NOT_A_FILE:           the target is not a regular file
+ * @field NOT_A_DIR:            the target is not a directory
+ * @field NOT_PERMITTED:        the node does not permit the requested access
+ * @field MOUNTPOINT_NOT_FOUND: the node has no covering mount
+ * @field HANDLER_NOT_PROVIDED: the mount lacks the required read/write handler
+ */
 enum fs_error: int64 {
     NOT_FOUND            = -2,
     NOT_A_FILE           = -3,
@@ -21,7 +32,8 @@ enum fs_error: int64 {
  *
  * @field name:      heap-allocated, NUL-terminated node name (owned; freed on destroy)
  * @field file_size: size in bytes for files; 0 for folders
- * @field attrs:     type bit (FS_NODE_ATTRS_TYPE_*) OR'd with flags (FS_NODE_ATTRS_FLAG_*)
+ * @field attrs:     type bit (node_attrs::DIR/FILE) OR'd with flags (node_attrs::LINK/HIDDEN)
+ *                   and permission bits (node_attrs::READ/WRITE/EXECUTE)
  * @field info:      driver-private pointer (e.g. fat32_entry_reference *), or null
  * @field mount:     covering mountpoint for this node, or null
  * @field next:      next sibling in the parent folder, or null
@@ -112,7 +124,7 @@ fn fs_remove_child(node: struct fs_node*, name: char*) -> int32 {
  * @param name:      null-terminated name string (length determined via strlen; duplicated into
  * heap)
  * @param file_size: file size in bytes stored in node->file_size (0 for folders)
- * @param attrs:     attribute flags (FS_NODE_ATTRS_TYPE_* combined with FS_NODE_ATTRS_FLAG_*)
+ * @param attrs:     attribute flags (node_attrs type bits combined with flag/permission bits)
  * @param info:      driver-private pointer stored in node->info (e.g. fat32_entry_reference *)
  * @param mount:     fs_mount pointer stored in node->mount, or null
  * @param next:      next sibling node in the directory, or null
@@ -159,13 +171,13 @@ fn fs_destroy_node(node: struct fs_node*) {
 }
 
 /**
- * Allocates and initializes a new fs_node with FS_NODE_ATTRS_TYPE_FILE set.
+ * Allocates and initializes a new fs_node with the node_attrs::FILE type bit set.
  * Convenience wrapper around fs_create_node with next and child set to null.
  *
  * @param name:      null-terminated name string (length determined via strlen; duplicated into
  * heap)
  * @param file_size: file size in bytes stored in node->file_size
- * @param attrs:     additional attribute flags (FS_NODE_ATTRS_FLAG_*); type bits are ignored
+ * @param attrs:     additional attribute flags (only permission bits are kept; type bits are ignored)
  * @param data:      driver-private pointer stored in node->info
  * @param mount:     fs_mount pointer stored in node->mount, or null
  *
@@ -178,12 +190,12 @@ fn fs_create_file(name: char*, file_size: uint64, attrs: uint32, data: byte*,
 }
 
 /**
- * Allocates and initializes a new fs_node with FS_NODE_ATTRS_TYPE_FOLDER set.
+ * Allocates and initializes a new fs_node with the node_attrs::DIR type bit set.
  * Convenience wrapper around fs_create_node with next and child set to null.
  * Automatically adds a "." self-reference child.
  *
  * @param name:  null-terminated name string (length determined via strlen; duplicated into heap)
- * @param attrs: additional attribute flags (FS_NODE_ATTRS_FLAG_*); type bits are ignored
+ * @param attrs: additional attribute flags (only permission bits are kept; type bits are ignored)
  * @param data:  driver-private pointer stored in node->info
  * @param mount: fs_mount pointer stored in node->mount, or null
  *
@@ -266,7 +278,7 @@ fn fs_create_parent_ref(parent: struct fs_node*, folder: struct fs_node*) -> str
  * @param name:      null-terminated name string for the new file (duplicated into a heap-allocated
  * buffer)
  * @param file_size: file size in bytes, stored in node->file_size
- * @param attrs:     attribute flags for the new file (FS_NODE_ATTRS_FLAG_*)
+ * @param attrs:     attribute flags for the new file (permission bits; type bits are ignored)
  * @param data:      driver-private pointer stored in node->info
  * @param mount:     fs_mount pointer stored in node->mount, or null
  *
@@ -274,7 +286,7 @@ fn fs_create_parent_ref(parent: struct fs_node*, folder: struct fs_node*) -> str
  */
 fn fs_add_file_to_folder(parent: struct fs_node*, name: char*, file_size: uint64,
                          attrs: uint32, data: byte*, mount: struct fs_mount*) -> struct fs_node* {
-    if ((parent->attrs & node_attrs::TYPE_MASK) != node_attrs::DIR) {
+    if (fs_node_get_type(parent) != node_attrs::DIR) {
         dprintk("[filesystem] Node is not a folder!\n");
         return null;
     }
@@ -292,7 +304,7 @@ fn fs_add_file_to_folder(parent: struct fs_node*, name: char*, file_size: uint64
  * @param parent: pointer to the parent folder node
  * @param name:   null-terminated name string for the new subfolder (duplicated into a
  * heap-allocated buffer)
- * @param attrs:  attribute flags for the new subfolder (FS_NODE_ATTRS_FLAG_*)
+ * @param attrs:  attribute flags for the new subfolder (permission bits; type bits are ignored)
  * @param data:   driver-private pointer stored in node->info
  * @param mount:  fs_mount pointer stored in node->mount, or null
  *
@@ -300,7 +312,7 @@ fn fs_add_file_to_folder(parent: struct fs_node*, name: char*, file_size: uint64
  */
 fn fs_add_subfolder(parent: struct fs_node *, name: char*, attrs: uint32, data: byte*,
                     mount: struct fs_mount*) -> struct fs_node * {
-    if ((parent->attrs & node_attrs::TYPE_MASK) != node_attrs::DIR) {
+    if (fs_node_get_type(parent) != node_attrs::DIR) {
         dprintk("[filesystem] node is not a folder!\n");
         return null;
     }
@@ -375,8 +387,7 @@ fn fs_dump_node(node: struct fs_node*, prefix: char*) {
 
     fs_dump_file(node, prefix);
 
-    let attrs = node->attrs & node_attrs::TYPE_MASK;
-    if (attrs == node_attrs::DIR and
+    if (fs_node_get_type(node) == node_attrs::DIR and
         strcmp(node->name, ".") != 0 and
         strcmp(node->name, "..") != 0) {
         let _prefix: char*;
@@ -411,9 +422,11 @@ fn fs_dump_node(node: struct fs_node*, prefix: char*) {
  * @param offset: byte offset into the file to read from
  *
  * @return return value of the mount's read handler on success;
- *         FS_IO_ERROR_FILE_NOT_FOUND if node is null,
- *         FS_IO_ERROR_MOUNTPOINT_NOT_FOUND if the node has no mount,
- *         FS_IO_ERROR_HANDLER_NOT_PROVIDED if the mount has no read handler
+ *         fs_error::NOT_FOUND if node is null,
+ *         fs_error::NOT_A_FILE if the node is not a file,
+ *         fs_error::MOUNTPOINT_NOT_FOUND if the node has no mount,
+ *         fs_error::HANDLER_NOT_PROVIDED if the mount has no read handler,
+ *         fs_error::NOT_PERMITTED if the node does not allow reads
  */
 fn fs_read(node: struct fs_node*, buffer: byte*, count: uint64, offset: uint64) -> fs_error {
     dprintk("[fs] buffer=0x%p, count=%llu, offset=%llu\n");
@@ -423,7 +436,7 @@ fn fs_read(node: struct fs_node*, buffer: byte*, count: uint64, offset: uint64) 
         return fs_error::NOT_FOUND;
     }
 
-    if ((node->attrs & node_attrs::TYPE_MASK) != node_attrs::FILE) {
+    if (fs_node_get_type(node) != node_attrs::FILE) {
         dprintk("[fs] \"%s\" is not a file!\n", node->name);
         return fs_error::NOT_A_FILE;
     }
@@ -439,7 +452,7 @@ fn fs_read(node: struct fs_node*, buffer: byte*, count: uint64, offset: uint64) 
         return fs_error::HANDLER_NOT_PROVIDED;
     }
 
-    if ((node->attrs & node_attrs::READ) == 0) {
+    if (!fs_node_test_attribute(node, node_attrs::READ)) {
         dprintk("[fs] \"%s\" does not allow reads\n", node->name);
         return fs_error::NOT_PERMITTED;
     }
@@ -456,9 +469,11 @@ fn fs_read(node: struct fs_node*, buffer: byte*, count: uint64, offset: uint64) 
  * @param offset: byte offset into the file to write to
  *
  * @return return value of the mount's write handler on success;
- *         FS_IO_ERROR_FILE_NOT_FOUND if node is null,
- *         FS_IO_ERROR_MOUNTPOINT_NOT_FOUND if the node has no mount,
- *         FS_IO_ERROR_HANDLER_NOT_PROVIDED if the mount has no write handler
+ *         fs_error::NOT_FOUND if node is null,
+ *         fs_error::NOT_A_FILE if the node is not a file,
+ *         fs_error::MOUNTPOINT_NOT_FOUND if the node has no mount,
+ *         fs_error::HANDLER_NOT_PROVIDED if the mount has no write handler,
+ *         fs_error::NOT_PERMITTED if the node does not allow writes
  */
 fn fs_write(node: struct fs_node*, buffer: byte*, count: uint64, offset: uint64) -> int64 {
     if (node == null) {
@@ -466,7 +481,7 @@ fn fs_write(node: struct fs_node*, buffer: byte*, count: uint64, offset: uint64)
         return fs_error::NOT_FOUND;
     }
 
-    if ((node->attrs & node_attrs::TYPE_MASK) != node_attrs::FILE) {
+    if (fs_node_get_type(node) != node_attrs::FILE) {
         dprintk("[fs] \"%s\" is not a file!\n", node->name);
         return fs_error::NOT_A_FILE;
     }
@@ -482,7 +497,7 @@ fn fs_write(node: struct fs_node*, buffer: byte*, count: uint64, offset: uint64)
         return fs_error::HANDLER_NOT_PROVIDED;
     }
 
-    if ((node->attrs & node_attrs::WRITE) == 0) {
+    if (!fs_node_test_attribute(node, node_attrs::WRITE)) {
         dprintk("[fs] \"%s\" does not allow writes\n", node->name);
         return fs_error::NOT_PERMITTED;
     }
@@ -513,7 +528,7 @@ fn fs_get_absolute_dir(node: struct fs_node*, buf: byte*, size: uint64) -> int64
     until (current == null) {
         dprintk("[fs] pushing \"%s\"\n", current->name == null ? "" : current->name);
 
-        if ((current->attrs & node_attrs::TYPE_MASK == node_attrs::DIR))
+        if (fs_node_get_type(current) == node_attrs::DIR)
             stack_push(&s, current);
 
         let parent_ref = fs_get_child(current, "..");
@@ -544,4 +559,30 @@ fn fs_get_absolute_dir(node: struct fs_node*, buf: byte*, size: uint64) -> int64
     buf[length] = '\0';
     
     return length as int64;
+}
+
+/**
+ * Extracts the type bits from a node's attrs, isolating whether it is a file or
+ * a directory. Compare the result against node_attrs::FILE or node_attrs::DIR.
+ *
+ * @param node: node whose type to read
+ *
+ * @return the masked type bits (node_attrs::TYPE_MASK applied to node->attrs)
+ */
+@inline
+fn fs_node_get_type(node: fs_node*) -> uint32 {
+    return node->attrs & node_attrs::TYPE_MASK;
+}
+
+/**
+ * Tests whether a single attribute bit is set on a node.
+ *
+ * @param node: node whose attrs to test
+ * @param attr: attribute bit to check (e.g. node_attrs::READ, node_attrs::HIDDEN)
+ *
+ * @return true if the bit is set, false otherwise
+ */
+@inline
+fn fs_node_test_attribute(node: fs_node*, attr: node_attrs) -> bool {
+    return (node->attrs & attr) != 0;
 }

@@ -17,6 +17,15 @@ const MAX_ARGS = 64;
 // overflowed into the adjacent heap block. See process_check_stack.
 const STACK_CANARY: uint64 = 0xDEADC0DECAFEF00D;
 
+/**
+ * Lifecycle state of a process, tracked in process.state and driven by the
+ * scheduler.
+ *
+ * @field DEAD:    exited; awaiting process_destroy to reclaim its resources
+ * @field CREATED: initialized but not yet enqueued in the scheduler
+ * @field READY:   runnable; eligible to be scheduled
+ * @field BLOCKED: waiting (on a child via waitpid, or sleeping until a deadline)
+ */
 enum proc_state: int64 {
     DEAD    = -1,
     CREATED = 0,
@@ -24,6 +33,7 @@ enum proc_state: int64 {
     BLOCKED = 2,
 }
     
+// Monotonic PID allocator. Handed out by get_next_pid and never reused.
 @static let next_pid: proc_pid = 1;
 
 /**
@@ -33,6 +43,9 @@ enum proc_state: int64 {
  * @field pid:         (pid_t) unique process identifier, assigned at creation
  * @field state:       current lifecycle state (proc_state::CREATED, proc_state::READY,
  *                     proc_state::BLOCKED, or proc_state::DEAD)
+ * @field image:       base address of the heap-allocated program image (code/data
+ *                     loaded by exec), or null before a program is loaded
+ * @field image_size:  size of the image allocation in bytes; 0 when imageless
  * @field stack:       base address of the heap-allocated task stack
  * @field ctx:         saved register frame (cpu_context), embedded near the top of stack and
  *                     updated on every context switch
@@ -507,34 +520,39 @@ fn dup_image(dest: struct process*, src: struct process*) -> int32 {
  *
  * @param proc:     process whose fd table the file is added to
  * @param pathname: path to open, resolved relative to proc->cwd
- * @param attrs:    access mode (FS_FILE_ATTRS_READ/WRITE/EXEC bits)
+ * @param mode:     access mode (open_mode::DIR/READ/WRITE/EXEC bits)
  *
- * @return the new file descriptor (index into the fd table),
- *         FILE_IO_ERROR_NOT_FOUND if the path does not resolve, or
- *         FILE_IO_ERROR_NOT_A_FILE if it names a folder
+ * @return the new file descriptor (index into the fd table), or a negative
+ *         io_error (NOT_FOUND if the path does not resolve, NOT_A_DIR if
+ *         open_mode::DIR was set on a non-directory, NOT_PERMITTED if the node
+ *         lacks the requested access)
  */
-fn process_open_file(proc: struct process*, pathname: char*, attrs: uint32) -> int64 {
-    dprintk("[process] open_file(%lld, \"%s\", %04X)\n", proc->pid, pathname, attrs);
+fn process_open_file(proc: struct process*, pathname: char*, mode: uint32) -> int64 {
+    dprintk("[process] open_file(%lld, \"%s\", %08X)\n", proc->pid, pathname, mode);
 
     let root = pathname[0] == '/' ? vfs_root() : proc->cwd;
     let node = vfs_get_node_for_path(pathname, root);
-    if (node == null)
-        return io_error::NOT_FOUND;
     
-    let dtor_ptrs = &proc->dtor_ptrs;
-    let fd = dtor_ptrs->length as int64;
-
-    let dtor = create_pointer<struct file_descriptor>();
-    list_push(dtor_ptrs, dtor);
-
-    file_init(dtor->value, node, attrs);
-
-    return fd;
+    return process_open_file_node(proc, node, mode);
 }
 
-fn process_open_file_at(proc: struct process*, dirfd: int64, pathname: char*, attrs: uint32) -> int64 {
+/**
+ * Like process_open_file, but resolves pathname relative to the directory node
+ * behind an already-open descriptor (dirfd) in proc's fd table rather than the
+ * cwd.
+ *
+ * @param proc:     process whose fd table holds dirfd and receives the new file
+ * @param dirfd:    descriptor of an open directory to resolve pathname against
+ * @param pathname: path to open, relative to dirfd
+ * @param mode:     access mode (open_mode::DIR/READ/WRITE/EXEC bits)
+ *
+ * @return the new file descriptor, or a negative io_error (NOT_FOUND if dirfd is
+ *         not open or the path does not resolve, NOT_A_DIR / NOT_PERMITTED as in
+ *         process_open_file)
+ */
+fn process_open_file_at(proc: struct process*, dirfd: int64, pathname: char*, mode: uint32) -> int64 {
     dprintk("[process] open_file_at(%lld, %lld, \"%s\", %04X)\n",
-            proc->pid, dirfd, pathname, attrs);
+            proc->pid, dirfd, pathname, mode);
 
     let dtor_ptrs = &proc->dtor_ptrs;
     let dtor: struct pointer<struct file_descriptor>*;
@@ -542,17 +560,45 @@ fn process_open_file_at(proc: struct process*, dirfd: int64, pathname: char*, at
         return io_error::NOT_FOUND;
 
     let node = vfs_get_node_for_path(pathname, dtor->value->fd_node);
+
+    return process_open_file_node(proc, node, mode);
+}
+
+/**
+ * Shared back end of process_open_file and process_open_file_at: validates the
+ * resolved node against the requested access mode, then registers it in proc's
+ * fd table. Allocates a refcounted pointer<file_descriptor>, initializes it via
+ * file_init, appends it to proc->dtor_ptrs, and returns its index as the fd.
+ *
+ * @param proc: process whose fd table the file is added to
+ * @param node: resolved VFS node to open, or null if the path did not resolve
+ * @param mode: access mode (open_mode::DIR/READ/WRITE/EXEC bits)
+ *
+ * @return the new file descriptor, or a negative io_error (NOT_FOUND if node is
+ *         null, NOT_A_DIR if open_mode::DIR was set on a non-directory,
+ *         NOT_PERMITTED if the node lacks the requested read/write access)
+ */
+@private
+fn process_open_file_node(proc: struct process*, node: fs_node*, mode: uint32) -> int64 {
     if (node == null)
         return io_error::NOT_FOUND;
 
-    let new_fd = dtor_ptrs->length as int64;
+    if ((mode & open_mode::DIR) and fs_node_get_type(node) != node_attrs::DIR)
+        return io_error::NOT_A_DIR;
+    
+    if (((mode & open_mode::READ) and !fs_node_test_attribute(node, node_attrs::READ))
+        or ((mode & open_mode::WRITE) and !fs_node_test_attribute(node, node_attrs::WRITE)))
+        return io_error::NOT_PERMITTED;
+    
+    let dtor_ptrs = &proc->dtor_ptrs;
+    let fd = dtor_ptrs->length as int64;
 
-    let new_dtor = create_pointer<struct file_descriptor>();
-    list_push(dtor_ptrs, new_dtor);
+    let dtor = create_pointer<struct file_descriptor>();
+    list_push(dtor_ptrs, dtor);
 
-    file_init(new_dtor->value, node, attrs);
+    file_init(dtor->value, node, mode);
 
-    return new_fd;
+    return fd;
 }
 
 /**
@@ -563,7 +609,7 @@ fn process_open_file_at(proc: struct process*, dirfd: int64, pathname: char*, at
  * @param proc: process owning the fd
  * @param fd:   file descriptor to close
  *
- * @return 0 on success, FILE_IO_ERROR_INVALID_DESCRIPTOR if fd is out of range
+ * @return 0 on success, io_error::INVALID_DESCRIPTOR if fd is out of range
  */
 fn process_close_file(proc: struct process*, fd: int64) -> int64 {
     dprintk("[process] close_file(%lld, %lld)\n", proc->pid, fd);
@@ -635,7 +681,7 @@ fn process_write_file(proc: struct process*, fd: int64, buffer: byte*, count: ui
  * @param fd:   file descriptor to stat
  * @param st:   caller-allocated file_stat to fill
  *
- * @return 0 on success, FILE_IO_ERROR_INVALID_DESCRIPTOR if fd is out of range
+ * @return 0 on success, io_error::INVALID_DESCRIPTOR if fd is out of range
  */
 fn process_file_stat(proc: struct process*, fd: int64, st: struct file_stat*) -> int64 {
     dprintk("[process] file_stat(%lld, %lld, %p)\n",
@@ -659,7 +705,7 @@ fn process_file_stat(proc: struct process*, fd: int64, st: struct file_stat*) ->
  * @param path: path to stat, resolved relative to proc->cwd
  * @param st:   caller-allocated file_stat to fill
  *
- * @return 0 on success, FILE_IO_ERROR_NOT_FOUND if the path does not resolve
+ * @return 0 on success, io_error::NOT_FOUND if the path does not resolve
  */
 fn process_stat(proc: struct process*, path: char*, st: struct file_stat*) -> int64 {
     dprintk("[process] stat(%lld, %s, %p)\n",

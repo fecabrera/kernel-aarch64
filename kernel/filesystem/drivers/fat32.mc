@@ -457,7 +457,7 @@ fn fat32_build_fs_tree(pathname: char*, bs_info: struct fat32_bs_info*,
             parent_node = root_node;
 
         // ignore file contents
-        if ((parent_node->attrs & node_attrs::TYPE_MASK) == node_attrs::FILE)
+        if (fs_node_get_type(parent_node) == node_attrs::FILE)
             continue;
 
         // go through all clusters on the cluster chain
@@ -589,12 +589,12 @@ fn fat32_mount(device_path: char*, mountpoint: char*) -> int64 {
             return FAT32_MOUNT_ERROR_MOUNTPOINT_NOT_FOUND;
         }
 
-        until ((root->attrs & node_attrs::LINK) == 0)
+        until (!fs_node_test_attribute(root, node_attrs::LINK))
             root = root->child;
     }
 
     // check if root is a folder
-    if ((root->attrs & node_attrs::TYPE_MASK) != node_attrs::DIR) {
+    if (fs_node_get_type(root) != node_attrs::DIR) {
         dprintk("[fat32] root is not a folder!\n");
         kdealloc(bs_info);
         return FAT32_MOUNT_ERROR_MOUNTPOINT_IS_NOT_A_FOLDER;

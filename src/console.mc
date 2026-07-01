@@ -66,18 +66,18 @@ fn console_ls(argc: int64, argv: char**) -> int64 {
     let node = vfs_get_node_for_path(filename, root);
     if (node == null) {
         println("\"%s\" not found!", filename);
-        return -1;
+        return 1;
     }
 
-    if ((node->attrs & node_attrs::TYPE_MASK) != node_attrs::DIR) {
+    if (fs_node_get_type(node) != node_attrs::DIR) {
         println("\"%s\" is not a folder!", filename);
-        return -2;
+        return 1;
     }
 
     let current = node->child;
     until (current == null) {
         defer current = current->next;
-        if ((current->attrs & node_attrs::HIDDEN) != 0)
+        if (fs_node_test_attribute(current, node_attrs::HIDDEN))
             continue;
         
         println("%s", current->name);
@@ -117,7 +117,7 @@ fn console_cd(argc: int64, argv: char**) -> int64 {
         return -2;
     }
 
-    if ((node->attrs & node_attrs::TYPE_MASK) != node_attrs::DIR) {
+    if (fs_node_get_type(node) != node_attrs::DIR) {
         println("\"%s\" is not a folder!", path);
         return -2;
     }

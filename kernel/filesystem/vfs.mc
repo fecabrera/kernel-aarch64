@@ -55,7 +55,7 @@ fn vfs_create_mountpoint(mountpoint: char*, device: char*, info: byte*,
         return null;
     }
 
-    if ((mp_node->attrs & node_attrs::TYPE_MASK) != node_attrs::DIR) {
+    if (fs_node_get_type(mp_node) != node_attrs::DIR) {
         dprintk("[vfs] \"%s\" is not a folder!\n", mountpoint);
         return null;
     }
@@ -157,7 +157,7 @@ fn vfs_get_node_for_path(pathname: char*, root: struct fs_node*) -> struct fs_no
     let j: uint64 = 0;
     until (current == null) {
         // follow links
-        until (current == null or (current->attrs & node_attrs::LINK) == 0) {
+        until (current == null or !fs_node_test_attribute(current, node_attrs::LINK)) {
             current = current->child;
         }
 
@@ -169,7 +169,7 @@ fn vfs_get_node_for_path(pathname: char*, root: struct fs_node*) -> struct fs_no
                 current = fs_get_child(current, str);
 
             // follow links
-            until (current == null or (current->attrs & node_attrs::LINK) == 0) {
+            until (current == null or !fs_node_test_attribute(current, node_attrs::LINK)) {
                 current = current->child;
             }
 
