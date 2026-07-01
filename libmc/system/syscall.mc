@@ -181,7 +181,7 @@ enum syscall: uint64 {
  * resolves the path relative to the process cwd and adds an entry to its fd table.
  *
  * @param path:  null-terminated path to open
- * @param attrs: access mode (FS_FILE_ATTRS_READ/WRITE/EXEC bits)
+ * @param attrs: access mode (open_mode::DIR/READ/WRITE/EXEC bits)
  *
  * @return the new file descriptor, or -1 on failure.
  */
@@ -195,6 +195,18 @@ enum syscall: uint64 {
     };
 }
 
+/**
+ * Like open, but resolves path relative to the open directory descriptor dirfd
+ * via syscall::OPENAT (svc #0) instead of the process cwd. Traps into EL1, where
+ * syscall_openat_handler resolves the path against dirfd's node and adds an entry
+ * to the process fd table.
+ *
+ * @param dirfd: descriptor of an open directory to resolve path against
+ * @param path:  null-terminated path to open, relative to dirfd
+ * @param attrs: access mode (open_mode::DIR/READ/WRITE/EXEC bits)
+ *
+ * @return the new file descriptor, or -1 on failure.
+ */
 @inline fn openat(dirfd: int64, path: char*, attrs: uint32) -> int64 {
     return @asm @clobbers("x0", "x1", "x2", "x3", "memory")
         (syscall::OPENAT, dirfd, path, attrs) -> int64 {
@@ -379,6 +391,16 @@ enum syscall: uint64 {
     };
 }
 
+/**
+ * Acquires a block of `size` bytes with the given alignment from the kernel via
+ * syscall::ACQMEM (svc #0). Traps into EL1, where syscall_acqmem_handler maps the
+ * memory into the calling process's address space.
+ *
+ * @param size:  number of bytes to acquire
+ * @param align: required alignment of the returned block, in bytes
+ *
+ * @return pointer to the acquired block, or null on failure.
+ */
 @inline fn acqmem(size: uint64, align: uint64) -> byte* {
     return @asm @clobbers("x0", "x1", "x2", "memory")
         (syscall::ACQMEM, size, align) -> byte* {
@@ -390,6 +412,18 @@ enum syscall: uint64 {
     };
 }
 
+/**
+ * Resizes a previously acquired block to `size` bytes with the given alignment
+ * via syscall::RSZMEM (svc #0). Traps into EL1, where syscall_rszmem_handler
+ * remaps the block, preserving its contents up to the smaller of the old and new
+ * sizes.
+ *
+ * @param ptr:   pointer to a block previously returned by acqmem
+ * @param size:  new size of the block in bytes
+ * @param align: required alignment of the returned block, in bytes
+ *
+ * @return pointer to the resized block (may differ from ptr), or null on failure.
+ */
 @inline fn rszmem(ptr: byte*, size: uint64, align: uint64) -> byte* {
     return @asm @clobbers("x0", "x1", "x2", "memory")
         (syscall::RSZMEM, ptr, size, align) -> byte* {
@@ -402,6 +436,13 @@ enum syscall: uint64 {
     };
 }
 
+/**
+ * Releases a block previously acquired via acqmem back to the kernel through
+ * syscall::RELMEM (svc #0). Traps into EL1, where syscall_relmem_handler unmaps
+ * the block from the calling process's address space.
+ *
+ * @param ptr: pointer to a block previously returned by acqmem
+ */
 @inline fn relmem(ptr: byte*) {
     @asm @clobbers("x0", "x1", "memory")
         (syscall::RELMEM, ptr) {
