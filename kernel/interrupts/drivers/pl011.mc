@@ -1,5 +1,4 @@
 import "debug";
-import "cpu";
 import "dtb";
 import "range";
 import "libc/stdio";
@@ -119,8 +118,6 @@ struct pl011_printf_ctx {
  * and registers the IRQ with the GIC.
  */
 fn pl011_init() {
-    // PL011 = UART0_BASE as struct pl011_regs*;
-
     // Disable UART before configuring
     PL011->cr = PL011_CR_DISABLED;
 
@@ -142,12 +139,12 @@ fn pl011_init() {
     // Enable UART, TX, RX
     PL011->cr = PL011_CR_UARTEN | PL011_CR_TXE | PL011_CR_RXE;
 
-    if (dtb_get_pl011_irq_number(&pl011_irq) == 0) {
-        dprintk("[pl011] Initializing IRQ: %i\n", pl011_irq);
+    if (dtb_find_irq_number("/pl011@9000000", "interrupts", 0, &pl011_irq)) {
+        dprintk("[pl011] registering IRQ: %d\n", pl011_irq);
         irq_register_handler(pl011_irq, pl011_irq_handler);
         gic_enable_irq(pl011_irq);
     } else {
-        dprintk("[pl011] IRQ not found!!\n");
+        dprintk("[pl011] IRQ not found\n");
     }
 }
 

@@ -78,10 +78,10 @@ linking kernel internals (heap, UART, `printk`) — see "ELF loader / user progr
 - CPU helpers (`cpu.mc`) — register accessors (cntpct/cntfrq/cntp_ctl/cntp_tval, vbar_el1), wfi/wfe, halt/hang, irq enable/disable, and bswap, all via inline `@asm`
 - Boot entry / init sequence (`kernel.mc`) — `kernel_init` subsystem bring-up and the `init` (pid 1) entry point
 - ELF64 loader — loads & runs relocatable objects (`ET_REL`) as processes: section layout, symbol rebasing, per-symbol GOT, and the core AArch64 relocations (`elf/elf64.mc`; driven by `process.mc`'s `process_exec`, reached from `console.mc`'s `try_run` via fork+execat)
+- FDT / device tree — a tree-building flattened-device-tree parser (`utils/fdt.mc`): parses the DTB into an in-memory node/property tree (`fdt_file_build_tree`) with path-based node lookup (`fdt_file_find_node`). `kernel/dtb.mc` wraps it for IRQ-number and memory-region lookups (`dtb_find_irq_number`/`dtb_find_memory_register`), keyed by full node path (e.g. `/pl011@9000000`, `/timer`, `/memory@40000000`)
 
 **Still C, bound from mc via `@extern`** (port targets):
 
-- FDT parser — `lib/src/dtb.c` (IRQ-number lookup for timer/RTC/virtio)
 - UTF-16 helpers — `lib/src/utf16.c` (used by the FAT32 long-name path)
 
 **Not being ported:**
@@ -93,7 +93,8 @@ linking kernel internals (heap, UART, `printk`) — see "ELF loader / user progr
 
 ### **DTB parsing**
 
-- Reads device tree at boot to discover IRQ numbers, memory layout, and peripheral addresses at runtime.
+- Parses the device tree at boot into an in-memory node/property tree (`utils/fdt.mc`) to discover IRQ numbers, memory layout, and peripheral addresses at runtime.
+- `kernel/dtb.mc` resolves nodes by full path (e.g. `/pl011@9000000`) and decodes `interrupts` cells into absolute GIC IRQ IDs (SPI + 32, PPI + 16).
 
 ### **GIC-400**
 
@@ -260,10 +261,10 @@ linking kernel internals (heap, UART, `printk`) — see "ELF loader / user progr
 
 Kernel implementations live in `.mc` under `kernel/` (plus the entry points in
 `src/`). The remaining C is split into two top-level trees that mc
-`@extern`-binds: `lib/` (the FDT parser and UTF-16 helpers, plus the AArch64/MMIO
-C headers the C still includes — `cpu.h`'s endian macros, `virtio_mmio.h`'s
-register structs, and the still-vestigial `arch/irq.h`) and `libc/` (the
-freestanding C standard library). `libmc/` is mcc's standard library;
+`@extern`-binds: `lib/` (the UTF-16 helpers, plus `cpu.h`'s endian macros that C
+still includes) and `libc/` (the freestanding C standard library). `libmc/` is
+mcc's standard library, and `utils/` holds standalone mc utility modules (the FDT
+parser, endian/byte-swap, and alignment helpers);
 `start.S`/`vectors.S` stay hand-written assembly and call `kernel_init` (in
 `kernel.mc`). Each C tree is `include/` (headers) + `src/` (sources). The build
 is driven by `build.sh`/`clean.sh`/`run.sh` (no Makefile); `build.sh` compiles
@@ -283,7 +284,7 @@ user/               — userspace tree
   libc.a            — user-side libc archive
 
 src/                — entry points (assembly stubs + top-level mc)
-  kernel.mc         — kernel_init: subsystem bring-up (DTB, memory + mem syscalls, IRQ, VFS, I/O, serial, storage, scheduler, timer); init(): pid 1 entry point — opens stdin/stdout on /dev/serial, mounts /dev/sda at /, then runs console()
+  kernel.mc         — kernel_init: subsystem bring-up (kernel heap, DTB, memory + mem syscalls, IRQ, VFS, I/O, serial, storage, scheduler, timer); init(): pid 1 entry point — opens stdin/stdout on /dev/serial, mounts /dev/sda at /, then runs console()
   console.mc        — console()/console_parse_command(): interactive terminal loop with cwd-aware prompt and argc/argv tokenization (quoted strings, backslash escapes), fork-per-command dispatch (cd dispatched directly); built-ins: cd, ls, mount, help; any other name is fork+execat'd as an ELF program from the `dirs` search path (try_run); line input via libmc/std readline
   start.S           — AArch64 boot stub, saves DTB pointer, zeros BSS
   vectors.S         — exception vector table, save/restore_context macros
@@ -291,7 +292,7 @@ src/                — entry points (assembly stubs + top-level mc)
 kernel/             — mc kernel modules (logic + @extern bindings to the C below)
   cpu.mc            — cpu_context, SPSR/CNTP_CTL defines; inline-@asm impls of wfe/wfi, halt/hang, irq_enable/disable, timer registers, set_vbar_el1, bswap; be*/le* helpers
   syscall.mc        — svc #0 dispatch table (generic set): syscall_init/register/unregister_handler, syscall_handler, syscall::* numbers
-  dtb.mc            — @extern bindings to the C DTB parser: dtb_init/dump/find_prop, *_irq_number lookups, fdt_header/memreg/fdt_prop structs
+  dtb.mc            — device-tree access layer over utils/fdt: dtb_init (parse + build tree), dtb_dump, dtb_find_irq_number (SPI/PPI → absolute GIC ID) and dtb_find_memory_register (RAM base/size), keyed by full node path; irq_prop/reg_prop structs
   pointer.mc        — generic refcounted pointer<T>: create_pointer/pointer_acquire/pointer_release
   process.mc        — process struct (cwd + refcounted fd table), create/duplicate/set_entry/destroy_process, process_open/close/read/write_file, process_file_stat/stat/get_cwd; bottom-of-stack canary (process_check_stack)
   scheduler.mc      — full scheduler: idle ctx+stack, ready/wait/sleep queues, scheduler_init/enqueue/dequeue/spawn/handler, notify_sleepers/waiters, all syscall handlers, scheduler_get/set_current_process
@@ -299,7 +300,7 @@ kernel/             — mc kernel modules (logic + @extern bindings to the C bel
   debug.mc          — printk (always on) / dprintk (DEBUG-gated via @if), thin wrappers over pl011_vprintf
   utf16.mc          — utf16lencpy/utf16bencpy bindings
   heap.mc           — free-list heap allocator: heap_init/heap_acquire/heap_release/heap_resize over a struct heap, with block splitting and adjacent-free coalescing; heap_check integrity validator (DEBUG-gated)
-  mm.mc             — kernel memory management: 16 MiB static kernel heap + 16 MiB stack pool, mem_init (heap/pool init + reads RAM base/size from the DTB at boot), kmalloc/kfree/krealloc(_aligned)/kmalloc_aligned + typed kalloc<T>/knew<T>/kalloc_aligned<T>/kresize<T>/kdealloc<T> generics, stack_alloc/stack_free, and the acqmem/rszmem/relmem syscall handlers (register_mem_syscalls)
+  mm.mc             — kernel memory management: 16 MiB static kernel heap + 16 MiB stack pool, kheap_init (kernel heap, run before the DTB parse) and mem_init (stack pool + reads RAM base/size from the DTB at boot), kmalloc/kfree/krealloc(_aligned)/kmalloc_aligned + typed kalloc<T>/knew<T>/kalloc_aligned<T>/kresize<T>/kdealloc<T> generics, stack_alloc/stack_free, and the acqmem/rszmem/relmem syscall handlers (register_mem_syscalls)
   pool.mc           — intrusive free-list fixed-block pool allocator: pool_init/pool_alloc/pool_free (backs the process stack pool)
   devices/
     serial.mc       — /dev/serial driver: serial_init, serial_read (pl011_getc+wfi), serial_write (pl011_putc)
@@ -338,14 +339,17 @@ libmc/              — mcc standard library (generic, type-parametric)
     fs.mc           — shared fs types: file_stat, the dirent/dent_type directory-entry types, io_error, and the FS_FILE_ATTRS_* constants
     proc.mc         — proc_pid (pid_t) type and the exec_err result enum, shared across the kernel and the syscall ABI
 
-lib/                — C helpers bound from mc via @extern (FDT + UTF-16)
+utils/              — standalone mc utility modules (no kernel/user coupling)
+  fdt.mc            — flattened-device-tree parser: fdt_file_init/build_tree/find_node/dump_tree builds an in-memory fdt_tree_node/fdt_tree_prop tree from a raw DTB; fdt_tree_node_find_prop/find_child for lookups
+  endian.mc         — be16/32/64 + le16/32/64 byte-order helpers
+  bswap.mc          — bswap16/32/64 byte-swap primitives
+  align.mc          — aligned() alignment helpers
+
+lib/                — C helpers bound from mc via @extern (UTF-16)
   include/
-    arch/cpu.h      — bswap16/32/64 + be*/le* endian macros (used by lib/src/dtb.c) and halt/hang declarations; register-accessor/halt/hang/wfe/wfi impls are in kernel/cpu.mc
-    arch/irq.h      — vestigial: cpu_context/irq_handler_t typedefs, no remaining C caller (impl in kernel/interrupts/irq.mc)
-    drivers/virtio_mmio.h — register/virtq structs used by lib/src/dtb.c for slot discovery; the driver impl is in kernel/interrupts/drivers/virtio_mmio.mc
-    dtb.h, utf16.h, ascii.h, debug.h — prototypes for the C sources / kernel-ported equivalents
+    arch/cpu.h      — bswap16/32/64 + be*/le* endian macros and halt/hang declarations; register-accessor/halt/hang/wfe/wfi impls are in kernel/cpu.mc
+    utf16.h         — prototype for utf16.c
   src/
-    dtb.c           — FDT parser (node/property walker); IRQ number lookup for timer, RTC, and virtio MMIO slots
     utf16.c         — UTF-16 copy helpers used by the FAT32 long-name path
 
 libc/               — freestanding C standard library

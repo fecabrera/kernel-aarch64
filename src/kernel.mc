@@ -18,9 +18,11 @@ import "system/syscall";
 import "console";
 
 fn kernel_init() {
+    // Initialize kernel heap
+    kheap_init();
+    
     // Initialize DTB
     dtb_init();
-    dtb_dump();
 
     // Initialize memory
     mem_init();

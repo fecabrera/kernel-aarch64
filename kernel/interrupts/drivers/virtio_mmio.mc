@@ -3,6 +3,7 @@ import "cpu";
 import "dtb";
 import "memory";
 import "range";
+import "libc/stdio";
 import "interrupts/irq";
 import "interrupts/gic";
 
@@ -90,12 +91,15 @@ const VIRTQ_DESC_F_INDIRECT = (1 << 2); // buffer contains a table of descriptor
 
 // Probing errors
 
-const VIRTIO_MMIO_BAD_MAGIC = -1;
-const VIRTIO_MMIO_UNSUPPORTED_VERSION = -2;
-const VIRTIO_MMIO_INVALID_DEVICE = -3;
-const VIRTIO_MMIO_NEGOTIATION_FAILED = -4;
-const VIRTIO_MMIO_QUEUE_NUM_ERROR = -5;
-const VIRTIO_MMIO_IRQ_NOT_FOUND = -6;
+enum virtio_mmio_status: int32 {
+    SUCCESS             = 0,
+    BAD_MAGIC           = -1,
+    UNSUPPORTED_VERSION = -2,
+    INVALID_DEVICE      = -3,
+    NEGOTIATION_FAILED  = -4,
+    QUEUE_NUM_ERROR     = -5,
+    IRQ_NOT_FOUND       = -6,
+}
 
 // ── Register accessors ───────────────────────────────────────────────────────
 @volatile
@@ -198,8 +202,22 @@ fn virtio_mmio_init() {
     }
 }
 
+/**
+ * Probes and initializes the virtio MMIO device in a single slot following the modern (v2)
+ * handshake: validates magic/version/device ID, walks the ACKNOWLEDGE → DRIVER → FEATURES_OK status
+ * sequence (negotiating VERSION_1 plus the block size/max features), sets up the slot's 64-entry
+ * virtqueue (writing the desc/avail/used ring physical addresses and marking it ready), then looks
+ * up the device's IRQ from the DTB (`/virtio_mmio@<addr>`), registers virtio_mmio_irq_handler with
+ * the GIC, and records the device in _devices[slot]. Called for every slot by virtio_mmio_init.
+ *
+ * @param slot: virtio MMIO slot index to probe
+ *
+ * @return 0 on success, or a negative VIRTIO_MMIO_* error code: BAD_MAGIC, UNSUPPORTED_VERSION,
+ *         INVALID_DEVICE (empty slot), NEGOTIATION_FAILED, QUEUE_NUM_ERROR (device's max queue size
+ *         is below DEFAULT_VIRTIO_QUEUE_NUM), or IRQ_NOT_FOUND.
+ */
 @private
-fn virtio_mmio_probe_device(slot: int8) -> int32 {
+fn virtio_mmio_probe_device(slot: int8) -> virtio_mmio_status {
     let device = &_devices[slot];
     let virtio = virtio_mmio_reg(slot);
 
@@ -209,15 +227,15 @@ fn virtio_mmio_probe_device(slot: int8) -> int32 {
 
     // parse magic
     if (magic != VIRTIO_MMIO_MAGIC)
-        return VIRTIO_MMIO_BAD_MAGIC;
+        return virtio_mmio_status::BAD_MAGIC;
 
     // parse version
     if (version != VIRTIO_MMIO_VERSION_MODERN)
-        return VIRTIO_MMIO_UNSUPPORTED_VERSION;
+        return virtio_mmio_status::UNSUPPORTED_VERSION;
 
     // parse device ID
     if (device_id == VIRTIO_DEVICE_ID_INVALID)
-        return VIRTIO_MMIO_INVALID_DEVICE;
+        return virtio_mmio_status::INVALID_DEVICE;
 
     dprintk("[virtio_mmio@%lx] magic = 0x%x, version = %i, device_id = %i\n",
             virtio, magic, version, virtio->device_id);
@@ -251,7 +269,7 @@ fn virtio_mmio_probe_device(slot: int8) -> int32 {
         dprintk("[virtio_mmio@%lx] features rejected\n", virtio);
         virtio->status = virtio->status | VIRTIO_STATUS_FAILED;
 
-        return VIRTIO_MMIO_NEGOTIATION_FAILED; // negotiation failed
+        return virtio_mmio_status::NEGOTIATION_FAILED; // negotiation failed
     }
 
     // negotiation accepted
@@ -266,7 +284,7 @@ fn virtio_mmio_probe_device(slot: int8) -> int32 {
     if (virtio_queue_num_max < DEFAULT_VIRTIO_QUEUE_NUM) {
         dprintk("[virtio_mmio@%lx] device doesn't support queue_num=%i\n",
                 virtio, DEFAULT_VIRTIO_QUEUE_NUM);
-        return VIRTIO_MMIO_QUEUE_NUM_ERROR;
+        return virtio_mmio_status::QUEUE_NUM_ERROR;
     }
 
     virtio->queue_num = DEFAULT_VIRTIO_QUEUE_NUM;
@@ -286,16 +304,20 @@ fn virtio_mmio_probe_device(slot: int8) -> int32 {
     // Mark the queue live
     virtio->queue_ready = 1;
 
+    // build prop name
+    let prop_name: char[50];
+    sprintf(prop_name, "/virtio_mmio@%lx", virtio_mmio_addr(slot));
+
     // initialize IRQ
     let virtio_mmio_irq: uint32;
-    if (dtb_get_virtio_mmio_irq_number(slot as int32, &virtio_mmio_irq) != 0) {
-        dprintk("[virtio_mmio] IRQ not found!!\n");
-        return VIRTIO_MMIO_IRQ_NOT_FOUND;
+    if (!dtb_find_irq_number(prop_name, "interrupts", 0, &virtio_mmio_irq)) {
+        dprintk("[virtio_mmio] IRQ not found\n");
+        return virtio_mmio_status::IRQ_NOT_FOUND;
     }
 
     _irq_to_slot[virtio_mmio_irq] = slot;
 
-    dprintk("[virtio_mmio@%lx] Initializing IRQ: %i\n", virtio, virtio_mmio_irq);
+    dprintk("[virtio_mmio@%lx] registering IRQ %i\n", virtio, virtio_mmio_irq);
     irq_register_handler(virtio_mmio_irq, virtio_mmio_irq_handler);
     gic_enable_irq(virtio_mmio_irq);
 
@@ -303,7 +325,7 @@ fn virtio_mmio_probe_device(slot: int8) -> int32 {
     device->irq_id = virtio_mmio_irq;
     device->device_id = device_id;
 
-    return 0;
+    return virtio_mmio_status::SUCCESS;
 }
 
 /**
@@ -337,7 +359,7 @@ fn virtio_mmio_find_next_slot(device_id: uint32, start: int8) -> int8 {
  *
  * @return the number of bytes read (VIRTIO_MMIO_BLK_SECTOR_SIZE) on success; the
  *         negated device status (-VIRTIO_BLK_S_IOERR / -VIRTIO_BLK_S_UNSUPP) on a
- *         device error, or VIRTIO_MMIO_INVALID_DEVICE if the slot has no
+ *         device error, or NVALID_DEVICE if the slot has no
  *         initialized device
  */
 fn virtio_mmio_read(slot: int8, sector_number: uint64, data: byte*) -> int64 {
@@ -345,7 +367,7 @@ fn virtio_mmio_read(slot: int8, sector_number: uint64, data: byte*) -> int64 {
 
     if (device->device_id == VIRTIO_DEVICE_ID_INVALID) {
         dprintk("[virtio_mmio] Device slot %i is invalid!\n", slot);
-        return VIRTIO_MMIO_INVALID_DEVICE;
+        return virtio_mmio_status::INVALID_DEVICE as int64;
     }
 
     // 1. Fill the header
@@ -424,10 +446,25 @@ fn virtio_mmio_irq_handler(irq: uint32, ctx: struct cpu_context*) -> struct cpu_
     return fnc(slot, ctx);
 }
 
+/**
+ * Computes the MMIO base address of a virtio slot: VIRTIO_MMIO_BASE + slot * VIRTIO_MMIO_STRIDE.
+ *
+ * @param slot: virtio MMIO slot index
+ *
+ * @return the physical base address of that slot's register block.
+ */
 @private @inline fn virtio_mmio_addr(slot: int8) -> uint64 {
     return VIRTIO_MMIO_BASE + (slot as uint64 * VIRTIO_MMIO_STRIDE);
 }
 
+/**
+ * Returns a typed register-block pointer for a virtio slot (virtio_mmio_addr cast to
+ * virtio_mmio_regs*), for accessing the slot's registers directly.
+ *
+ * @param slot: virtio MMIO slot index
+ *
+ * @return pointer to the slot's virtio_mmio_regs register block.
+ */
 @private @inline fn virtio_mmio_reg(slot: int8) -> struct virtio_mmio_regs* {
     return virtio_mmio_addr(slot) as struct virtio_mmio_regs*;
 }

@@ -43,8 +43,8 @@ const RTC_INT_MATCH = (1 << 0); // Match interrupt
 fn pl031_init() {
     PL031->cr = RTC_CR_EN;
 
-    if (dtb_get_rtc_irq_number(&pl031_irq) == 0) {
-        dprintk("[pl031] Initializing IRQ: %i\n", pl031_irq);
+    if (dtb_find_irq_number("/pl031@9010000", "interrupts", 0, &pl031_irq)) {
+        dprintk("[pl031] registering IRQ %d\n", pl031_irq);
         irq_register_handler(pl031_irq, pl031_irq_handler);
         syscall_register_handler(syscall::TIME, syscall_time_handler);
     } else {

@@ -1,5 +1,6 @@
 import "debug";
 import "cpu";
+import "endian";
 import "dtb";
 import "syscall";
 import "scheduler";
@@ -43,13 +44,13 @@ fn timer_init() {
 
     // register uptime syscall
     syscall_register_handler(syscall::UPTIME, syscall_uptime_handler);
-
-    if (dtb_get_timer_irq_number(&timer_irq) == 0) {
-        dprintk("[timer] Initializing IRQ: %i\n", timer_irq);
+    
+    if (dtb_find_irq_number("/timer", "interrupts", 1, &timer_irq)) {
+        dprintk("[timer] registering IRQ %d\n", timer_irq);
         irq_register_handler(timer_irq, timer_irq_handler);
         gic_enable_irq(timer_irq);
     } else {
-        dprintk("[timer] IRQ not found!!\n");
+        dprintk("[timer] IRQ not found\n");
     }
 }
 

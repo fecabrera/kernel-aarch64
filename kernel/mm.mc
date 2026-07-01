@@ -1,5 +1,6 @@
 import "debug";
 import "dtb";
+import "endian";
 import "heap";
 import "pool";
 import "align";
@@ -13,7 +14,7 @@ const STACK_POOL_BLK_SIZE = 16 * (1 << 10); // 16 KiB stack blocks;
 const DEFAULT_STACK_BLOCK_COUNT = 1;
 const DEFAULT_STACK_SIZE = STACK_POOL_BLK_SIZE * DEFAULT_STACK_BLOCK_COUNT;
 
-@static let mem: struct memreg;
+@static let mem: reg_prop;
 
 @static let kheap_ptr: byte[KERNEL_HEAP_SIZE];
 @static let kheap: struct heap;
@@ -22,24 +23,31 @@ const DEFAULT_STACK_SIZE = STACK_POOL_BLK_SIZE * DEFAULT_STACK_BLOCK_COUNT;
 @static let stack_pool: struct pool;
 
 /**
- * Initializes the kernel heap over the static 16 MiB kheap_ptr region and the process stack pool
- * over the static 16 MiB stack_pool_ptr region (16 KiB blocks), then reads the RAM base address and
- * size from the device tree (DTB) via dtb_get_memory_register and logs them. Must be called after
- * the DTB has been parsed and before any kmalloc/kfree or stack_alloc.
+ * Initializes the kernel heap over the static 16 MiB kheap_ptr region. Must be called before any
+ * kmalloc/kfree, and before dtb_init so the device-tree parser can allocate from the heap.
  */
-fn mem_init() {
+fn kheap_init() {
     // initialize kernel heap
     heap_init(&kheap, KERNEL_HEAP_SIZE, KERNEL_MIN_BLK_SIZE, kheap_ptr);
+}
 
+/**
+ * Initializes the process stack pool over the static 16 MiB stack_pool_ptr region (16 KiB blocks),
+ * then reads the RAM base address and size from the device tree (DTB) via dtb_find_memory_register
+ * and logs them. Must be called after kheap_init and after the DTB has been parsed, and before any
+ * stack_alloc.
+ */
+fn mem_init() {
     // initialize stack pool
     pool_init(&stack_pool, stack_pool_ptr as uint64, STACK_POOL_SIZE,
               STACK_POOL_BLK_SIZE);
     pool_dump(&stack_pool);
-    
-    if (dtb_get_memory_register(&mem) == 0)
-        dprintk("[mem] base: %p, size=%i MiB\n", mem.base, mem.size / (1 << 20));
-    else
-        dprintk("[mem] Memory register not found!");
+
+    if (dtb_find_memory_register("/memory@40000000", "reg", &mem)) {
+        dprintk("[mm] base=0x%p, size=%llu MiB\n", mem.base, mem.size / (1 << 20));
+    } else {
+        dprintk("[mm] memory register not found");
+    }
 }
 
 /**
