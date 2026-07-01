@@ -6,7 +6,7 @@ import "range";
 
 // E_IDENT
 
-const EI_MAGIC: uint32 = 0x7F454C46; // [0x7F, 'E', 'F', 'I']
+const EI_MAGIC: uint32 = 0x7F454C46; // [0x7F, 'E', 'L', 'F']
 
 enum elf_ei_class: byte {
     ELFCLASSNONE = 0x00,
